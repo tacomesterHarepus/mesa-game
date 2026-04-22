@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { ensureSession } from "@/lib/supabase/anon";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -19,8 +18,7 @@ export function CreateGameForm() {
     setLoading(true);
 
     try {
-      const userId = await ensureSession();
-      const supabase = createClient();
+      const { userId, supabase } = await ensureSession();
 
       const { data: game, error: gameError } = await supabase
         .from("games")
