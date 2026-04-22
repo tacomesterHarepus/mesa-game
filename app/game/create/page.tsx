@@ -1,15 +1,6 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { CreateGameForm } from "./CreateGameForm";
 
-export default async function CreateGamePage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
+export default function CreateGamePage() {
   return (
     <div className="min-h-screen bg-deep flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
@@ -22,7 +13,7 @@ export default async function CreateGamePage() {
           </p>
         </div>
         <div className="bg-surface border border-border rounded-lg p-6">
-          <CreateGameForm userId={user.id} />
+          <CreateGameForm />
         </div>
       </div>
     </div>

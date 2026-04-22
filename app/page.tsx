@@ -1,16 +1,7 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/Button";
 
-export default async function Home() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
+export default function Home() {
   return (
     <div className="min-h-screen bg-deep flex items-center justify-center p-4">
       <div className="w-full max-w-sm text-center">
@@ -23,7 +14,9 @@ export default async function Home() {
         <Link href="/game/create" className="block">
           <Button className="w-full">New Game</Button>
         </Link>
-        <p className="mt-8 text-faint text-xs font-mono">{user.email}</p>
+        <p className="mt-5 text-faint text-xs font-mono leading-relaxed">
+          To join or watch, use the link your host shared.
+        </p>
       </div>
     </div>
   );

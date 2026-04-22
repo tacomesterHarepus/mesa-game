@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { ensureSession } from "@/lib/supabase/anon";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
-export function CreateGameForm({ userId }: { userId: string }) {
+export function CreateGameForm() {
   const router = useRouter();
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,33 +18,39 @@ export function CreateGameForm({ userId }: { userId: string }) {
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
+    try {
+      const userId = await ensureSession();
+      const supabase = createClient();
 
-    const { data: game, error: gameError } = await supabase
-      .from("games")
-      .insert({ host_user_id: userId })
-      .select()
-      .single();
+      const { data: game, error: gameError } = await supabase
+        .from("games")
+        .insert({ host_user_id: userId })
+        .select()
+        .single();
 
-    if (gameError || !game) {
-      setError(gameError?.message ?? "Failed to create game");
+      if (gameError || !game) {
+        setError(gameError?.message ?? "Failed to create game");
+        setLoading(false);
+        return;
+      }
+
+      const { error: playerError } = await supabase.from("players").insert({
+        game_id: game.id,
+        user_id: userId,
+        display_name: displayName.trim(),
+      });
+
+      if (playerError) {
+        setError(playerError.message);
+        setLoading(false);
+        return;
+      }
+
+      router.push(`/game/${game.id}/lobby`);
+    } catch {
+      setError("Failed to create session. Please try again.");
       setLoading(false);
-      return;
     }
-
-    const { error: playerError } = await supabase.from("players").insert({
-      game_id: game.id,
-      user_id: userId,
-      display_name: displayName.trim(),
-    });
-
-    if (playerError) {
-      setError(playerError.message);
-      setLoading(false);
-      return;
-    }
-
-    router.push(`/game/${game.id}/lobby`);
   }
 
   return (

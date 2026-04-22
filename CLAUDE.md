@@ -176,6 +176,48 @@ Timer check always takes priority over Progress check.
 
 ---
 
+## Design Decisions
+
+### Player Identity
+
+- Players enter a display name when joining a game — **no account required** for now.
+- Keep joining as frictionless as possible for early playtesting.
+- Implementation: Supabase anonymous auth (generates a real `user_id` without signup). The current email/password auth pages are a placeholder; they will be replaced with anonymous sessions before public playtesting.
+- Persistent accounts, usernames, and profiles will be added later when ranked play is introduced.
+
+### Spectators
+
+- Spectators join via the same invite link — they choose "Watch" instead of a display name.
+- Stored in a separate `spectators` table (not `players`), so game logic is never contaminated with non-players.
+- Spectators can see: main board, mission progress, game log, public chat, each AI's CPU/RAM stats.
+- Spectators cannot see: any player's hand, AI alignment roles (until game ends), misaligned AI private chat, virus pool card identities.
+- Spectator count is visible to all players (e.g. "3 watching").
+- RLS implication: a helper `is_spectator_in_game(gid)` function gates spectator read access alongside `is_player_in_game`.
+
+### End Game Screen (`/game/[gameId]/end`)
+
+- **Role reveal**: all AI alignments revealed dramatically (animated if possible).
+- **Per-player post-game summary** (displayed as a table):
+  - Total Compute / Data / Validation contributed across all missions
+  - Total virus cards generated (placed into pool)
+  - Missions they individually completed (played the final contributing card)
+  - Cards sacrificed to dilute the virus pool (Progress cards placed as virus filler)
+- **Game timeline**: key moments from `game_log`, e.g. `Round 3 — Cascading Failure pushed Timer to 6`.
+- **Winner announcement**: visually distinct — Human+Aligned win vs Misaligned win have different colour schemes and copy.
+- Stats are derived from `mission_contributions`, `pending_viruses`, and `game_log` — no extra tables needed, but logging must be thorough throughout.
+
+### Rematch
+
+- After the end screen the host sees a **Rematch** button.
+- Clicking creates a new game with all the same players joined automatically (same display names).
+- Roles are reshuffled randomly in the new game — same distribution for the player count.
+- All players receive an in-app notification (realtime broadcast on the old game's channel) with a one-click "Rejoin" link to the new lobby.
+- The new game stores `previous_game_id` (references the old game) for stats continuity.
+- Same game settings carry over (player count, nothing else configurable yet).
+- Schema: `games.previous_game_id uuid REFERENCES games` (nullable).
+
+---
+
 ## Clarifying Questions — Confirmed Answers
 
 **Q1. Initial turn order for the first mission?**

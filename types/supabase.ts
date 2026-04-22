@@ -17,6 +17,7 @@ export type Database = {
           targeting_deadline: string | null
           winner: "humans" | "misaligned" | null
           host_user_id: string
+          previous_game_id: string | null
           created_at: string
         }
         Insert: {
@@ -32,6 +33,7 @@ export type Database = {
           targeting_deadline?: string | null
           winner?: "humans" | "misaligned" | null
           host_user_id: string
+          previous_game_id?: string | null
           created_at?: string
         }
         Update: Partial<Database["public"]["Tables"]["games"]["Row"]>
@@ -63,6 +65,24 @@ export type Database = {
           has_revealed_card?: boolean
         }
         Update: Partial<Database["public"]["Tables"]["players"]["Row"]>
+        Relationships: []
+      }
+      spectators: {
+        Row: {
+          id: string
+          game_id: string
+          user_id: string
+          display_name: string | null
+          joined_at: string
+        }
+        Insert: {
+          id?: string
+          game_id: string
+          user_id: string
+          display_name?: string | null
+          joined_at?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["spectators"]["Row"]>
         Relationships: []
       }
       deck_cards: {
@@ -277,6 +297,10 @@ export type Database = {
         Returns: boolean
       }
       is_misaligned_in_game: {
+        Args: { gid: string }
+        Returns: boolean
+      }
+      is_spectator_in_game: {
         Args: { gid: string }
         Returns: boolean
       }

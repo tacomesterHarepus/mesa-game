@@ -1,4 +1,4 @@
-import { redirect, notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LobbyPhase } from "@/components/game/phases/LobbyPhase";
 
@@ -12,7 +12,8 @@ export default async function LobbyPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  // Any anonymous or authenticated visitor can view a lobby-phase game.
+  // The client handles anonymous sign-in before join/watch actions.
 
   const { data: game } = await supabase
     .from("games")
@@ -23,22 +24,38 @@ export default async function LobbyPage({
   if (!game) notFound();
   if (game.phase !== "lobby") redirect(`/game/${params.gameId}`);
 
-  // Returns [] for non-players (RLS filters all rows) — they'll see the join form.
+  const userId = user?.id ?? null;
+
+  // Returns [] when unauthenticated (RLS). Client fetches after signing in.
   const { data: players } = await supabase
     .from("players")
     .select("*")
     .eq("game_id", params.gameId);
 
-  const currentPlayer =
-    players?.find((p) => p.user_id === user.id) ?? null;
+  // Returns [] when not a player or spectator (RLS).
+  const { data: spectators } = await supabase
+    .from("spectators")
+    .select("*")
+    .eq("game_id", params.gameId);
+
+  const currentPlayer = userId
+    ? (players?.find((p) => p.user_id === userId) ?? null)
+    : null;
+
+  const isSpectating = userId
+    ? (spectators?.some((s) => s.user_id === userId) ?? false)
+    : false;
 
   return (
     <LobbyPhase
       gameId={params.gameId}
-      userId={user.id}
-      isHost={game.host_user_id === user.id}
+      hostUserId={game.host_user_id}
+      userId={userId}
+      isHost={userId !== null && game.host_user_id === userId}
       initialPlayers={players ?? []}
       currentPlayer={currentPlayer}
+      initialSpectators={spectators ?? []}
+      initialIsSpectating={isSpectating}
     />
   );
 }

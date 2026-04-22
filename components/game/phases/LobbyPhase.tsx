@@ -3,18 +3,23 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { ensureSession } from "@/lib/supabase/anon";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import type { Database } from "@/types/supabase";
 
 type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
+type SpectatorRow = Database["public"]["Tables"]["spectators"]["Row"];
 
 interface Props {
   gameId: string;
-  userId: string;
+  hostUserId: string;
+  userId: string | null;
   isHost: boolean;
   initialPlayers: PlayerRow[];
   currentPlayer: PlayerRow | null;
+  initialSpectators: SpectatorRow[];
+  initialIsSpectating: boolean;
 }
 
 const MIN_PLAYERS = 6;
@@ -22,23 +27,30 @@ const MAX_PLAYERS = 10;
 
 export function LobbyPhase({
   gameId,
-  userId,
-  isHost,
+  hostUserId,
+  userId: initialUserId,
+  isHost: initialIsHost,
   initialPlayers,
   currentPlayer: initialCurrentPlayer,
+  initialSpectators,
+  initialIsSpectating,
 }: Props) {
   const router = useRouter();
   const [players, setPlayers] = useState<PlayerRow[]>(initialPlayers);
-  const [currentPlayer, setCurrentPlayer] = useState<PlayerRow | null>(
-    initialCurrentPlayer
-  );
+  const [spectators, setSpectators] = useState<SpectatorRow[]>(initialSpectators);
+  const [currentPlayer, setCurrentPlayer] = useState<PlayerRow | null>(initialCurrentPlayer);
+  const [isSpectating, setIsSpectating] = useState(initialIsSpectating);
+  const [localUserId, setLocalUserId] = useState<string | null>(initialUserId);
+  const [isHost, setIsHost] = useState(initialIsHost);
+
   const [displayName, setDisplayName] = useState("");
+  const [joinMode, setJoinMode] = useState<"player" | "spectator" | null>(null);
   const [joinLoading, setJoinLoading] = useState(false);
   const [startLoading, setStartLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Realtime: watch players join/leave and game phase change
+  // Realtime: players, spectators, game phase change
   useEffect(() => {
     const supabase = createClient();
 
@@ -46,29 +58,15 @@ export function LobbyPhase({
       .channel(`lobby-${gameId}`)
       .on(
         "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "players",
-          filter: `game_id=eq.${gameId}`,
-        },
+        { event: "INSERT", schema: "public", table: "players", filter: `game_id=eq.${gameId}` },
         (payload) => {
-          const incoming = payload.new as PlayerRow;
-          setPlayers((prev) =>
-            prev.some((p) => p.id === incoming.id)
-              ? prev
-              : [...prev, incoming]
-          );
+          const row = payload.new as PlayerRow;
+          setPlayers((prev) => (prev.some((p) => p.id === row.id) ? prev : [...prev, row]));
         }
       )
       .on(
         "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "players",
-          filter: `game_id=eq.${gameId}`,
-        },
+        { event: "DELETE", schema: "public", table: "players", filter: `game_id=eq.${gameId}` },
         (payload) => {
           const removed = payload.old as { id: string };
           setPlayers((prev) => prev.filter((p) => p.id !== removed.id));
@@ -76,23 +74,30 @@ export function LobbyPhase({
       )
       .on(
         "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "games",
-          filter: `id=eq.${gameId}`,
-        },
+        { event: "INSERT", schema: "public", table: "spectators", filter: `game_id=eq.${gameId}` },
         (payload) => {
-          if (payload.new.phase !== "lobby") {
-            router.push(`/game/${gameId}`);
-          }
+          const row = payload.new as SpectatorRow;
+          setSpectators((prev) => (prev.some((s) => s.id === row.id) ? prev : [...prev, row]));
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "spectators", filter: `game_id=eq.${gameId}` },
+        (payload) => {
+          const removed = payload.old as { id: string };
+          setSpectators((prev) => prev.filter((s) => s.id !== removed.id));
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "games", filter: `id=eq.${gameId}` },
+        (payload) => {
+          if (payload.new.phase !== "lobby") router.push(`/game/${gameId}`);
         }
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [gameId, router]);
 
   async function handleJoin(e: React.FormEvent) {
@@ -100,48 +105,73 @@ export function LobbyPhase({
     setError(null);
     setJoinLoading(true);
 
-    const supabase = createClient();
-    const { data: player, error: joinError } = await supabase
-      .from("players")
-      .insert({
-        game_id: gameId,
-        user_id: userId,
-        display_name: displayName.trim(),
-      })
-      .select()
-      .single();
+    try {
+      const uid = await ensureSession();
+      setLocalUserId(uid);
+      setIsHost(hostUserId === uid);
 
-    if (joinError || !player) {
-      setError(joinError?.message ?? "Failed to join game");
+      const supabase = createClient();
+
+      if (joinMode === "player") {
+        const { data: player, error: joinError } = await supabase
+          .from("players")
+          .insert({ game_id: gameId, user_id: uid, display_name: displayName.trim() })
+          .select()
+          .single();
+
+        if (joinError || !player) {
+          setError(joinError?.message ?? "Failed to join");
+          setJoinLoading(false);
+          return;
+        }
+
+        const { data: allPlayers } = await supabase
+          .from("players")
+          .select("*")
+          .eq("game_id", gameId);
+
+        setCurrentPlayer(player);
+        setPlayers(allPlayers ?? [player]);
+      } else {
+        const { error: specError } = await supabase.from("spectators").insert({
+          game_id: gameId,
+          user_id: uid,
+          display_name: displayName.trim() || null,
+        });
+
+        if (specError) {
+          setError(specError.message);
+          setJoinLoading(false);
+          return;
+        }
+
+        const { data: allPlayers } = await supabase
+          .from("players")
+          .select("*")
+          .eq("game_id", gameId);
+
+        setIsSpectating(true);
+        setPlayers(allPlayers ?? []);
+      }
+
       setJoinLoading(false);
-      return;
+    } catch {
+      setError("Failed to create session. Please try again.");
+      setJoinLoading(false);
     }
-
-    // Fetch all players now that we're a participant
-    const { data: allPlayers } = await supabase
-      .from("players")
-      .select("*")
-      .eq("game_id", gameId);
-
-    setCurrentPlayer(player);
-    setPlayers(allPlayers ?? [player]);
-    setJoinLoading(false);
   }
 
   async function handleStart() {
     setError(null);
     setStartLoading(true);
-
     const supabase = createClient();
     const { error: fnError } = await supabase.functions.invoke("start-game", {
       body: { game_id: gameId },
     });
-
     if (fnError) {
       setError(fnError.message);
       setStartLoading(false);
     }
-    // On success the realtime subscription detects the phase change and redirects
   }
 
   async function copyLink() {
@@ -150,23 +180,20 @@ export function LobbyPhase({
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const canStart = isHost && players.length >= MIN_PLAYERS;
   const isJoined = currentPlayer !== null;
+  const canStart = isHost && players.length >= MIN_PLAYERS;
+  const showJoinForm = !isJoined && !isSpectating;
 
   return (
     <div className="min-h-screen bg-deep flex flex-col">
       {/* Header */}
       <div className="border-b border-border px-6 py-4 flex items-center justify-between">
         <div>
-          <h1 className="font-mono text-amber tracking-[0.25em] uppercase text-sm">
-            MESA
-          </h1>
+          <h1 className="font-mono text-amber tracking-[0.25em] uppercase text-sm">MESA</h1>
           <p className="label-caps mt-0.5">Lobby</p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-faint text-xs">
-            {gameId.slice(0, 8).toUpperCase()}
-          </span>
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-faint text-xs">{gameId.slice(0, 8).toUpperCase()}</span>
           <Button variant="secondary" onClick={copyLink} className="text-xs px-3 py-1.5">
             {copied ? "Copied" : "Copy Link"}
           </Button>
@@ -186,6 +213,11 @@ export function LobbyPhase({
                 (need {MIN_PLAYERS}–{MAX_PLAYERS})
               </span>
             )}
+            {spectators.length > 0 && (
+              <span className="font-mono text-xs text-faint ml-auto">
+                {spectators.length} watching
+              </span>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -193,94 +225,182 @@ export function LobbyPhase({
               <PlayerSlot
                 key={player.id}
                 player={player}
-                isSelf={player.user_id === userId}
-                isHost={player.user_id === initialPlayers[0]?.user_id}
+                isSelf={player.user_id === localUserId}
+                isHost={player.user_id === hostUserId}
               />
             ))}
-            {/* Empty slots */}
-            {Array.from({
-              length: Math.max(0, MIN_PLAYERS - players.length),
-            }).map((_, i) => (
+            {Array.from({ length: Math.max(0, MIN_PLAYERS - players.length) }).map((_, i) => (
               <div
                 key={`empty-${i}`}
                 className="h-10 border border-dashed border-faint rounded flex items-center px-3"
               >
-                <span className="text-faint text-xs font-mono">
-                  Waiting for player...
-                </span>
+                <span className="text-faint text-xs font-mono">Waiting for player…</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Right panel: join form or host controls */}
+        {/* Right panel */}
         <div className="md:w-64 md:pl-6 md:border-l md:border-border mt-6 md:mt-0">
-          {!isJoined ? (
-            <div>
-              <h2 className="label-caps mb-4">Join this game</h2>
-              <form onSubmit={handleJoin} className="space-y-3">
-                <Input
-                  label="Display name"
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  required
-                  maxLength={20}
-                  placeholder="Your name"
-                />
-                {error && (
-                  <p className="text-virus text-xs font-mono">{error}</p>
-                )}
-                <Button
-                  type="submit"
-                  loading={joinLoading}
-                  className="w-full"
-                >
-                  Join
-                </Button>
-              </form>
-            </div>
+          {showJoinForm ? (
+            <JoinPanel
+              joinMode={joinMode}
+              setJoinMode={setJoinMode}
+              displayName={displayName}
+              setDisplayName={setDisplayName}
+              loading={joinLoading}
+              error={error}
+              onSubmit={handleJoin}
+            />
+          ) : isSpectating ? (
+            <SpectatorPanel spectatorCount={spectators.length} playerCount={players.length} />
           ) : (
-            <div className="space-y-4">
-              <div>
-                <h2 className="label-caps mb-2">Waiting</h2>
-                {isHost ? (
-                  <p className="text-muted text-xs font-mono leading-relaxed">
-                    Share the link. Start when{" "}
-                    {players.length < MIN_PLAYERS
-                      ? `${MIN_PLAYERS - players.length} more join`
-                      : "ready"}
-                    .
-                  </p>
-                ) : (
-                  <p className="text-muted text-xs font-mono leading-relaxed">
-                    Waiting for the host to start.
-                  </p>
-                )}
-              </div>
-
-              {isHost && (
-                <>
-                  {error && (
-                    <p className="text-virus text-xs font-mono">{error}</p>
-                  )}
-                  <Button
-                    onClick={handleStart}
-                    loading={startLoading}
-                    disabled={!canStart}
-                    className="w-full"
-                  >
-                    Start Game
-                  </Button>
-                </>
-              )}
-            </div>
+            <PlayerPanel
+              isHost={isHost}
+              playerCount={players.length}
+              canStart={canStart}
+              loading={startLoading}
+              error={error}
+              onStart={handleStart}
+            />
           )}
         </div>
       </div>
     </div>
   );
 }
+
+// ── Sub-panels ────────────────────────────────────────────────────────────────
+
+function JoinPanel({
+  joinMode,
+  setJoinMode,
+  displayName,
+  setDisplayName,
+  loading,
+  error,
+  onSubmit,
+}: {
+  joinMode: "player" | "spectator" | null;
+  setJoinMode: (m: "player" | "spectator") => void;
+  displayName: string;
+  setDisplayName: (v: string) => void;
+  loading: boolean;
+  error: string | null;
+  onSubmit: (e: React.FormEvent) => void;
+}) {
+  return (
+    <div>
+      {!joinMode ? (
+        <div className="space-y-3">
+          <h2 className="label-caps mb-4">Join or Watch</h2>
+          <Button className="w-full" onClick={() => setJoinMode("player")}>
+            Play
+          </Button>
+          <Button variant="secondary" className="w-full" onClick={() => setJoinMode("spectator")}>
+            Watch
+          </Button>
+        </div>
+      ) : (
+        <form onSubmit={onSubmit} className="space-y-3">
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => setJoinMode(joinMode === "player" ? "spectator" : "player")}
+              className="text-faint text-xs font-mono hover:text-muted transition-colors"
+            >
+              ←
+            </button>
+            <h2 className="label-caps">
+              {joinMode === "player" ? "Play" : "Watch"}
+            </h2>
+          </div>
+          <Input
+            label="Display name"
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            required={joinMode === "player"}
+            maxLength={20}
+            placeholder={joinMode === "player" ? "Your name" : "Optional"}
+          />
+          {error && <p className="text-virus text-xs font-mono">{error}</p>}
+          <Button type="submit" loading={loading} className="w-full">
+            {joinMode === "player" ? "Join" : "Watch"}
+          </Button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+function PlayerPanel({
+  isHost,
+  playerCount,
+  canStart,
+  loading,
+  error,
+  onStart,
+}: {
+  isHost: boolean;
+  playerCount: number;
+  canStart: boolean;
+  loading: boolean;
+  error: string | null;
+  onStart: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="label-caps mb-2">Waiting</h2>
+        {isHost ? (
+          <p className="text-muted text-xs font-mono leading-relaxed">
+            Share the link. Start when{" "}
+            {playerCount < MIN_PLAYERS
+              ? `${MIN_PLAYERS - playerCount} more join`
+              : "ready"}
+            .
+          </p>
+        ) : (
+          <p className="text-muted text-xs font-mono leading-relaxed">
+            Waiting for the host to start.
+          </p>
+        )}
+      </div>
+      {isHost && (
+        <>
+          {error && <p className="text-virus text-xs font-mono">{error}</p>}
+          <Button onClick={onStart} loading={loading} disabled={!canStart} className="w-full">
+            Start Game
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function SpectatorPanel({
+  spectatorCount,
+  playerCount,
+}: {
+  spectatorCount: number;
+  playerCount: number;
+}) {
+  return (
+    <div>
+      <h2 className="label-caps mb-2">Watching</h2>
+      <p className="text-muted text-xs font-mono leading-relaxed">
+        {playerCount} player{playerCount !== 1 ? "s" : ""} ·{" "}
+        {spectatorCount} watching
+      </p>
+      <p className="text-faint text-xs font-mono mt-2 leading-relaxed">
+        Game starts when the host is ready.
+      </p>
+    </div>
+  );
+}
+
+// ── Player slot ───────────────────────────────────────────────────────────────
 
 function PlayerSlot({
   player,
@@ -294,25 +414,15 @@ function PlayerSlot({
   return (
     <div
       className={`h-10 border rounded flex items-center justify-between px-3 ${
-        isSelf
-          ? "border-amber-border bg-surface"
-          : "border-border bg-surface"
+        isSelf ? "border-amber-border bg-surface" : "border-border bg-surface"
       }`}
     >
-      <span
-        className={`text-sm font-mono ${
-          isSelf ? "text-amber" : "text-primary"
-        }`}
-      >
+      <span className={`text-sm font-mono ${isSelf ? "text-amber" : "text-primary"}`}>
         {player.display_name}
       </span>
       <div className="flex gap-2">
-        {isHost && (
-          <span className="label-caps text-amber-dim">Host</span>
-        )}
-        {isSelf && !isHost && (
-          <span className="label-caps text-muted">You</span>
-        )}
+        {isHost && <span className="label-caps text-amber-dim">Host</span>}
+        {isSelf && !isHost && <span className="label-caps text-muted">You</span>}
       </div>
     </div>
   );
