@@ -288,6 +288,7 @@ games (
   targeting_deadline timestamptz, -- set when secret_targeting phase begins (1 min timer)
   winner text,                    -- null | humans | misaligned
   host_user_id uuid,
+  previous_game_id uuid REFERENCES games,  -- set on rematch
   created_at timestamptz
 )
 
@@ -302,6 +303,14 @@ players (
   turn_order int,
   skip_next_turn boolean DEFAULT false,  -- persists across missions until consumed
   has_revealed_card boolean DEFAULT false
+)
+
+spectators (
+  id uuid PRIMARY KEY,
+  game_id uuid REFERENCES games,
+  user_id uuid,                   -- Supabase auth user (anonymous ok)
+  display_name text,              -- optional
+  joined_at timestamptz DEFAULT now()
 )
 
 deck_cards (
@@ -564,10 +573,10 @@ mesa/
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| 1. Project setup | **NEXT UP** | Next.js + TypeScript + Supabase + GitHub + Vercel CI/CD — **blocked on Node.js and GitHub CLI install** |
-| 2. Auth + lobby | pending | |
-| 3. Database + RLS | pending | |
-| 4. Game state machine | pending | |
+| 1. Project setup | **DONE** | Next.js 14 + TypeScript strict + Supabase + GitHub + Vercel CI/CD |
+| 2. Auth + lobby | **DONE** | Anonymous auth, create game, join lobby, spectators, start-game edge function |
+| 3. Database + RLS | **DONE** | Migrations 001–003, spectators table, rematch schema, realtime publication |
+| 4. Game state machine | **NEXT UP** | Main game screen, phase routing |
 | 5. Card data layer | pending | |
 | 6. Mission flow | pending | |
 | 7. Virus system | pending | |
@@ -580,18 +589,11 @@ mesa/
 | 14. Playwright tests | pending | Written alongside each feature, not after |
 | 15. Email (Resend) | pending | |
 
-### To resume after installing Node.js and GitHub CLI
+### Supabase setup steps (manual — CLI not installed)
 
-1. Confirm tools are working: `node --version`, `gh --version`
-2. Authenticate GitHub CLI: `gh auth login`
-3. Tell Claude Code you're ready — Phase 1 begins immediately
-
-### Tools needed (run in terminal with admin rights)
-```
-winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
-winget install GitHub.cli --accept-source-agreements --accept-package-agreements
-```
-Then reopen terminal and run `gh auth login`.
+1. Run migrations 001, 002, 003 in order via Supabase Dashboard → SQL Editor
+2. Enable anonymous sign-ins: Authentication → Providers → Anonymous
+3. Deploy edge functions via Dashboard or `supabase functions deploy <name>`
 
 ---
 
