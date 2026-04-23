@@ -67,23 +67,40 @@ export function GameBoard({
 
   const gameId = game.id;
 
-  // Polling fallback: re-fetch game and players every 3s in case Realtime misses events.
+  // Polling fallback: re-fetch game, players, active_mission, and hand every 3s.
+  // Covers the cases where Realtime misses an event — without this, mission progress
+  // and hand state go permanently stale for the session.
   useEffect(() => {
     const supabase = createClient();
+    const handPlayerId = devMode ? activeDevPlayer?.id : currentPlayer?.id;
+    const handPlayerRole = devMode ? activeDevPlayer?.role : currentPlayer?.role;
 
     const poll = async () => {
       await supabase.auth.getSession();
-      const [{ data: g }, { data: p }] = await Promise.all([
+      const [{ data: g }, { data: p }, { data: m }] = await Promise.all([
         supabase.from("games").select("*").eq("id", gameId).single(),
         supabase.from("players").select("*").eq("game_id", gameId),
+        supabase.from("active_mission").select("*").eq("game_id", gameId).maybeSingle(),
       ]);
       if (g) setGame((prev) => ({ ...prev, ...g }));
       if (p && p.length > 0) setPlayers(p);
+      // m is null when there is no active mission (lobby, resource_adjustment, etc.) — that is valid
+      if (m !== undefined) setMission(m);
+
+      // Hand poll backup: avoids invisible cards when Realtime INSERT/DELETE is dropped
+      if (handPlayerId && handPlayerRole !== "human") {
+        const { data: h } = await supabase
+          .from("hands").select("*")
+          .eq("player_id", handPlayerId).eq("game_id", gameId);
+        if (h) setHand(h);
+      }
     };
 
     const id = setInterval(poll, 3000);
     return () => clearInterval(id);
-  }, [gameId]);
+  // activeDevPlayer?.id in deps ensures the interval re-creates when switching players
+  // in dev mode so the hand poll targets the newly selected bot.
+  }, [gameId, activeDevPlayer?.id, currentPlayer?.id, devMode]);
 
   // Realtime subscriptions
   useEffect(() => {
