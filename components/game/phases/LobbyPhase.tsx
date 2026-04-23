@@ -106,9 +106,11 @@ export function LobbyPhase({
     setJoinLoading(true);
 
     try {
-      const { userId: uid, supabase } = await ensureSession();
+      const uid = await ensureSession();
       setLocalUserId(uid);
       setIsHost(hostUserId === uid);
+
+      const supabase = createClient();
 
       if (joinMode === "player") {
         const { data: player, error: joinError } = await supabase
@@ -162,7 +164,7 @@ export function LobbyPhase({
   async function handleStart() {
     setError(null);
     setStartLoading(true);
-    const { supabase } = await ensureSession();
+    const supabase = createClient();
     const { error: fnError } = await supabase.functions.invoke("start-game", {
       body: { game_id: gameId },
     });

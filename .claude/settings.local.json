@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(gh --version)",
+      "Bash(gh auth *)",
+      "Bash(gh repo *)",
+      "Bash(npx create-next-app@14 . --typescript --tailwind --eslint --app --src-dir=false --import-alias=\"@/*\" --yes)",
+      "Read(//c/Users/linds/projects/**)",
+      "Bash(npx create-next-app@14 mesa-temp --typescript --tailwind --eslint --app --src-dir=false --import-alias=\"@/*\" --yes)",
+      "Bash(CI=true NEXT_TELEMETRY_DISABLED=1 npx --yes create-next-app@14 mesa-temp --typescript --tailwind --eslint --app --no-src-dir --import-alias=\"@/*\")",
+      "Bash(cp *)",
+      "Bash(cp mesa-temp/README.md mesa/)",
+      "Bash(cp mesa-temp/next-env.d.ts mesa/)",
+      "Bash(cp mesa-temp/next.config.mjs mesa/)",
+      "Bash(cp mesa-temp/package-lock.json mesa/)",
+      "Bash(cp mesa-temp/.eslintrc.json mesa/)",
+      "Bash(npm install *)",
+      "Bash(node -e \"require\\('@supabase/supabase-js'\\); console.log\\('ok'\\)\")",
+      "Bash(npx tsc *)",
+      "Bash(git init *)",
+      "Bash(git remote *)"
+    ]
+  }
+}
