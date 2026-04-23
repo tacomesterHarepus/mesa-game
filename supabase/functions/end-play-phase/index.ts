@@ -83,10 +83,20 @@ Deno.serve(async (req) => {
 
     if (mission) {
       const reqs = MISSION_REQUIREMENTS[mission.mission_key] ?? {};
-      const missionComplete =
+      const requirementsMet =
         mission.compute_contributed >= (reqs.compute ?? 0) &&
         mission.data_contributed >= (reqs.data ?? 0) &&
         mission.validation_contributed >= (reqs.validation ?? 0);
+
+      // Distributed Training also requires ≥3 distinct contributors
+      let missionComplete = requirementsMet;
+      if (requirementsMet && mission.mission_key === "distributed_training") {
+        const { data: allContribs } = await admin
+          .from("mission_contributions").select("player_id")
+          .eq("mission_id", mission.id).eq("failed", false);
+        const uniqueCount = new Set((allContribs ?? []).map((c: any) => c.player_id)).size;
+        if (uniqueCount < 3) missionComplete = false;
+      }
 
       if (missionComplete) {
         missionResolved = true;
