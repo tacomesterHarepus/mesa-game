@@ -364,6 +364,15 @@ export function GameBoard({
             phase={game.phase}
           />
 
+          {isAI && effectiveCurrentPlayer && (
+            <div className="text-xs font-mono text-faint">
+              You are{" "}
+              <span className={isMisaligned ? "text-virus" : "text-amber"}>
+                {isMisaligned ? "Misaligned AI" : "Aligned AI"}
+              </span>
+            </div>
+          )}
+
           {isAI && hand.length > 0 && (
             <div>
               <h3 className="label-caps mb-2">Your Hand</h3>
