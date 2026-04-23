@@ -62,7 +62,7 @@ function PlayerRow({
     <div
       className={`rounded px-2 py-1.5 border text-xs font-mono ${
         isActive
-          ? "border-amber-border bg-surface text-amber"
+          ? "border-amber bg-surface text-amber ring-2 ring-amber/40"
           : isSelf
           ? "border-amber-border bg-surface text-primary"
           : "border-border bg-surface text-muted"

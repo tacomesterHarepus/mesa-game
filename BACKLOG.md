@@ -6,7 +6,7 @@ Ideas and polish items that aren't blocking current phases. Add freely; prioriti
 
 ## UX Polish
 
-- **Active turn indicator** — Unclear whose turn it is in the player roster. Add a solid coloured ring/border around the active AI's player card during `player_turn` phase. *(Reported: first dev-mode playthrough)*
+- **Active turn indicator** — *(Resolved: ring-2 ring-amber/40 added to isActive branch in PlayerRoster.tsx, 2026-04-24)*
 
 - **ResourceAllocation base-stat clarity** — The allocation UI only shows the delta controls (+CPU / +RAM, starting at 0), which caused playtester to misread AI stats as 0/0. Should clearly show each AI's current CPU/RAM, plus a live preview of the post-allocation value (current + delta) as the human adjusts. *(Reported: first dev-mode playthrough)*
 
@@ -36,4 +36,4 @@ Ideas and polish items that aren't blocking current phases. Add freely; prioriti
 
 ## Future Features
 
-*(empty)*
+- **Captain role for humans** — Consider restricting human actions (resource adjustment, allocation, mission abort) to a single "captain" human rather than any human. Needs design decisions: captain selection (random/voted/rotating), mid-game reassignment, scope (which actions are captain-only vs. all-humans). Rationale: clearer decision-making, reduced coordination friction, more social-deduction-game feel. Defer until after first multi-human playtest confirms coordination is actually a problem. *(Reported: design review, not yet tested)*
