@@ -6,8 +6,10 @@ import type { Database } from "@/types/supabase";
 
 export default async function GamePage({
   params,
+  searchParams,
 }: {
   params: { gameId: string };
+  searchParams: { dev_mode?: string };
 }) {
   const supabase = createClient();
   const { gameId } = params;
@@ -18,7 +20,10 @@ export default async function GamePage({
 
   const { data: game } = await supabase.from("games").select("*").eq("id", gameId).single();
   if (!game) redirect("/");
-  if (game.phase === "lobby") redirect(`/game/${gameId}/lobby`);
+  if (game.phase === "lobby") {
+    const devSuffix = searchParams.dev_mode === "true" ? "?dev_mode=true" : "";
+    redirect(`/game/${gameId}/lobby${devSuffix}`);
+  }
 
   const { data: players } = await supabase.from("players").select("*").eq("game_id", gameId);
   const allPlayers = players ?? [];
@@ -55,6 +60,9 @@ export default async function GamePage({
     .order("created_at")
     .limit(100);
 
+  const devMode =
+    process.env.NODE_ENV !== "production" && searchParams.dev_mode === "true";
+
   return (
     <GameBoard
       initialGame={game as unknown as Game}
@@ -64,6 +72,7 @@ export default async function GamePage({
       initialMission={mission}
       initialLog={logEntries ?? []}
       userId={user?.id ?? null}
+      devMode={devMode}
     />
   );
 }

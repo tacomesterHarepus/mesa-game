@@ -8,12 +8,14 @@ const corsHeaders = {
 
 // AI player reveals one card from their hand (kept in hand; just a public record).
 // When all AIs have revealed, advances to resource_allocation.
-// Body: { game_id, card_key }
+// Body: { game_id, card_key, override_player_id?: string }
+// override_player_id is only honoured in non-production environments when the
+// caller owns every player in the game (dev mode single-user testing).
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { game_id, card_key } = await req.json();
+    const { game_id, card_key, override_player_id } = await req.json();
     if (!game_id || !card_key) throw new Error("game_id and card_key required");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -34,14 +36,8 @@ Deno.serve(async (req) => {
     if (!game) throw new Error("Game not found");
     if (game.phase !== "card_reveal") throw new Error("Not in card_reveal phase");
 
-    // Verify caller is an AI player in this game
-    const { data: callerPlayer } = await admin
-      .from("players")
-      .select("*")
-      .eq("game_id", game_id)
-      .eq("user_id", userId)
-      .single();
-    if (!callerPlayer || callerPlayer.role === "human") throw new Error("Only AI players may reveal cards");
+    const callerPlayer = await resolvePlayer(admin, game_id, userId, override_player_id);
+    if (callerPlayer.role === "human") throw new Error("Only AI players may reveal cards");
     if (callerPlayer.has_revealed_card) throw new Error("Already revealed a card this phase");
 
     // Verify the card is in the player's hand (player may have duplicates, so limit 1)
@@ -96,3 +92,31 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+async function resolvePlayer(
+  admin: ReturnType<typeof createClient>,
+  game_id: string,
+  userId: string,
+  override_player_id?: string,
+): Promise<any> {
+  if (override_player_id && Deno.env.get("MESA_ENVIRONMENT") !== "production") {
+    const { count } = await admin
+      .from("players")
+      .select("id", { count: "exact", head: true })
+      .eq("game_id", game_id)
+      .neq("user_id", userId);
+    if ((count ?? 1) !== 0) throw new Error("Dev override denied");
+
+    const { data } = await admin
+      .from("players").select("*")
+      .eq("id", override_player_id).eq("game_id", game_id).single();
+    if (!data) throw new Error("Override player not found in game");
+    return data;
+  }
+
+  const { data } = await admin
+    .from("players").select("*")
+    .eq("game_id", game_id).eq("user_id", userId).single();
+  if (!data) throw new Error("Player not found");
+  return data;
+}

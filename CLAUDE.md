@@ -4,6 +4,10 @@
 
 **At the start of every session, read `SESSION_NOTES.md` first.** It contains the current blocker, next actions, and context from the previous session. Update it at the end of each session before closing.
 
+## Planning Protocol
+
+When the user asks a question during a planning or design phase, respond with analysis only. Do not begin implementation until the user explicitly says "approved" or "go."
+
 ## What is MESA?
 
 MESA is a 6–10 player social deduction + cooperative board game built as a web app.
@@ -78,7 +82,7 @@ Human identity is public. AI alignment (Aligned vs Misaligned) is secret and mus
 ## AI Stats
 
 - **RAM** = max hand size (starting: 4, range: 3–7)
-- **CPU** = max cards playable per turn; ≥2 triggers virus generation (starting: 2, range: 1–4)
+- **CPU** = max cards playable per turn; ≥2 triggers virus generation (starting: 1, range: 1–4)
 
 Between missions: Humans may reduce any AI's CPU/RAM (down to minimums).
 During resource allocation: Humans may only *add* CPU/RAM from the mission's pool.
@@ -115,11 +119,13 @@ Normally stays at 4 face-down cards from the main deck.
 
 ## Mission Phase (before each mission)
 
-1. **Resource adjustment** — Humans freely reduce any AI's CPU/RAM (down to minimums). AIs cannot speak.
-2. **Mission selection** — Draw 3 Mission cards. Humans pick 1. AIs cannot speak.
-3. **Card reveal** — Each AI reveals 1 card of their choice face-up from their hand (kept in hand after). AIs cannot speak.
-4. **Resource allocation** — Humans distribute the mission's bonus CPU/RAM pool among AIs as they choose. AIs cannot speak.
-5. AI chat unlocks. Mission begins.
+> **Mission 1 only:** Skip straight to Mission Selection — Resource Adjustment does not occur before the first mission.
+
+1. **Resource adjustment** — Humans freely reduce any AI's CPU/RAM (down to minimums). Humans can post in public chat; AIs can read but not post.
+2. **Mission selection** — Draw 3 Mission cards. Humans pick 1. Humans can post in public chat; AIs can read but not post.
+3. **Card reveal** — Each AI reveals 1 card of their choice face-up from their hand (kept in hand after). Humans can post in public chat; AIs can read but not post.
+4. **Resource allocation** — Humans distribute the mission's bonus CPU/RAM pool among AIs as they choose. Humans can post in public chat; AIs can read but not post.
+5. AI chat opens. Mission begins.
 
 ---
 
@@ -302,7 +308,7 @@ players (
   user_id uuid,                   -- Supabase auth user
   display_name text,
   role text,                      -- human | aligned_ai | misaligned_ai
-  cpu int DEFAULT 2,
+  cpu int DEFAULT 1,
   ram int DEFAULT 4,
   turn_order int,
   skip_next_turn boolean DEFAULT false,  -- persists across missions until consumed
@@ -429,16 +435,18 @@ chat_messages (
 LOBBY
   → [host starts game]
   → role assignment (instant: deals roles, initialises deck, sets random turn_order)
+  → Mission 1: skip RESOURCE_ADJUSTMENT → go directly to MISSION_SELECTION
+  → Mission 2+: full sequence below applies
 
-RESOURCE_ADJUSTMENT  (AI chat locked)
+RESOURCE_ADJUSTMENT  (AI posting locked; humans can post freely)
   → [humans confirm ready]
-MISSION_SELECTION  (AI chat locked)
+MISSION_SELECTION  (AI posting locked; humans can post freely)
   → [humans pick 1 of 3 mission cards]
-CARD_REVEAL  (AI chat locked)
+CARD_REVEAL  (AI posting locked; humans can post freely)
   → [all AIs have revealed 1 card]
-RESOURCE_ALLOCATION  (AI chat locked)
+RESOURCE_ALLOCATION  (AI posting locked; humans can post freely)
   → [humans submit CPU/RAM distribution]
-  → AI chat unlocked
+  → AI chat opens
 
 PLAYER_TURN  (active AI acts)
   sub-steps (enforced by edge functions):
@@ -467,7 +475,7 @@ MISSION_RESOLUTION
   → apply success reward or fail penalty
   → check win conditions
   → if game over → GAME_OVER
-  → else → RESOURCE_ADJUSTMENT (loop)
+  → else → RESOURCE_ADJUSTMENT (missions 2+ always go through full sequence)
 
 GAME_OVER
   → reveal all roles

@@ -4,8 +4,10 @@ import { LobbyPhase } from "@/components/game/phases/LobbyPhase";
 
 export default async function LobbyPage({
   params,
+  searchParams,
 }: {
   params: { gameId: string };
+  searchParams: { dev_mode?: string };
 }) {
   const supabase = createClient();
   const {
@@ -46,6 +48,9 @@ export default async function LobbyPage({
     ? (spectators?.some((s) => s.user_id === userId) ?? false)
     : false;
 
+  const devMode =
+    process.env.NODE_ENV !== "production" && searchParams.dev_mode === "true";
+
   return (
     <LobbyPhase
       gameId={params.gameId}
@@ -56,6 +61,7 @@ export default async function LobbyPage({
       currentPlayer={currentPlayer}
       initialSpectators={spectators ?? []}
       initialIsSpectating={isSpectating}
+      devMode={devMode}
     />
   );
 }

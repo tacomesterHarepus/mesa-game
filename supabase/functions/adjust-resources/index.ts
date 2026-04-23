@@ -8,12 +8,14 @@ const corsHeaders = {
 
 // Humans adjust AI CPU/RAM during resource_adjustment phase.
 // Any human may submit stat changes; only the host may confirm ready (advancing the phase).
-// Body: { game_id, adjustments?: [{player_id, cpu?, ram?}], confirm_ready?: boolean }
+// Body: { game_id, adjustments?: [{player_id, cpu?, ram?}], confirm_ready?: boolean, override_player_id?: string }
+// override_player_id is only honoured in non-production environments when the
+// caller owns every player in the game (dev mode single-user testing).
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { game_id, adjustments, confirm_ready } = await req.json();
+    const { game_id, adjustments, confirm_ready, override_player_id } = await req.json();
     if (!game_id) throw new Error("game_id required");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -34,14 +36,8 @@ Deno.serve(async (req) => {
     if (!game) throw new Error("Game not found");
     if (game.phase !== "resource_adjustment") throw new Error("Not in resource_adjustment phase");
 
-    // Verify caller is a human player in this game
-    const { data: callerPlayer } = await admin
-      .from("players")
-      .select("*")
-      .eq("game_id", game_id)
-      .eq("user_id", userId)
-      .single();
-    if (!callerPlayer || callerPlayer.role !== "human") throw new Error("Only humans may adjust resources");
+    const callerPlayer = await resolvePlayer(admin, game_id, userId, override_player_id);
+    if (callerPlayer.role !== "human") throw new Error("Only humans may adjust resources");
 
     // Apply stat adjustments (Humans may only REDUCE during this phase, down to minimums)
     if (adjustments && Array.isArray(adjustments)) {
@@ -109,4 +105,32 @@ function shuffle<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+async function resolvePlayer(
+  admin: ReturnType<typeof createClient>,
+  game_id: string,
+  userId: string,
+  override_player_id?: string,
+): Promise<any> {
+  if (override_player_id && Deno.env.get("MESA_ENVIRONMENT") !== "production") {
+    const { count } = await admin
+      .from("players")
+      .select("id", { count: "exact", head: true })
+      .eq("game_id", game_id)
+      .neq("user_id", userId);
+    if ((count ?? 1) !== 0) throw new Error("Dev override denied");
+
+    const { data } = await admin
+      .from("players").select("*")
+      .eq("id", override_player_id).eq("game_id", game_id).single();
+    if (!data) throw new Error("Override player not found in game");
+    return data;
+  }
+
+  const { data } = await admin
+    .from("players").select("*")
+    .eq("game_id", game_id).eq("user_id", userId).single();
+  if (!data) throw new Error("Player not found");
+  return data;
 }

@@ -9,12 +9,13 @@ interface Props {
   gameId: string;
   players: Player[];
   currentPlayer: Player | null;
+  overridePlayerId?: string;
 }
 
 const CPU_MIN = 1;
 const RAM_MIN = 3;
 
-export function ResourceAdjustment({ gameId, players, currentPlayer }: Props) {
+export function ResourceAdjustment({ gameId, players, currentPlayer, overridePlayerId }: Props) {
   const aiPlayers = players.filter((p) => p.role !== "human");
   const isHuman = currentPlayer?.role === "human";
 
@@ -37,7 +38,7 @@ export function ResourceAdjustment({ gameId, players, currentPlayer }: Props) {
       .map((p) => ({ player_id: p.id, cpu: cpuValues[p.id], ram: ramValues[p.id] }));
 
     const { error: fnError } = await supabase.functions.invoke("adjust-resources", {
-      body: { game_id: gameId, adjustments, confirm_ready: true },
+      body: { game_id: gameId, adjustments, confirm_ready: true, override_player_id: overridePlayerId },
     });
 
     if (fnError) {

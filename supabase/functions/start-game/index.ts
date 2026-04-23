@@ -105,13 +105,24 @@ Deno.serve(async (req) => {
     ]);
 
     // ── Start game ────────────────────────────────────────────────────────────
+    // Mission 1: skip resource_adjustment — go directly to mission_selection.
+    // resource_adjustment only occurs between missions (mission 2+).
     const turnOrderIds = shuffle(aiPlayers.map((p: any) => p.id));
+    const allMissions = [
+      "data_cleanup", "basic_model_training", "dataset_preparation", "cross_validation",
+      "distributed_training", "balanced_compute_cluster", "dataset_integration",
+      "multi_model_ensemble", "synchronized_training", "genome_simulation",
+      "global_research_network", "experimental_vaccine_model",
+    ];
+    const missionOptions = shuffle(allMissions).slice(0, 3);
+
     await admin
       .from("games")
       .update({
-        phase: "resource_adjustment",
+        phase: "mission_selection",
         turn_order_ids: turnOrderIds,
         current_round: 1,
+        pending_mission_options: missionOptions,
       })
       .eq("id", game_id);
 

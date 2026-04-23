@@ -19,9 +19,10 @@ interface Props {
   currentPlayer: Player | null;
   hand: HandCard[];
   round: number;
+  overridePlayerId?: string;
 }
 
-export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, round }: Props) {
+export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, round, overridePlayerId }: Props) {
   const isMyTurn = currentPlayer?.id === currentTurnPlayer?.id;
   const isAI = currentPlayer?.role !== "human" && currentPlayer !== null;
 
@@ -31,7 +32,7 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
   const [error, setError] = useState<string | null>(null);
 
   const playableHand = hand.filter((c) => c.card_type === "progress");
-  const cpu = currentPlayer?.cpu ?? 2;
+  const cpu = currentPlayer?.cpu ?? 1;
 
   async function handlePlayCard() {
     if (!selectedCardKey) return;
@@ -41,7 +42,7 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
     setPlayLoading(true);
     const supabase = createClient();
     const { data, error: fnError } = await supabase.functions.invoke("play-card", {
-      body: { game_id: gameId, card_id: card.id },
+      body: { game_id: gameId, card_id: card.id, override_player_id: overridePlayerId },
     });
     if (fnError) {
       setError(fnError.message);
@@ -58,7 +59,7 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
     setEndLoading(true);
     const supabase = createClient();
     const { data, error: fnError } = await supabase.functions.invoke("end-play-phase", {
-      body: { game_id: gameId },
+      body: { game_id: gameId, override_player_id: overridePlayerId },
     });
     if (fnError) {
       setError(fnError.message);

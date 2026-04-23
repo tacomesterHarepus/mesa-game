@@ -20,6 +20,7 @@ interface Props {
   currentPlayer: PlayerRow | null;
   initialSpectators: SpectatorRow[];
   initialIsSpectating: boolean;
+  devMode?: boolean;
 }
 
 const MIN_PLAYERS = 6;
@@ -34,8 +35,10 @@ export function LobbyPhase({
   currentPlayer: initialCurrentPlayer,
   initialSpectators,
   initialIsSpectating,
+  devMode = false,
 }: Props) {
   const router = useRouter();
+  const gameUrl = devMode ? `/game/${gameId}?dev_mode=true` : `/game/${gameId}`;
   const [players, setPlayers] = useState<PlayerRow[]>(initialPlayers);
   const [spectators, setSpectators] = useState<SpectatorRow[]>(initialSpectators);
   const [currentPlayer, setCurrentPlayer] = useState<PlayerRow | null>(initialCurrentPlayer);
@@ -65,12 +68,12 @@ export function LobbyPhase({
       ]);
       if (p) setPlayers(p);
       if (s) setSpectators(s);
-      if (g && g.phase !== "lobby") router.push(`/game/${gameId}`);
+      if (g && g.phase !== "lobby") router.push(gameUrl);
     };
 
     const id = setInterval(poll, 2000);
     return () => clearInterval(id);
-  }, [gameId, router]);
+  }, [gameId, router, gameUrl]);
 
   // Realtime: players, spectators, game phase change
   useEffect(() => {
@@ -122,7 +125,7 @@ export function LobbyPhase({
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "games", filter: `id=eq.${gameId}` },
           (payload) => {
-            if (payload.new.phase !== "lobby") router.push(`/game/${gameId}`);
+            if (payload.new.phase !== "lobby") router.push(gameUrl);
           }
         )
         .subscribe();
@@ -134,7 +137,7 @@ export function LobbyPhase({
       cancelled = true;
       if (channel) supabase.removeChannel(channel);
     };
-  }, [gameId, router]);
+  }, [gameId, router, gameUrl]);
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
@@ -168,7 +171,7 @@ export function LobbyPhase({
           user_id: uid,
           display_name: displayName.trim(),
           role: null,
-          cpu: 2,
+          cpu: 1,
           ram: 4,
           turn_order: 0,
           skip_next_turn: false,

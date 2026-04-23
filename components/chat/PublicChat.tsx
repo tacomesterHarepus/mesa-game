@@ -11,10 +11,10 @@ interface Props {
   gameId: string;
   currentPlayer: Player | null;
   players: Player[];
-  chatEnabled: boolean;
+  canPost: boolean;
 }
 
-export function PublicChat({ gameId, currentPlayer, players, chatEnabled }: Props) {
+export function PublicChat({ gameId, currentPlayer, players, canPost }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -61,7 +61,7 @@ export function PublicChat({ gameId, currentPlayer, players, chatEnabled }: Prop
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
-    if (!input.trim() || !currentPlayer || !chatEnabled) return;
+    if (!input.trim() || !currentPlayer || !canPost) return;
     setSending(true);
     const supabase = createClient();
     await supabase.from("chat_messages").insert({
@@ -95,14 +95,14 @@ export function PublicChat({ gameId, currentPlayer, players, chatEnabled }: Prop
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            disabled={!chatEnabled || sending}
-            placeholder={chatEnabled ? "Message…" : "Chat locked"}
+            disabled={!canPost || sending}
+            placeholder={canPost ? "Message…" : "Read only"}
             maxLength={200}
             className="flex-1 bg-base border border-border rounded px-2 py-1 text-xs font-mono text-primary placeholder:text-faint focus:outline-none focus:border-muted disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={!chatEnabled || sending || !input.trim()}
+            disabled={!canPost || sending || !input.trim()}
             className="px-2 py-1 bg-surface border border-border rounded text-xs font-mono text-muted hover:text-primary disabled:opacity-40"
           >
             ↑

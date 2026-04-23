@@ -10,9 +10,10 @@ interface Props {
   gameId: string;
   pendingOptions: string[];
   currentPlayer: Player | null;
+  overridePlayerId?: string;
 }
 
-export function MissionSelection({ gameId, pendingOptions, currentPlayer }: Props) {
+export function MissionSelection({ gameId, pendingOptions, currentPlayer, overridePlayerId }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +25,7 @@ export function MissionSelection({ gameId, pendingOptions, currentPlayer }: Prop
     setLoading(true);
     const supabase = createClient();
     const { error: fnError } = await supabase.functions.invoke("select-mission", {
-      body: { game_id: gameId, mission_key: selected },
+      body: { game_id: gameId, mission_key: selected, override_player_id: overridePlayerId },
     });
     if (fnError) {
       setError(fnError.message);

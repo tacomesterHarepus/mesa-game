@@ -6,16 +6,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Humans pick one of the 3 pending mission options.
-// Body: { game_id, mission_key, override_player_id?: string }
-// override_player_id is only honoured in non-production environments when the
-// caller owns every player in the game (dev mode single-user testing).
+// AI secretly places a card from their hand into the pending virus pool during player_turn.
+// The card is removed from the hand and inserted into pending_viruses.
+// Pending viruses are shuffled into the virus pool when the turn ends (end-play-phase).
+// Body: { game_id, card_id: string, override_player_id?: string }
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { game_id, mission_key, override_player_id } = await req.json();
-    if (!game_id || !mission_key) throw new Error("game_id and mission_key required");
+    const { game_id, card_id, override_player_id } = await req.json();
+    if (!game_id || !card_id) throw new Error("game_id and card_id required");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -33,55 +33,29 @@ Deno.serve(async (req) => {
 
     const { data: game } = await admin.from("games").select("*").eq("id", game_id).single();
     if (!game) throw new Error("Game not found");
-    if (game.phase !== "mission_selection") throw new Error("Not in mission_selection phase");
+    if (game.phase !== "player_turn") throw new Error("Not in player_turn phase");
 
     const callerPlayer = await resolvePlayer(admin, game_id, userId, override_player_id);
-    if (callerPlayer.role !== "human") throw new Error("Only humans may select missions");
+    if (callerPlayer.id !== game.current_turn_player_id) throw new Error("Not your turn");
+    if (callerPlayer.role === "human") throw new Error("Humans cannot place virus cards");
 
-    // Validate mission_key is one of the 3 options
-    if (!game.pending_mission_options.includes(mission_key)) {
-      throw new Error("mission_key not in pending options");
-    }
+    // Verify card is in player's hand
+    const { data: handCard } = await admin
+      .from("hands").select("*").eq("id", card_id).eq("player_id", callerPlayer.id).single();
+    if (!handCard) throw new Error("Card not found in your hand");
 
-    // Create the active_mission record
-    const { data: mission, error: missionErr } = await admin.from("active_mission").insert({
-      game_id,
-      mission_key,
-      compute_contributed: 0,
-      data_contributed: 0,
-      validation_contributed: 0,
-      round: 1,
-      special_state: {},
-    }).select().single();
-    if (missionErr || !mission) throw new Error("Failed to create active mission");
+    // Move card from hand to pending_viruses
+    await Promise.all([
+      admin.from("pending_viruses").insert({
+        game_id,
+        placed_by_player_id: callerPlayer.id,
+        card_key: handCard.card_key,
+        card_type: handCard.card_type,
+      }),
+      admin.from("hands").delete().eq("id", card_id),
+    ]);
 
-    // Reset all AI players' has_revealed_card and revealed_card_key
-    const { data: aiPlayers } = await admin
-      .from("players")
-      .select("id")
-      .eq("game_id", game_id)
-      .neq("role", "human");
-
-    if (aiPlayers && aiPlayers.length > 0) {
-      await admin.from("players").update({
-        has_revealed_card: false,
-        revealed_card_key: null,
-      }).eq("game_id", game_id).neq("role", "human");
-    }
-
-    await admin.from("games").update({
-      phase: "card_reveal",
-      current_mission_id: mission.id,
-      pending_mission_options: [],
-    }).eq("id", game_id);
-
-    await admin.from("game_log").insert({
-      game_id,
-      event_type: "mission_selected",
-      public_description: `Mission selected: ${mission_key.replace(/_/g, " ")}.`,
-    });
-
-    return new Response(JSON.stringify({ success: true, mission_id: mission.id }), {
+    return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

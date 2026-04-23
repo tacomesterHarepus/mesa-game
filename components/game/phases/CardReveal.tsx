@@ -18,9 +18,10 @@ interface Props {
   players: Player[];
   currentPlayer: Player | null;
   hand: HandCard[];
+  overridePlayerId?: string;
 }
 
-export function CardReveal({ gameId, players, currentPlayer, hand }: Props) {
+export function CardReveal({ gameId, players, currentPlayer, hand, overridePlayerId }: Props) {
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +37,7 @@ export function CardReveal({ gameId, players, currentPlayer, hand }: Props) {
     setLoading(true);
     const supabase = createClient();
     const { error: fnError } = await supabase.functions.invoke("reveal-card", {
-      body: { game_id: gameId, card_key: selectedCard },
+      body: { game_id: gameId, card_key: selectedCard, override_player_id: overridePlayerId },
     });
     if (fnError) {
       setError(fnError.message);

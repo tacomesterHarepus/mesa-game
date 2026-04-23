@@ -72,8 +72,8 @@ test("second player joins via invite link and appears in both views", async ({
   // Bob appears in his own view
   await expect(p2Page.getByText("Bob").first()).toBeVisible();
 
-  // Bob appears in Alice's view via Realtime
-  await expect(hostPage.getByText("Bob")).toBeVisible();
+  // Bob appears in Alice's view via Realtime — allow extra time for propagation
+  await expect(hostPage.getByText("Bob")).toBeVisible({ timeout: 30_000 });
 
   await hostCtx.close();
   await p2Ctx.close();

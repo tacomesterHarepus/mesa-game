@@ -123,39 +123,9 @@ test.describe("game phase flow", () => {
     await expect(hostPage.getByText("0 / 8")).toBeVisible();
   });
 
-  test("resource_adjustment phase is shown with player roster", async () => {
-    await expect(hostPage.getByText("Resource Adjustment")).toBeVisible();
-    await expect(hostPage.getByRole("heading", { name: "Players" })).toBeVisible();
-  });
-
-  test("at least one human player sees the Confirm button", async () => {
-    const humanPage = await findPageWithButton(pages, /Confirm/i);
-    expect(humanPage).not.toBeNull();
-  });
-
-  test("confirming resource adjustment advances to mission_selection", async () => {
-    const humanPage = await findPageWithButton(pages, /Confirm/i);
-    expect(humanPage).not.toBeNull();
-
-    // Capture any adjust-resources error for diagnostics
-    let adjustRawError: string | null = null;
-    humanPage!.on("response", async (response) => {
-      if (response.url().includes("/adjust-resources")) {
-        if (!response.ok()) {
-          adjustRawError = await response.text().catch(() => `HTTP ${response.status()}`);
-        }
-      }
-    });
-
-    await humanPage!.getByRole("button", { name: /Confirm/i }).click();
-
-    // Wait briefly for the function to complete, then check for errors
-    await humanPage!.waitForTimeout(3000);
-    if (adjustRawError) {
-      throw new Error(`adjust-resources edge function failed:\n${adjustRawError}`);
-    }
-
-    // At least one page should see Mission Selection appear
+  test("mission_selection phase is shown directly after game start (no resource_adjustment on mission 1)", async () => {
+    // Per spec: resource_adjustment is skipped for the first mission.
+    // All pages should land on mission_selection immediately after start-game.
     let sawMissionSelection = false;
     for (const page of pages) {
       if (await page.getByText("Mission Selection").isVisible({ timeout: 15_000 }).catch(() => false)) {
@@ -164,6 +134,10 @@ test.describe("game phase flow", () => {
       }
     }
     expect(sawMissionSelection).toBe(true);
+    // Resource Adjustment must NOT appear on any page at this point
+    for (const page of pages) {
+      await expect(page.getByText("Resource Adjustment")).not.toBeVisible();
+    }
   });
 
   test("selecting a mission advances to card_reveal", async () => {
@@ -304,7 +278,7 @@ test.describe("game phase flow", () => {
     await expect(endTurnBtn).toBeVisible();
     await endTurnBtn.click();
 
-    // Game should advance: either next player's turn or back to resource_adjustment
+    // Game should advance: either next player's turn (mid-mission) or resource_adjustment (mission 2+)
     let advanced = false;
     for (const page of pages) {
       const hasPlayerTurn = await page.getByText(/Player Turn|Resource Adjustment/).isVisible({ timeout: 15_000 }).catch(() => false);

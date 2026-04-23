@@ -17,6 +17,7 @@ import { SecretTargeting } from "./phases/SecretTargeting";
 import { GameOver } from "./phases/GameOver";
 import { PublicChat } from "@/components/chat/PublicChat";
 import { MisalignedPrivateChat } from "@/components/chat/MisalignedPrivateChat";
+import { DevModeOverlay } from "./DevModeOverlay";
 import type { Game } from "@/types/game";
 import type { Database } from "@/types/supabase";
 
@@ -33,6 +34,7 @@ interface Props {
   initialMission: ActiveMission | null;
   initialLog: LogEntry[];
   userId: string | null;
+  devMode?: boolean;
 }
 
 // Phases where AI chat is locked
@@ -51,11 +53,15 @@ export function GameBoard({
   initialMission,
   initialLog,
   userId,
+  devMode = false,
 }: Props) {
   const [game, setGame] = useState<Game>(initialGame);
   const [players, setPlayers] = useState<PlayerRow[]>(initialPlayers);
   const [currentPlayer] = useState<PlayerRow | null>(initialCurrentPlayer);
   const [hand, setHand] = useState<HandCard[]>(initialHand);
+  const [activeDevPlayer, setActiveDevPlayer] = useState<PlayerRow | null>(
+    devMode ? initialCurrentPlayer : null
+  );
   const [mission, setMission] = useState<ActiveMission | null>(initialMission);
   const [log, setLog] = useState<LogEntry[]>(initialLog);
 
@@ -134,8 +140,11 @@ export function GameBoard({
           }
         );
 
-      // Hand updates (only relevant if current player is an AI)
-      if (currentPlayer && currentPlayer.role !== "human") {
+      // Hand updates — subscribe to whichever player's hand is active.
+      // In dev mode this is the currently-selected bot; otherwise the auth user's player.
+      const handPlayerId = devMode ? activeDevPlayer?.id : currentPlayer?.id;
+      const handPlayerRole = devMode ? activeDevPlayer?.role : currentPlayer?.role;
+      if (handPlayerId && handPlayerRole !== "human") {
         channel
           .on(
             "postgres_changes",
@@ -143,7 +152,7 @@ export function GameBoard({
               event: "INSERT",
               schema: "public",
               table: "hands",
-              filter: `player_id=eq.${currentPlayer.id}`,
+              filter: `player_id=eq.${handPlayerId}`,
             },
             (payload) => {
               setHand((prev) => [...prev, payload.new as HandCard]);
@@ -155,7 +164,7 @@ export function GameBoard({
               event: "DELETE",
               schema: "public",
               table: "hands",
-              filter: `player_id=eq.${currentPlayer.id}`,
+              filter: `player_id=eq.${handPlayerId}`,
             },
             (payload) => {
               const removed = payload.old as { id: string };
@@ -172,19 +181,40 @@ export function GameBoard({
       cancelled = true;
       if (channel) supabase.removeChannel(channel);
     };
-  }, [gameId, currentPlayer]);
+  }, [gameId, currentPlayer, devMode, activeDevPlayer?.id]);
+
+  // In dev mode: when the active bot changes, fetch that player's hand from Supabase.
+  // The widened `hands` RLS (migration 007) allows this because all bots share user_id.
+  useEffect(() => {
+    if (!devMode || !activeDevPlayer) return;
+    const supabase = createClient();
+    supabase
+      .from("hands")
+      .select("*")
+      .eq("player_id", activeDevPlayer.id)
+      .then(({ data }) => { if (data) setHand(data); });
+  }, [devMode, activeDevPlayer?.id]);
 
   const isHost = game.host_user_id === userId;
-  const isAI = currentPlayer?.role !== "human" && currentPlayer !== null;
-  const isMisaligned = currentPlayer?.role === "misaligned_ai";
-  const misalignedPlayers = players.filter((p) => p.role === "misaligned_ai");
-  const chatEnabled = !CHAT_LOCKED_PHASES.has(game.phase);
-  const currentTurnPlayer = players.find((p) => p.id === game.current_turn_player_id) ?? null;
 
-  // Sync updated player data for currentPlayer (CPU/RAM changes from resource allocation)
+  // In dev mode the "current player" is whoever is selected in the switcher.
   const syncedCurrentPlayer = currentPlayer
     ? players.find((p) => p.id === currentPlayer.id) ?? currentPlayer
     : null;
+  const syncedActiveDevPlayer = activeDevPlayer
+    ? players.find((p) => p.id === activeDevPlayer.id) ?? activeDevPlayer
+    : null;
+  const effectiveCurrentPlayer = devMode ? syncedActiveDevPlayer : syncedCurrentPlayer;
+
+  const isAI = effectiveCurrentPlayer?.role !== "human" && effectiveCurrentPlayer !== null;
+  const isMisaligned = effectiveCurrentPlayer?.role === "misaligned_ai";
+  const misalignedPlayers = players.filter((p) => p.role === "misaligned_ai");
+  const isLockedPhase = CHAT_LOCKED_PHASES.has(game.phase);
+  // Humans can always post; AIs are read-only during locked phases.
+  const canPostChat = !isLockedPhase || effectiveCurrentPlayer?.role === "human";
+  const currentTurnPlayer = players.find((p) => p.id === game.current_turn_player_id) ?? null;
+
+  const overridePlayerId = devMode ? (activeDevPlayer?.id ?? undefined) : undefined;
 
   function renderPhase() {
     switch (game.phase) {
@@ -193,7 +223,8 @@ export function GameBoard({
           <ResourceAdjustment
             gameId={gameId}
             players={players}
-            currentPlayer={syncedCurrentPlayer}
+            currentPlayer={effectiveCurrentPlayer}
+            overridePlayerId={overridePlayerId}
           />
         );
       case "mission_selection":
@@ -201,7 +232,8 @@ export function GameBoard({
           <MissionSelection
             gameId={gameId}
             pendingOptions={game.pending_mission_options}
-            currentPlayer={syncedCurrentPlayer}
+            currentPlayer={effectiveCurrentPlayer}
+            overridePlayerId={overridePlayerId}
           />
         );
       case "card_reveal":
@@ -209,8 +241,9 @@ export function GameBoard({
           <CardReveal
             gameId={gameId}
             players={players}
-            currentPlayer={syncedCurrentPlayer}
+            currentPlayer={effectiveCurrentPlayer}
             hand={hand}
+            overridePlayerId={overridePlayerId}
           />
         );
       case "resource_allocation":
@@ -218,8 +251,9 @@ export function GameBoard({
           <ResourceAllocation
             gameId={gameId}
             players={players}
-            currentPlayer={syncedCurrentPlayer}
+            currentPlayer={effectiveCurrentPlayer}
             missionKey={mission?.mission_key ?? ""}
+            overridePlayerId={overridePlayerId}
           />
         );
       case "player_turn":
@@ -228,19 +262,26 @@ export function GameBoard({
           <PlayerTurn
             gameId={gameId}
             currentTurnPlayer={currentTurnPlayer}
-            currentPlayer={syncedCurrentPlayer}
+            currentPlayer={effectiveCurrentPlayer}
             hand={hand}
             round={mission?.round ?? 1}
+            overridePlayerId={overridePlayerId}
           />
         );
       case "virus_resolution":
-        return <VirusResolution />;
+        return (
+          <VirusResolution
+            gameId={gameId}
+            currentPlayer={effectiveCurrentPlayer}
+            overridePlayerId={overridePlayerId}
+          />
+        );
       case "secret_targeting":
         return (
           <SecretTargeting
             gameId={gameId}
             players={players}
-            currentPlayer={syncedCurrentPlayer}
+            currentPlayer={effectiveCurrentPlayer}
             targetingDeadline={game.targeting_deadline}
           />
         );
@@ -250,7 +291,7 @@ export function GameBoard({
             gameId={gameId}
             winner={game.winner}
             players={players}
-            currentPlayer={syncedCurrentPlayer}
+            currentPlayer={effectiveCurrentPlayer}
             isHost={isHost}
           />
         );
@@ -264,7 +305,14 @@ export function GameBoard({
   }
 
   return (
-    <div className="min-h-screen bg-deep flex flex-col">
+    <div className={`min-h-screen bg-deep flex flex-col ${devMode ? "pt-6" : ""}`}>
+      {devMode && (
+        <DevModeOverlay
+          players={players}
+          activePlayer={activeDevPlayer}
+          onSwitch={setActiveDevPlayer}
+        />
+      )}
       {/* Header */}
       <div className="border-b border-border px-6 py-3 flex items-center justify-between bg-base">
         <h1 className="font-mono text-amber tracking-[0.25em] uppercase text-sm">MESA</h1>
@@ -307,10 +355,10 @@ export function GameBoard({
           <GameLog entries={log} />
 
           {/* Misaligned private chat */}
-          {isMisaligned && currentPlayer && (
+          {isMisaligned && effectiveCurrentPlayer && (
             <MisalignedPrivateChat
               gameId={gameId}
-              currentPlayer={currentPlayer}
+              currentPlayer={effectiveCurrentPlayer}
               misalignedPlayers={misalignedPlayers}
             />
           )}
@@ -318,9 +366,9 @@ export function GameBoard({
           {/* Public chat */}
           <PublicChat
             gameId={gameId}
-            currentPlayer={currentPlayer}
+            currentPlayer={effectiveCurrentPlayer}
             players={players}
-            chatEnabled={chatEnabled}
+            canPost={canPostChat}
           />
         </div>
       </div>

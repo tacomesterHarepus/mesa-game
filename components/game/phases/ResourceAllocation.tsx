@@ -11,12 +11,13 @@ interface Props {
   players: Player[];
   currentPlayer: Player | null;
   missionKey: string;
+  overridePlayerId?: string;
 }
 
 const CPU_MAX = 4;
 const RAM_MAX = 7;
 
-export function ResourceAllocation({ gameId, players, currentPlayer, missionKey }: Props) {
+export function ResourceAllocation({ gameId, players, currentPlayer, missionKey, overridePlayerId }: Props) {
   const def = MISSION_MAP[missionKey];
   const aiPlayers = players.filter((p) => p.role !== "human");
   const isHuman = currentPlayer?.role === "human";
@@ -69,7 +70,7 @@ export function ResourceAllocation({ gameId, players, currentPlayer, missionKey 
     }));
 
     const { error: fnError } = await supabase.functions.invoke("allocate-resources", {
-      body: { game_id: gameId, allocations },
+      body: { game_id: gameId, allocations, override_player_id: overridePlayerId },
     });
 
     if (fnError) {

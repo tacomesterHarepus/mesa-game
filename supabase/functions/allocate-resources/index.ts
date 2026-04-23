@@ -8,13 +8,14 @@ const corsHeaders = {
 
 // Humans distribute the mission's bonus CPU/RAM pool among AI players.
 // During this phase Humans may ONLY ADD (up to per-player max).
-// Body: { game_id, allocations: [{player_id, cpu_delta, ram_delta}] }
-// The host submitting allocations also advances the phase to player_turn.
+// Body: { game_id, allocations: [{player_id, cpu_delta, ram_delta}], override_player_id?: string }
+// override_player_id is only honoured in non-production environments when the
+// caller owns every player in the game (dev mode single-user testing).
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { game_id, allocations } = await req.json();
+    const { game_id, allocations, override_player_id } = await req.json();
     if (!game_id || !Array.isArray(allocations)) throw new Error("game_id and allocations required");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -35,14 +36,8 @@ Deno.serve(async (req) => {
     if (!game) throw new Error("Game not found");
     if (game.phase !== "resource_allocation") throw new Error("Not in resource_allocation phase");
 
-    // Verify caller is a human player in this game
-    const { data: callerPlayer } = await admin
-      .from("players")
-      .select("*")
-      .eq("game_id", game_id)
-      .eq("user_id", userId)
-      .single();
-    if (!callerPlayer || callerPlayer.role !== "human") throw new Error("Only humans may allocate resources");
+    const callerPlayer = await resolvePlayer(admin, game_id, userId, override_player_id);
+    if (callerPlayer.role !== "human") throw new Error("Only humans may allocate resources");
 
     // Get mission to know the pool sizes
     const { data: activeMission } = await admin
@@ -118,3 +113,31 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+async function resolvePlayer(
+  admin: ReturnType<typeof createClient>,
+  game_id: string,
+  userId: string,
+  override_player_id?: string,
+): Promise<any> {
+  if (override_player_id && Deno.env.get("MESA_ENVIRONMENT") !== "production") {
+    const { count } = await admin
+      .from("players")
+      .select("id", { count: "exact", head: true })
+      .eq("game_id", game_id)
+      .neq("user_id", userId);
+    if ((count ?? 1) !== 0) throw new Error("Dev override denied");
+
+    const { data } = await admin
+      .from("players").select("*")
+      .eq("id", override_player_id).eq("game_id", game_id).single();
+    if (!data) throw new Error("Override player not found in game");
+    return data;
+  }
+
+  const { data } = await admin
+    .from("players").select("*")
+    .eq("game_id", game_id).eq("user_id", userId).single();
+  if (!data) throw new Error("Player not found");
+  return data;
+}

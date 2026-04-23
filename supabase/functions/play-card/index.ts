@@ -22,12 +22,14 @@ const MISSION_REQUIREMENTS: Record<string, { compute?: number; data?: number; va
 };
 
 // Active AI plays one card from hand to contribute to the active mission.
-// Body: { game_id, card_id: string }
+// Body: { game_id, card_id: string, override_player_id?: string }
+// override_player_id is only honoured in non-production environments when the
+// caller owns every player in the game (dev mode single-user testing).
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { game_id, card_id } = await req.json();
+    const { game_id, card_id, override_player_id } = await req.json();
     if (!game_id || !card_id) throw new Error("game_id and card_id required");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -48,9 +50,7 @@ Deno.serve(async (req) => {
     if (!game) throw new Error("Game not found");
     if (game.phase !== "player_turn") throw new Error("Not in player_turn phase");
 
-    const { data: callerPlayer } = await admin
-      .from("players").select("*").eq("game_id", game_id).eq("user_id", userId).single();
-    if (!callerPlayer) throw new Error("Player not found");
+    const callerPlayer = await resolvePlayer(admin, game_id, userId, override_player_id);
     if (callerPlayer.id !== game.current_turn_player_id) throw new Error("Not your turn");
 
     // Verify card is in player's hand
@@ -110,6 +110,11 @@ Deno.serve(async (req) => {
       await admin.from("deck_cards").update({ status: "discarded" }).eq("id", deckCard.id);
     }
 
+    // Increment turn play count for virus generation calculation
+    await admin.from("games")
+      .update({ turn_play_count: game.turn_play_count + 1 })
+      .eq("id", game_id);
+
     await admin.from("game_log").insert({
       game_id,
       event_type: "card_played",
@@ -135,3 +140,32 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+async function resolvePlayer(
+  admin: ReturnType<typeof createClient>,
+  game_id: string,
+  userId: string,
+  override_player_id?: string,
+): Promise<any> {
+  if (override_player_id && Deno.env.get("MESA_ENVIRONMENT") !== "production") {
+    // Verify caller owns every player in this game — only true in dev mode games.
+    const { count } = await admin
+      .from("players")
+      .select("id", { count: "exact", head: true })
+      .eq("game_id", game_id)
+      .neq("user_id", userId);
+    if ((count ?? 1) !== 0) throw new Error("Dev override denied");
+
+    const { data } = await admin
+      .from("players").select("*")
+      .eq("id", override_player_id).eq("game_id", game_id).single();
+    if (!data) throw new Error("Override player not found in game");
+    return data;
+  }
+
+  const { data } = await admin
+    .from("players").select("*")
+    .eq("game_id", game_id).eq("user_id", userId).single();
+  if (!data) throw new Error("Player not found");
+  return data;
+}

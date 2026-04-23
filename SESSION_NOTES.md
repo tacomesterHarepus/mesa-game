@@ -1,73 +1,128 @@
 # Session Notes
 
 ## Current Phase
-**Phase 7 — Virus System** (NEXT UP)
+**Phase 8 — Secret Actions** (next up)
 
-## Phase 6 Complete ✓
+## Build Status
 
-All 15 E2E tests pass (5 lobby + 10 mission-flow). Full test run: `15 passed (52.6s)`.
+| Phase | Status | Notes |
+|-------|--------|-------|
+| 1. Project setup | ✓ | Next.js 14, TypeScript strict, Supabase, GitHub, Vercel |
+| 2. Auth + lobby | ✓ | Anonymous auth, create/join game, start-game edge function |
+| 3. Database + RLS | ✓ | Migrations 001–007, spectators, rematch schema, RLS policies |
+| 4. Game state machine | ✓ | GameBoard, all phase components, polling + Realtime |
+| 5. Card data layer | ✓ | cards.ts, missions.ts, deck.ts, virusRules.ts, missionRules.ts |
+| 6. Mission flow | ✓ | play-card, end-play-phase (simplified — no virus resolution yet) |
+| Dev Mode | ✓ | Fill Lobby, PlayerSwitcher, override_player_id in all 6 edge functions |
+| 7. Virus system | ✓ | place-virus, end-play-phase v4, resolve-next-virus; VirusResolution UI; 23/23 tests |
+| 8. Secret actions | **NEXT UP** | |
+| 9. Mission special rules | pending | |
+| 10. Human controls | pending | |
+| 11. Game log | pending | |
+| 12. Chat system | pending | |
+| 13. UI polish | pending | |
 
-### What Was Built in Phase 6
-- `supabase/functions/play-card/index.ts` — AI plays a progress card to active mission. Validates caller = current turn player, card in hand (progress only), CPU limit. Updates mission contribution counts.
-- `supabase/functions/end-play-phase/index.ts` — AI ends their turn. Checks mission complete, advances turn order (skipping `skip_next_turn` players), handles round 2 start, mission success/failure. Phase 6 simplified: no virus resolution, advances turn order directly.
-- `components/game/phases/PlayerTurn.tsx` — Full AI turn UI: hand filtered to progress cards, Play Card button, End Turn button.
+**Test suite: 23/23 passing** (5 lobby + 7 dev-mode + 8 mission-flow + 3 virus-system)
 
-### Key Fixes Applied
-1. **verify_jwt: false on all edge functions** — Supabase switched to ES256 JWT. All functions must use verify_jwt: false and do manual atob() JWT decode.
-2. **reveal-card `.single()` bug** — Changed to `.limit(1).maybeSingle()` for hand card lookup. `.single()` fails if player has duplicate cards with same key.
-3. **allocate-resources host-only restriction** — Removed `host_user_id` check. Any human can submit allocation (host may be AI). Updated `ResourceAllocation` component to show "Start Mission" to any human, not just host.
-4. **Test timing** — Test 10 (End Turn) uses a retry loop (30 × 500ms) instead of per-page timeout to find the "End Turn" button efficiently.
+## Deployed Edge Functions
 
-### Deployed Edge Functions (all verify_jwt: false)
-- start-game: v6
-- adjust-resources: v2
-- select-mission: v2
-- reveal-card: v3 (fixed .single() → .limit(1).maybeSingle())
-- allocate-resources: v3 (removed host-only restriction)
-- play-card: v2 (verify_jwt: false)
-- end-play-phase: v2 (verify_jwt: false)
+All functions use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function body). Supabase switched to ES256 and rejects tokens when `verify_jwt: true`.
 
-## Next: Phase 7 — Virus System
+| Function | Version | Notes |
+|----------|---------|-------|
+| start-game | v6 | |
+| adjust-resources | v3 | override_player_id support |
+| select-mission | v3 | override_player_id support |
+| reveal-card | v4 | override_player_id support |
+| allocate-resources | v4 | override_player_id support |
+| play-card | v4 | turn_play_count tracking |
+| place-virus | v1 | AI places cards into pending_viruses |
+| end-play-phase | v4 | full virus pipeline: shuffle → queue → virus_resolution phase |
+| resolve-next-virus | v1 | applies one virus effect, win checks, Cascading Failure chaining, pool refill |
 
-The current `end-play-phase` is simplified (Phase 6): it skips virus resolution entirely and advances turn order directly. Phase 7 needs to implement the full virus pipeline:
+## Dev Mode (DONE)
 
-1. `place-virus` edge function — AI places virus cards face-down next to pool during their turn (simultaneously with playing progress cards)
-2. `end-play-phase` update — after AI plays cards, shuffle pending viruses into pool, then trigger virus resolution instead of advancing turn directly
-3. `resolve-next-virus` edge function — resolves one card from the virus_resolution_queue, checks win conditions, handles Cascading Failure chaining
-4. `VirusResolution` phase component — UI for watching virus cards resolve one by one
+Single-user multi-player testing without needing 6 browsers.
 
-### Virus generation rules
-- CPU ≥ 2 → +1 virus per turn
-- Every 3rd card played that turn → +1 additional virus (max total: 2 per turn)
+- Migration 007: widened `hands` + `pending_viruses` RLS from `=` to `IN` (scalar subquery breaks with 6 players sharing user_id)
+- `CreateGameForm.tsx`: "Dev Mode: Fill Lobby" button (NODE_ENV gated)
+- `DevModeOverlay.tsx`: full-width amber DEV MODE banner + fixed top-right PlayerSwitcher; buttons carry `data-player-id` for test automation
+- `GameBoard.tsx`: `activeDevPlayer` state, `effectiveCurrentPlayer`, hand re-fetch on switch
+- All edge functions: `override_player_id` accepted, gated by `MESA_ENVIRONMENT !== "production"` AND caller owns all players
+- **TODO (manual):** Set `MESA_ENVIRONMENT=production` in Supabase Dashboard → Project Settings → Edge Functions → Environment Variables
 
-### Win conditions (after every state change)
-- Escape Timer reaches 8 → Misaligned AIs win immediately
-- Core Progress reaches 10 → Humans win after active AI's full virus chain resolves
+## Phase 7 Completed — Key Technical Notes
 
-## Architecture Reminder
+**Virus generation formula** (per AI turn in `end-play-phase`):
+- `base = cpu >= 2 ? 1 : 0`
+- `bonus = cardsPlayed >= 3 ? 1 : 0`
+- Total = min(2, base + bonus)
 
-The key Realtime/polling pattern used throughout:
+**`end-play-phase` v4 flow:**
+1. Fetch pending_viruses for current player
+2. Shuffle them into virus_pool (random position insertion)
+3. Compute virus count via formula above
+4. If count > 0: draw top N cards from pool into virus_resolution_queue, set phase = virus_resolution
+5. If count = 0: call `advanceTurnOrPhase` directly
+
+**`resolve-next-virus` flow:**
+1. Get next unresolved row from virus_resolution_queue
+2. Mark it resolved
+3. Apply effect via `applyVirusEffect`:
+   - `cascading_failure`: insert 2 more cards from pool into queue
+   - `system_overload`: escape_timer + 1
+   - `model_corruption / data_drift / validation_failure`: mission -1 contribution
+   - `pipeline_breakdown / dependency_error`: set special_state flag
+   - Secret-targeting cards: set phase = secret_targeting, return (pause resolution)
+4. Check win conditions (escape_timer ≥ 8 after every card)
+5. If queue empty: refill pool to 4 from deck, then `advanceTurnOrPhase`
+
+**E2E test pattern for direct API calls from Playwright:**
+- `@supabase/ssr` stores auth in cookies as `sb-<ref>-auth-token` with `base64-<base64_data>` encoding
+- Extract with: `Buffer.from(value.slice(7), "base64").toString("utf-8")`, then JSON.parse for `access_token`
+- Use `page.context().cookies("http://localhost:3000")` to get all cookies in test (Node.js context)
+- DevModeOverlay buttons carry `data-player-id` attribute — use `.locator("[data-player-id]")` to get player IDs
+- Direct fetch calls to Supabase REST API + edge functions bypass UI timing issues entirely
+
+## Phase 8 Plan — Secret Actions
+
+Cards that require secret targeting (targeting phase):
+- `process_crash`: Misaligned AIs target → skip next turn
+- `memory_leak`: target → loses 1 RAM
+- `resource_surge`: target → gains 1 CPU
+- `cpu_drain`: target → loses 1 CPU
+- `memory_allocation`: target → gains 1 RAM
+
+**What's needed:**
+1. **`secret-target` edge function** — Misaligned AI submits a vote for a target player
+   - Inserts into `secret_target_votes` (game_id, resolution_id, voter_player_id, target_player_id)
+   - After all misaligned AIs vote OR deadline passes: tallies votes, random tiebreak, applies effect, returns to virus_resolution
+2. **`SecretTargeting.tsx` component** — UI shown only to misaligned AIs during targeting phase
+   - Dropdown/list to select a target AI (not human)
+   - Shows 1-minute countdown from `game.targeting_deadline`
+   - Submit vote button
+3. **Targeting deadline** — `games.targeting_deadline` set in `resolve-next-virus` when secret-targeting card is hit
+4. **Tally + effect application** — either in `secret-target` edge function (on last vote) or in a separate `end-targeting` edge function (on deadline)
+
+**Key edge cases:**
+- Only one misaligned AI in game → auto-resolves immediately
+- Target cannot be a human
+- Effect respects CPU/RAM min/max limits (1-4, 3-7)
+- Effect persists across missions if target doesn't act before mission ends
+
+## Key Architecture Notes
+
+**Realtime + polling pattern** (used in GameBoard and LobbyPhase):
+- Polling every 3s fetches `games` + `players` (ensures state even if Realtime misses events)
+- Realtime subscription uses `await supabase.auth.getSession()` before subscribing (critical — JWT must be loaded before the channel JOIN is sent)
+- `game_log` is Realtime-only (not polled); log entries may be missing on pages with broken Realtime
+
+**ES256 JWT decode pattern** (all edge functions):
 ```typescript
-// Polling fallback (runs every 3s, ensures session loaded first)
-useEffect(() => {
-  const supabase = createClient();
-  const poll = async () => {
-    await supabase.auth.getSession();
-    const { data } = await supabase.from("...").select("*").eq("...", id);
-    if (data) setState(data);
-  };
-  const id = setInterval(poll, 3000);
-  return () => clearInterval(id);
-}, [id]);
-
-// Realtime subscription (runs in parallel, faster but unreliable without loaded session)
-useEffect(() => {
-  const supabase = createClient();
-  const setup = async () => {
-    await supabase.auth.getSession(); // critical: load JWT before subscribing
-    channel = supabase.channel("...").on("postgres_changes", ...).subscribe();
-  };
-  setup();
-  return () => supabase.removeChannel(channel);
-}, [id]);
+const token = authHeader.replace("Bearer ", "");
+const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+const userId: string = payload.sub;
 ```
+
+**Hand card lookups must use `.limit(1).maybeSingle()`** (not `.single()`):
+Players can have multiple cards with the same `card_key`. `.single()` fails with a PostgREST error if more than one row matches.

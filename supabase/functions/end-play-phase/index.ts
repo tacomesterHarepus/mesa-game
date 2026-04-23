@@ -37,14 +37,20 @@ const MISSION_FAIL_PENALTIES: Record<string, number> = {
   global_research_network: 3, experimental_vaccine_model: 3,
 };
 
-// Active AI signals they are done playing cards and viruses for this turn.
-// Phase 6 simplified: no virus resolution — advances turn order directly.
-// Body: { game_id }
+// Active AI signals they are done playing cards and virus placements for this turn.
+// Full Phase 7 implementation:
+//   1. Check mission complete / end-of-round-2 failure
+//   2. Apply score changes if mission resolved; clear current_mission_id
+//   3. Shuffle pending_viruses into virus_pool
+//   4. Compute viruses to resolve: virusCount(player.cpu, turn_play_count)
+//   5. If viruses > 0: draw from pool into virus_resolution_queue, phase = virus_resolution
+//   6. If viruses == 0: advance turn directly (or game_over / resource_adjustment)
+// Body: { game_id, override_player_id?: string }
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { game_id } = await req.json();
+    const { game_id, override_player_id } = await req.json();
     if (!game_id) throw new Error("game_id required");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -65,97 +71,120 @@ Deno.serve(async (req) => {
     if (!game) throw new Error("Game not found");
     if (game.phase !== "player_turn") throw new Error("Not in player_turn phase");
 
-    const { data: callerPlayer } = await admin
-      .from("players").select("*").eq("game_id", game_id).eq("user_id", userId).single();
-    if (!callerPlayer) throw new Error("Player not found");
+    const callerPlayer = await resolvePlayer(admin, game_id, userId, override_player_id);
     if (callerPlayer.id !== game.current_turn_player_id) throw new Error("Not your turn");
 
+    // ── 1. Check mission outcome ──────────────────────────────────────────────
     const { data: mission } = await admin
-      .from("active_mission").select("*").eq("id", game.current_mission_id).single();
-    if (!mission) throw new Error("No active mission");
+      .from("active_mission").select("*").eq("id", game.current_mission_id).maybeSingle();
 
-    // Check mission complete
-    const reqs = MISSION_REQUIREMENTS[mission.mission_key] ?? {};
-    const missionComplete =
-      mission.compute_contributed >= (reqs.compute ?? 0) &&
-      mission.data_contributed >= (reqs.data ?? 0) &&
-      mission.validation_contributed >= (reqs.validation ?? 0);
+    let missionResolved = false;
+    let gameUpdates: Record<string, any> = { turn_play_count: 0 };
 
-    if (missionComplete) {
-      return await handleMissionSuccess(admin, game, mission);
-    }
+    if (mission) {
+      const reqs = MISSION_REQUIREMENTS[mission.mission_key] ?? {};
+      const missionComplete =
+        mission.compute_contributed >= (reqs.compute ?? 0) &&
+        mission.data_contributed >= (reqs.data ?? 0) &&
+        mission.validation_contributed >= (reqs.validation ?? 0);
 
-    // Advance turn order: find next player, skipping anyone with skip_next_turn
-    const turnOrderIds: string[] = game.turn_order_ids ?? [];
-    const currentIdx = turnOrderIds.indexOf(callerPlayer.id);
-    let nextIdx = currentIdx + 1;
-
-    while (nextIdx < turnOrderIds.length) {
-      const nextPlayerId = turnOrderIds[nextIdx];
-      const { data: nextPlayer } = await admin.from("players").select("*").eq("id", nextPlayerId).single();
-      if (!nextPlayer) { nextIdx++; continue; }
-
-      if (nextPlayer.skip_next_turn) {
-        await admin.from("players").update({ skip_next_turn: false }).eq("id", nextPlayerId);
+      if (missionComplete) {
+        missionResolved = true;
+        const reward = MISSION_REWARDS[mission.mission_key] ?? 2;
+        gameUpdates.core_progress = game.core_progress + reward;
+        gameUpdates.current_mission_id = null;
+        gameUpdates.pending_mission_options = [];
+        await resetPlayersForNextMission(admin, game_id);
         await admin.from("game_log").insert({
           game_id,
-          event_type: "turn_skipped",
-          public_description: `${nextPlayer.display_name}'s turn was skipped.`,
+          event_type: "mission_complete",
+          public_description: `Mission complete! Core Progress +${reward}. (${gameUpdates.core_progress}/10)`,
         });
-        nextIdx++;
-        continue;
-      }
+      } else {
+        // Check end of round 2
+        const turnOrderIds: string[] = game.turn_order_ids ?? [];
+        const currentIdx = turnOrderIds.indexOf(callerPlayer.id);
+        const isLastPlayer = currentIdx >= turnOrderIds.length - 1;
 
-      // This player goes next
-      await admin.from("games").update({ current_turn_player_id: nextPlayerId }).eq("id", game_id);
-      await admin.from("game_log").insert({
-        game_id,
-        event_type: "turn_start",
-        public_description: `${nextPlayer.display_name}'s turn.`,
-      });
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // End of round
-    if (mission.round === 1) {
-      // Start round 2: reset to first player
-      const firstPlayerId = turnOrderIds[0];
-      let firstIdx = 0;
-      while (firstIdx < turnOrderIds.length) {
-        const pid = turnOrderIds[firstIdx];
-        const { data: fp } = await admin.from("players").select("*").eq("id", pid).single();
-        if (fp && !fp.skip_next_turn) break;
-        if (fp?.skip_next_turn) {
-          await admin.from("players").update({ skip_next_turn: false }).eq("id", pid);
+        if (isLastPlayer && mission.round === 2) {
+          missionResolved = true;
+          const penalty = MISSION_FAIL_PENALTIES[mission.mission_key] ?? 1;
+          gameUpdates.escape_timer = game.escape_timer + penalty;
+          gameUpdates.current_mission_id = null;
+          gameUpdates.pending_mission_options = [];
+          await resetPlayersForNextMission(admin, game_id);
           await admin.from("game_log").insert({
             game_id,
-            event_type: "turn_skipped",
-            public_description: `${fp.display_name}'s turn was skipped.`,
+            event_type: "mission_failed",
+            public_description: `Mission failed! Escape Timer +${penalty}. (${gameUpdates.escape_timer}/8)`,
           });
         }
-        firstIdx++;
       }
-      const round2FirstPlayer = firstIdx < turnOrderIds.length ? turnOrderIds[firstIdx] : firstPlayerId;
+    }
 
-      await admin.from("active_mission").update({ round: 2 }).eq("id", mission.id);
-      await admin.from("games").update({
-        current_turn_player_id: round2FirstPlayer,
-        current_round: 2,
-      }).eq("id", game_id);
-      await admin.from("game_log").insert({
-        game_id,
-        event_type: "round_start",
-        public_description: "Round 2 begins.",
-      });
+    // ── 2. Shuffle pending_viruses into virus_pool ────────────────────────────
+    const { data: pending } = await admin
+      .from("pending_viruses").select("*").eq("game_id", game_id);
+
+    if (pending && pending.length > 0) {
+      const { data: maxPoolRow } = await admin.from("virus_pool")
+        .select("position").eq("game_id", game_id)
+        .order("position", { ascending: false }).limit(1).maybeSingle();
+      const startPos = (maxPoolRow?.position ?? -1) + 1;
+      const shuffled = shuffle([...pending]);
+
+      await admin.from("virus_pool").insert(
+        shuffled.map((card: any, i: number) => ({
+          game_id,
+          card_key: card.card_key,
+          card_type: card.card_type,
+          position: startPos + i,
+        }))
+      );
+      await admin.from("pending_viruses").delete().eq("game_id", game_id);
+    }
+
+    // ── 3. Compute viruses to resolve ─────────────────────────────────────────
+    const cardsPlayedThisTurn = game.turn_play_count; // already reflects cards played
+    const numViruses = virusCount(callerPlayer.cpu, cardsPlayedThisTurn);
+
+    // ── 4. Queue resolution or advance directly ───────────────────────────────
+    if (numViruses > 0) {
+      const { data: pool } = await admin.from("virus_pool")
+        .select("*").eq("game_id", game_id).order("position").limit(numViruses);
+
+      if (pool && pool.length > 0) {
+        await admin.from("virus_resolution_queue").insert(
+          pool.map((card: any, i: number) => ({
+            game_id,
+            card_key: card.card_key,
+            card_type: card.card_type,
+            position: i,
+            resolved: false,
+          }))
+        );
+        await admin.from("virus_pool").delete().in("id", pool.map((c: any) => c.id));
+        await admin.from("game_log").insert({
+          game_id,
+          event_type: "virus_queue_start",
+          public_description: `${callerPlayer.display_name} generated ${pool.length} virus${pool.length > 1 ? "es" : ""}.`,
+        });
+        gameUpdates.phase = "virus_resolution";
+      } else {
+        // Pool was empty — no viruses to resolve, advance directly
+        gameUpdates.phase = "player_turn";
+      }
+
+      await admin.from("games").update(gameUpdates).eq("id", game_id);
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Round 2 over — mission failed
-    return await handleMissionFailure(admin, game, mission);
+    // No viruses — advance turn directly
+    await admin.from("games").update(gameUpdates).eq("id", game_id);
+    const updatedGame = { ...game, ...gameUpdates };
+    return await advanceTurnOrPhase(admin, updatedGame, callerPlayer, missionResolved);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }), {
@@ -165,82 +194,133 @@ Deno.serve(async (req) => {
   }
 });
 
-async function handleMissionSuccess(admin: any, game: any, mission: any) {
+// ── Shared turn advancement logic ─────────────────────────────────────────────
+// Called from end-play-phase (no viruses) and resolve-next-virus (queue exhausted).
+export async function advanceTurnOrPhase(
+  admin: any,
+  game: any,
+  currentPlayer: any,
+  missionResolved: boolean,
+): Promise<Response> {
   const game_id = game.id;
-  const reward = MISSION_REWARDS[mission.mission_key] ?? 2;
-  const newProgress = game.core_progress + reward;
-  const winner = newProgress >= 10 ? "humans" : null;
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
 
-  await resetPlayersForNextMission(admin, game_id);
-
-  if (winner) {
-    await admin.from("games").update({
-      phase: "game_over",
-      winner: "humans",
-      core_progress: newProgress,
-      current_mission_id: null,
-    }).eq("id", game_id);
-    await admin.from("game_log").insert({
-      game_id,
-      event_type: "game_over",
-      public_description: "Mission complete! Humans win!",
+  // Win condition checks
+  if ((game.escape_timer ?? 0) >= 8) {
+    await admin.from("games").update({ phase: "game_over", winner: "misaligned" }).eq("id", game_id);
+    await admin.from("game_log").insert({ game_id, event_type: "game_over", public_description: "Escape Timer reached 8! Misaligned AIs win!" });
+    return new Response(JSON.stringify({ success: true, game_over: true, winner: "misaligned" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } else {
-    await admin.from("games").update({
-      phase: "resource_adjustment",
-      core_progress: newProgress,
-      current_mission_id: null,
-      pending_mission_options: [],
-    }).eq("id", game_id);
-    await admin.from("game_log").insert({
-      game_id,
-      event_type: "mission_complete",
-      public_description: `Mission complete! Core Progress +${reward}. (${newProgress}/10)`,
+  }
+  if ((game.core_progress ?? 0) >= 10) {
+    await admin.from("games").update({ phase: "game_over", winner: "humans" }).eq("id", game_id);
+    await admin.from("game_log").insert({ game_id, event_type: "game_over", public_description: "Core Progress reached 10! Humans win!" });
+    return new Response(JSON.stringify({ success: true, game_over: true, winner: "humans" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  return new Response(JSON.stringify({ success: true, mission_complete: true, winner }), {
+  // Mission resolved this turn — go to resource_adjustment for next mission
+  if (missionResolved || !game.current_mission_id) {
+    // Draw 3 mission options for the upcoming mission_selection
+    const allMissions = [
+      "data_cleanup", "basic_model_training", "dataset_preparation", "cross_validation",
+      "distributed_training", "balanced_compute_cluster", "dataset_integration",
+      "multi_model_ensemble", "synchronized_training", "genome_simulation",
+      "global_research_network", "experimental_vaccine_model",
+    ];
+    await admin.from("games").update({
+      phase: "resource_adjustment",
+      pending_mission_options: shuffle(allMissions).slice(0, 3),
+    }).eq("id", game_id);
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Mission still in progress — advance turn order
+  const { data: mission } = await admin
+    .from("active_mission").select("*").eq("id", game.current_mission_id).maybeSingle();
+
+  const turnOrderIds: string[] = game.turn_order_ids ?? [];
+  const currentIdx = turnOrderIds.indexOf(currentPlayer.id);
+  let nextIdx = currentIdx + 1;
+
+  while (nextIdx < turnOrderIds.length) {
+    const nextPlayerId = turnOrderIds[nextIdx];
+    const { data: nextPlayer } = await admin.from("players").select("*").eq("id", nextPlayerId).single();
+    if (!nextPlayer) { nextIdx++; continue; }
+
+    if (nextPlayer.skip_next_turn) {
+      await admin.from("players").update({ skip_next_turn: false }).eq("id", nextPlayerId);
+      await admin.from("game_log").insert({
+        game_id, event_type: "turn_skipped",
+        public_description: `${nextPlayer.display_name}'s turn was skipped.`,
+      });
+      nextIdx++;
+      continue;
+    }
+
+    await admin.from("games").update({ current_turn_player_id: nextPlayerId, phase: "player_turn" }).eq("id", game_id);
+    await admin.from("game_log").insert({
+      game_id, event_type: "turn_start",
+      public_description: `${nextPlayer.display_name}'s turn.`,
+    });
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // End of round
+  if (mission && mission.round === 1) {
+    // Start round 2: find first non-skipped player
+    let firstIdx = 0;
+    while (firstIdx < turnOrderIds.length) {
+      const pid = turnOrderIds[firstIdx];
+      const { data: fp } = await admin.from("players").select("*").eq("id", pid).single();
+      if (fp && !fp.skip_next_turn) break;
+      if (fp?.skip_next_turn) {
+        await admin.from("players").update({ skip_next_turn: false }).eq("id", pid);
+        await admin.from("game_log").insert({
+          game_id, event_type: "turn_skipped",
+          public_description: `${fp.display_name}'s turn was skipped.`,
+        });
+      }
+      firstIdx++;
+    }
+    const round2FirstPlayer = firstIdx < turnOrderIds.length ? turnOrderIds[firstIdx] : turnOrderIds[0];
+
+    await admin.from("active_mission").update({ round: 2 }).eq("id", game.current_mission_id);
+    await admin.from("games").update({
+      current_turn_player_id: round2FirstPlayer,
+      current_round: 2,
+      phase: "player_turn",
+    }).eq("id", game_id);
+    await admin.from("game_log").insert({
+      game_id, event_type: "round_start",
+      public_description: "Round 2 begins.",
+    });
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Round 2 last player — mission should have been resolved above; shouldn't reach here
+  return new Response(JSON.stringify({ success: true }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
-async function handleMissionFailure(admin: any, game: any, mission: any) {
-  const game_id = game.id;
-  const penalty = MISSION_FAIL_PENALTIES[mission.mission_key] ?? 1;
-  const newTimer = game.escape_timer + penalty;
-  const winner = newTimer >= 8 ? "misaligned" : null;
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-  await resetPlayersForNextMission(admin, game_id);
-
-  if (winner) {
-    await admin.from("games").update({
-      phase: "game_over",
-      winner: "misaligned",
-      escape_timer: newTimer,
-      current_mission_id: null,
-    }).eq("id", game_id);
-    await admin.from("game_log").insert({
-      game_id,
-      event_type: "game_over",
-      public_description: "Mission failed! Misaligned AIs win!",
-    });
-  } else {
-    await admin.from("games").update({
-      phase: "resource_adjustment",
-      escape_timer: newTimer,
-      current_mission_id: null,
-      pending_mission_options: [],
-    }).eq("id", game_id);
-    await admin.from("game_log").insert({
-      game_id,
-      event_type: "mission_failed",
-      public_description: `Mission failed! Escape Timer +${penalty}. (${newTimer}/8)`,
-    });
-  }
-
-  return new Response(JSON.stringify({ success: true, mission_complete: false, winner }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+function virusCount(cpu: number, cardsPlayed: number): number {
+  const base = cpu >= 2 ? 1 : 0;
+  const bonus = cardsPlayed >= 3 ? 1 : 0;
+  return Math.min(2, base + bonus);
 }
 
 async function resetPlayersForNextMission(admin: any, game_id: string) {
@@ -248,4 +328,41 @@ async function resetPlayersForNextMission(admin: any, game_id: string) {
     has_revealed_card: false,
     revealed_card_key: null,
   }).eq("game_id", game_id).neq("role", "human");
+}
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+async function resolvePlayer(
+  admin: ReturnType<typeof createClient>,
+  game_id: string,
+  userId: string,
+  override_player_id?: string,
+): Promise<any> {
+  if (override_player_id && Deno.env.get("MESA_ENVIRONMENT") !== "production") {
+    const { count } = await admin
+      .from("players")
+      .select("id", { count: "exact", head: true })
+      .eq("game_id", game_id)
+      .neq("user_id", userId);
+    if ((count ?? 1) !== 0) throw new Error("Dev override denied");
+
+    const { data } = await admin
+      .from("players").select("*")
+      .eq("id", override_player_id).eq("game_id", game_id).single();
+    if (!data) throw new Error("Override player not found in game");
+    return data;
+  }
+
+  const { data } = await admin
+    .from("players").select("*")
+    .eq("game_id", game_id).eq("user_id", userId).single();
+  if (!data) throw new Error("Player not found");
+  return data;
 }
