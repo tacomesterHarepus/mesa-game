@@ -51,6 +51,7 @@ export type Database = {
           turn_order: number
           skip_next_turn: boolean
           has_revealed_card: boolean
+          revealed_card_key: string | null
         }
         Insert: {
           id?: string
@@ -63,6 +64,7 @@ export type Database = {
           turn_order?: number
           skip_next_turn?: boolean
           has_revealed_card?: boolean
+          revealed_card_key?: string | null
         }
         Update: Partial<Database["public"]["Tables"]["players"]["Row"]>
         Relationships: []

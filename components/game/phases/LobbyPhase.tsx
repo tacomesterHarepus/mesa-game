@@ -50,54 +50,90 @@ export function LobbyPhase({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Realtime: players, spectators, game phase change
+  // Polling fallback: re-fetch lobby state every 3s in case Realtime misses events.
+  // Also checks game phase so all players navigate when the host starts the game,
+  // even if their Realtime subscription was established before they had a session.
   useEffect(() => {
     const supabase = createClient();
 
-    const channel = supabase
-      .channel(`lobby-${gameId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "players", filter: `game_id=eq.${gameId}` },
-        (payload) => {
-          const row = payload.new as PlayerRow;
-          setPlayers((prev) => (prev.some((p) => p.id === row.id) ? prev : [...prev, row]));
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "players", filter: `game_id=eq.${gameId}` },
-        (payload) => {
-          const removed = payload.old as { id: string };
-          setPlayers((prev) => prev.filter((p) => p.id !== removed.id));
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "spectators", filter: `game_id=eq.${gameId}` },
-        (payload) => {
-          const row = payload.new as SpectatorRow;
-          setSpectators((prev) => (prev.some((s) => s.id === row.id) ? prev : [...prev, row]));
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "spectators", filter: `game_id=eq.${gameId}` },
-        (payload) => {
-          const removed = payload.old as { id: string };
-          setSpectators((prev) => prev.filter((s) => s.id !== removed.id));
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "games", filter: `id=eq.${gameId}` },
-        (payload) => {
-          if (payload.new.phase !== "lobby") router.push(`/game/${gameId}`);
-        }
-      )
-      .subscribe();
+    const poll = async () => {
+      await supabase.auth.getSession();
+      const [{ data: p }, { data: s }, { data: g }] = await Promise.all([
+        supabase.from("players").select("*").eq("game_id", gameId),
+        supabase.from("spectators").select("*").eq("game_id", gameId),
+        supabase.from("games").select("phase").eq("id", gameId).single(),
+      ]);
+      if (p) setPlayers(p);
+      if (s) setSpectators(s);
+      if (g && g.phase !== "lobby") router.push(`/game/${gameId}`);
+    };
 
-    return () => { supabase.removeChannel(channel); };
+    const id = setInterval(poll, 2000);
+    return () => clearInterval(id);
+  }, [gameId, router]);
+
+  // Realtime: players, spectators, game phase change
+  useEffect(() => {
+    const supabase = createClient();
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    // Await getSession() before subscribing so the JWT is loaded by the time
+    // the channel JOIN message is sent — avoids anonymous-user RLS failures.
+    const setup = async () => {
+      await supabase.auth.getSession();
+      if (cancelled) return;
+
+      channel = supabase
+        .channel(`lobby-${gameId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "players", filter: `game_id=eq.${gameId}` },
+          (payload) => {
+            const row = payload.new as PlayerRow;
+            setPlayers((prev) => (prev.some((p) => p.id === row.id) ? prev : [...prev, row]));
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "DELETE", schema: "public", table: "players", filter: `game_id=eq.${gameId}` },
+          (payload) => {
+            const removed = payload.old as { id: string };
+            setPlayers((prev) => prev.filter((p) => p.id !== removed.id));
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "spectators", filter: `game_id=eq.${gameId}` },
+          (payload) => {
+            const row = payload.new as SpectatorRow;
+            setSpectators((prev) => (prev.some((s) => s.id === row.id) ? prev : [...prev, row]));
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "DELETE", schema: "public", table: "spectators", filter: `game_id=eq.${gameId}` },
+          (payload) => {
+            const removed = payload.old as { id: string };
+            setSpectators((prev) => prev.filter((s) => s.id !== removed.id));
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "games", filter: `id=eq.${gameId}` },
+          (payload) => {
+            if (payload.new.phase !== "lobby") router.push(`/game/${gameId}`);
+          }
+        )
+        .subscribe();
+    };
+
+    setup();
+
+    return () => {
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [gameId, router]);
 
   async function handleJoin(e: React.FormEvent) {
@@ -113,25 +149,35 @@ export function LobbyPhase({
       const supabase = createClient();
 
       if (joinMode === "player") {
-        const { data: player, error: joinError } = await supabase
+        // Generate ID client-side so we can build the row without a SELECT
+        // (avoids read-replica lag on .select().single() after INSERT)
+        const playerId = crypto.randomUUID();
+        const { error: joinError } = await supabase
           .from("players")
-          .insert({ game_id: gameId, user_id: uid, display_name: displayName.trim() })
-          .select()
-          .single();
+          .insert({ id: playerId, game_id: gameId, user_id: uid, display_name: displayName.trim() });
 
-        if (joinError || !player) {
-          setError(joinError?.message ?? "Failed to join");
+        if (joinError) {
+          setError(joinError.message);
           setJoinLoading(false);
           return;
         }
 
-        const { data: allPlayers } = await supabase
-          .from("players")
-          .select("*")
-          .eq("game_id", gameId);
+        const player: PlayerRow = {
+          id: playerId,
+          game_id: gameId,
+          user_id: uid,
+          display_name: displayName.trim(),
+          role: null,
+          cpu: 2,
+          ram: 4,
+          turn_order: 0,
+          skip_next_turn: false,
+          has_revealed_card: false,
+          revealed_card_key: null,
+        };
 
         setCurrentPlayer(player);
-        setPlayers(allPlayers ?? [player]);
+        setPlayers((prev) => (prev.some((p) => p.id === player.id) ? prev : [...prev, player]));
       } else {
         const { error: specError } = await supabase.from("spectators").insert({
           game_id: gameId,
@@ -145,13 +191,8 @@ export function LobbyPhase({
           return;
         }
 
-        const { data: allPlayers } = await supabase
-          .from("players")
-          .select("*")
-          .eq("game_id", gameId);
-
         setIsSpectating(true);
-        setPlayers(allPlayers ?? []);
+        // Players list is already loaded from initial state + Realtime
       }
 
       setJoinLoading(false);
@@ -165,11 +206,22 @@ export function LobbyPhase({
     setError(null);
     setStartLoading(true);
     const supabase = createClient();
-    const { error: fnError } = await supabase.functions.invoke("start-game", {
+    const { data, error: fnError } = await supabase.functions.invoke("start-game", {
       body: { game_id: gameId },
     });
     if (fnError) {
-      setError(fnError.message);
+      let message = fnError.message;
+      try {
+        const raw = await (fnError as unknown as { context?: Response }).context?.text();
+        if (raw) {
+          try { const j = JSON.parse(raw); if (j?.error) message = j.error; }
+          catch { message = raw.slice(0, 300); }
+        }
+      } catch { /* give up */ }
+      setError(message);
+      setStartLoading(false);
+    } else if (data?.error) {
+      setError(data.error);
       setStartLoading(false);
     }
   }

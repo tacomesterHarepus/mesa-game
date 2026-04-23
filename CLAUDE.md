@@ -1,5 +1,9 @@
 # MESA — Project Reference
 
+## Session Continuity
+
+**At the start of every session, read `SESSION_NOTES.md` first.** It contains the current blocker, next actions, and context from the previous session. Update it at the end of each session before closing.
+
 ## What is MESA?
 
 MESA is a 6–10 player social deduction + cooperative board game built as a web app.
@@ -576,8 +580,8 @@ mesa/
 | 1. Project setup | **DONE** | Next.js 14 + TypeScript strict + Supabase + GitHub + Vercel CI/CD |
 | 2. Auth + lobby | **DONE** | Anonymous auth, create game, join lobby, spectators, start-game edge function |
 | 3. Database + RLS | **DONE** | Migrations 001–003, spectators table, rematch schema, realtime publication |
-| 4. Game state machine | **NEXT UP** | Main game screen, phase routing |
-| 5. Card data layer | pending | |
+| 4. Game state machine | **DONE** | Main game screen, phase routing, polling fallback, 5 edge functions |
+| 5. Card data layer | **NEXT UP** | `lib/game/deck.ts` — deck construction and shuffle |
 | 6. Mission flow | pending | |
 | 7. Virus system | pending | |
 | 8. Secret actions | pending | |

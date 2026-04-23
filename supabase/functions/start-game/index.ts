@@ -18,29 +18,26 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Caller-auth client (respects RLS for identity check)
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Unauthorized");
-    const callerClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const {
-      data: { user },
-    } = await callerClient.auth.getUser();
-    if (!user) throw new Error("Unauthorized");
+    const token = authHeader.replace("Bearer ", "");
+    const payloadB64 = token.split(".")[1];
+    if (!payloadB64) throw new Error("Unauthorized");
+    const payload = JSON.parse(atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/")));
+    const userId: string = payload.sub;
+    if (!userId) throw new Error("Unauthorized");
 
     // Admin client (bypasses RLS for writes)
     const admin = createClient(supabaseUrl, serviceKey);
 
-    const { data: game } = await admin
+    const { data: game, error: gameError } = await admin
       .from("games")
       .select("*")
       .eq("id", game_id)
       .single();
-    if (!game) throw new Error("Game not found");
-    if (game.host_user_id !== user.id) throw new Error("Only the host can start");
+    if (gameError || !game) throw new Error("Game not found");
+    if (game.host_user_id !== userId) throw new Error("Only the host can start");
     if (game.phase !== "lobby") throw new Error("Game already started");
 
     const { data: players } = await admin
@@ -60,12 +57,11 @@ Deno.serve(async (req) => {
       ...Array(dist.misaligned).fill("misaligned_ai"),
     ];
     const shuffledPlayers = shuffle(players!);
-    for (let i = 0; i < shuffledPlayers.length; i++) {
-      await admin
-        .from("players")
-        .update({ role: roles[i], turn_order: i })
-        .eq("id", shuffledPlayers[i].id);
-    }
+
+    // Assign roles in parallel
+    await Promise.all(shuffledPlayers.map((player, i) =>
+      admin.from("players").update({ role: roles[i], turn_order: i }).eq("id", player.id)
+    ));
 
     const aiPlayers = shuffledPlayers.filter((_, i) => roles[i] !== "human");
 
@@ -82,39 +78,31 @@ Deno.serve(async (req) => {
     const { error: deckErr } = await admin.from("deck_cards").insert(deckRecords);
     if (deckErr) throw new Error("Failed to create deck");
 
-    // First 4 cards → virus pool
+    // First 4 cards → virus pool; then deal AI hands — run in parallel
     const poolRecords = deck.slice(0, 4).map((card, pos) => ({
       game_id,
       card_key: card.key,
       card_type: card.type,
       position: pos,
     }));
-    await admin.from("virus_pool").insert(poolRecords);
-    await admin
-      .from("deck_cards")
-      .update({ status: "drawn" })
-      .eq("game_id", game_id)
-      .lt("position", 4);
 
-    // Next RAM cards to each AI (default RAM = 4)
+    // Build all hand records in one pass (all AIs use default RAM = 4 at start)
+    const allHandRecords: Array<{ game_id: string; player_id: string; card_key: string; card_type: string }> = [];
     let deckPos = 4;
     for (const ai of aiPlayers) {
-      const handCards = deck.slice(deckPos, deckPos + ai.ram);
-      const handRecords = handCards.map((card) => ({
-        game_id,
-        player_id: ai.id,
-        card_key: card.key,
-        card_type: card.type,
-      }));
-      await admin.from("hands").insert(handRecords);
-      await admin
-        .from("deck_cards")
-        .update({ status: "drawn" })
-        .eq("game_id", game_id)
-        .gte("position", deckPos)
-        .lt("position", deckPos + ai.ram);
-      deckPos += ai.ram;
+      const ram = ai.ram ?? 4;
+      deck.slice(deckPos, deckPos + ram).forEach((card) =>
+        allHandRecords.push({ game_id, player_id: ai.id, card_key: card.key, card_type: card.type })
+      );
+      deckPos += ram;
     }
+    const totalDrawn = deckPos; // virus pool (4) + all hand cards
+
+    await Promise.all([
+      admin.from("virus_pool").insert(poolRecords),
+      admin.from("hands").insert(allHandRecords),
+      admin.from("deck_cards").update({ status: "drawn" }).eq("game_id", game_id).lt("position", totalDrawn),
+    ]);
 
     // ── Start game ────────────────────────────────────────────────────────────
     const turnOrderIds = shuffle(aiPlayers.map((p: any) => p.id));

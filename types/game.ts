@@ -36,10 +36,11 @@ export interface Player {
   game_id: string
   user_id: string
   display_name: string
-  role: Role
+  role: Role | null
   cpu: number
   ram: number
   turn_order: number
   skip_next_turn: boolean
   has_revealed_card: boolean
+  revealed_card_key: string | null
 }
