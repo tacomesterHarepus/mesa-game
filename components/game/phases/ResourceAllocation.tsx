@@ -10,14 +10,13 @@ interface Props {
   gameId: string;
   players: Player[];
   currentPlayer: Player | null;
-  isHost: boolean;
   missionKey: string;
 }
 
 const CPU_MAX = 4;
 const RAM_MAX = 7;
 
-export function ResourceAllocation({ gameId, players, currentPlayer, isHost, missionKey }: Props) {
+export function ResourceAllocation({ gameId, players, currentPlayer, missionKey }: Props) {
   const def = MISSION_MAP[missionKey];
   const aiPlayers = players.filter((p) => p.role !== "human");
   const isHuman = currentPlayer?.role === "human";
@@ -137,7 +136,7 @@ export function ResourceAllocation({ gameId, players, currentPlayer, isHost, mis
         ))}
       </div>
 
-      {isHost && (
+      {isHuman && (
         <div className="mt-4">
           {error && <p className="text-virus text-xs font-mono mb-2">{error}</p>}
           <Button onClick={handleSubmit} loading={loading} className="w-full">
@@ -146,11 +145,6 @@ export function ResourceAllocation({ gameId, players, currentPlayer, isHost, mis
         </div>
       )}
 
-      {isHuman && !isHost && (
-        <p className="mt-4 text-faint text-xs font-mono text-center">
-          Waiting for the host to start the mission…
-        </p>
-      )}
 
       {!isHuman && (
         <p className="mt-4 text-faint text-xs font-mono text-center">

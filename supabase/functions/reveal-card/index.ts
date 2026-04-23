@@ -44,13 +44,14 @@ Deno.serve(async (req) => {
     if (!callerPlayer || callerPlayer.role === "human") throw new Error("Only AI players may reveal cards");
     if (callerPlayer.has_revealed_card) throw new Error("Already revealed a card this phase");
 
-    // Verify the card is in the player's hand
+    // Verify the card is in the player's hand (player may have duplicates, so limit 1)
     const { data: handCard } = await admin
       .from("hands")
       .select("*")
       .eq("player_id", callerPlayer.id)
       .eq("card_key", card_key)
-      .single();
+      .limit(1)
+      .maybeSingle();
     if (!handCard) throw new Error("Card not in hand");
 
     // Mark revealed (card stays in hand)

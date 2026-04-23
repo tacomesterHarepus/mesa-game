@@ -219,7 +219,6 @@ export function GameBoard({
             gameId={gameId}
             players={players}
             currentPlayer={syncedCurrentPlayer}
-            isHost={isHost}
             missionKey={mission?.mission_key ?? ""}
           />
         );

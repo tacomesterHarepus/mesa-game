@@ -1,39 +1,48 @@
 # Session Notes
 
 ## Current Phase
-**Phase 5 — Card Data Layer** (NEXT UP)
+**Phase 7 — Virus System** (NEXT UP)
 
-## Phase 4 Complete ✓
+## Phase 6 Complete ✓
 
-All 12 E2E tests pass (5 lobby + 7 mission-flow). Full test run: `12 passed (43.4s)`.
+All 15 E2E tests pass (5 lobby + 10 mission-flow). Full test run: `15 passed (52.6s)`.
 
-### What Was Built in Phase 4
-- `components/game/GameBoard.tsx` — main game screen with Realtime + polling fallback
-- `components/game/TrackerBar.tsx`, `MissionBoard.tsx`, `PlayerRoster.tsx`, `Hand.tsx`, `GameLog.tsx`
-- Phase components: `ResourceAdjustment`, `MissionSelection`, `CardReveal`, `ResourceAllocation`, `PlayerTurn`, `VirusResolution`, `SecretTargeting`, `GameOver`
-- `components/chat/PublicChat.tsx`, `MisalignedPrivateChat.tsx`
-- 5 edge functions deployed: `start-game`, `adjust-resources`, `select-mission`, `reveal-card`, `allocate-resources`
-- `supabase/migrations/006_service_role_grants.sql` — `GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role`
+### What Was Built in Phase 6
+- `supabase/functions/play-card/index.ts` — AI plays a progress card to active mission. Validates caller = current turn player, card in hand (progress only), CPU limit. Updates mission contribution counts.
+- `supabase/functions/end-play-phase/index.ts` — AI ends their turn. Checks mission complete, advances turn order (skipping `skip_next_turn` players), handles round 2 start, mission success/failure. Phase 6 simplified: no virus resolution, advances turn order directly.
+- `components/game/phases/PlayerTurn.tsx` — Full AI turn UI: hand filtered to progress cards, Play Card button, End Turn button.
 
 ### Key Fixes Applied
-1. **ES256 JWT** — All edge functions use `atob()` to decode JWT manually (Supabase switched from HS256 to ES256)
-2. **Service role grants** — Migration 006 added `GRANT ALL` to `service_role` (was missing from 004_grants.sql)
-3. **Realtime delivery** — Realtime `postgres_changes` events require JWT loaded BEFORE subscribing. Fixed by adding polling fallback (3s interval) in both `LobbyPhase` and `GameBoard`
-4. **Lobby polling** — Also checks game phase so all players navigate to the game board even if Realtime subscription was established before they had a session
+1. **verify_jwt: false on all edge functions** — Supabase switched to ES256 JWT. All functions must use verify_jwt: false and do manual atob() JWT decode.
+2. **reveal-card `.single()` bug** — Changed to `.limit(1).maybeSingle()` for hand card lookup. `.single()` fails if player has duplicate cards with same key.
+3. **allocate-resources host-only restriction** — Removed `host_user_id` check. Any human can submit allocation (host may be AI). Updated `ResourceAllocation` component to show "Start Mission" to any human, not just host.
+4. **Test timing** — Test 10 (End Turn) uses a retry loop (30 × 500ms) instead of per-page timeout to find the "End Turn" button efficiently.
 
-## Next: Phase 5 — Card Data Layer
+### Deployed Edge Functions (all verify_jwt: false)
+- start-game: v6
+- adjust-resources: v2
+- select-mission: v2
+- reveal-card: v3 (fixed .single() → .limit(1).maybeSingle())
+- allocate-resources: v3 (removed host-only restriction)
+- play-card: v2 (verify_jwt: false)
+- end-play-phase: v2 (verify_jwt: false)
 
-The card constants and mission constants already exist in `lib/game/cards.ts` and `lib/game/missions.ts` (used by start-game edge function and UI components). What's missing:
+## Next: Phase 7 — Virus System
 
-- `lib/game/deck.ts` — client-side deck helpers if needed for UI
-- Verify all card keys in `CARD_MAP` and `MISSION_MAP` are correct and match the DB/edge function usage
+The current `end-play-phase` is simplified (Phase 6): it skips virus resolution entirely and advances turn order directly. Phase 7 needs to implement the full virus pipeline:
 
-Actually, looking at the build sequence: `start-game` already builds and deals the deck server-side. The client just reads cards from the `hands` table. Phase 5 might be largely done already.
+1. `place-virus` edge function — AI places virus cards face-down next to pool during their turn (simultaneously with playing progress cards)
+2. `end-play-phase` update — after AI plays cards, shuffle pending viruses into pool, then trigger virus resolution instead of advancing turn directly
+3. `resolve-next-virus` edge function — resolves one card from the virus_resolution_queue, checks win conditions, handles Cascading Failure chaining
+4. `VirusResolution` phase component — UI for watching virus cards resolve one by one
 
-**Next concrete actions:**
-1. Check what `lib/game/cards.ts` and `lib/game/missions.ts` currently contain
-2. Check what `lib/game/deck.ts` needs to contain (or if it even needs to exist)
-3. If Phase 5 is already done by the start-game implementation, move to Phase 6 (Mission flow — play-card edge function)
+### Virus generation rules
+- CPU ≥ 2 → +1 virus per turn
+- Every 3rd card played that turn → +1 additional virus (max total: 2 per turn)
+
+### Win conditions (after every state change)
+- Escape Timer reaches 8 → Misaligned AIs win immediately
+- Core Progress reaches 10 → Humans win after active AI's full virus chain resolves
 
 ## Architecture Reminder
 

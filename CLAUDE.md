@@ -581,9 +581,9 @@ mesa/
 | 2. Auth + lobby | **DONE** | Anonymous auth, create game, join lobby, spectators, start-game edge function |
 | 3. Database + RLS | **DONE** | Migrations 001–003, spectators table, rematch schema, realtime publication |
 | 4. Game state machine | **DONE** | Main game screen, phase routing, polling fallback, 5 edge functions |
-| 5. Card data layer | **NEXT UP** | `lib/game/deck.ts` — deck construction and shuffle |
-| 6. Mission flow | pending | |
-| 7. Virus system | pending | |
+| 5. Card data layer | **DONE** | cards.ts, missions.ts, deck.ts, virusRules.ts, missionRules.ts, phaseTransitions.ts |
+| 6. Mission flow | **DONE** | play-card, end-play-phase edge functions + PlayerTurn UI; simplified (no virus resolution yet) |
+| 7. Virus system | **NEXT UP** | |
 | 8. Secret actions | pending | |
 | 9. Mission special rules | pending | |
 | 10. Human controls | pending | |

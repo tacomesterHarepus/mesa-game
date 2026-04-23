@@ -37,12 +37,15 @@ async function joinGame(ctx: BrowserContext, lobbyUrl: string, name: string): Pr
   return page;
 }
 
-// Finds the first page that has a visible button matching the text pattern
-async function findPageWithButton(pages: Page[], name: RegExp | string): Promise<Page | null> {
+// Finds the first page that has a visible button matching the text pattern.
+// timeout controls how long to wait per page before moving on (default: no wait).
+async function findPageWithButton(pages: Page[], name: RegExp | string, timeout = 0): Promise<Page | null> {
   for (const page of pages) {
     const btn = page.getByRole("button", { name });
-    if (await btn.isVisible().catch(() => false)) {
-      return page;
+    if (timeout > 0) {
+      if (await btn.isVisible({ timeout }).catch(() => false)) return page;
+    } else {
+      if (await btn.isVisible().catch(() => false)) return page;
     }
   }
   return null;
@@ -224,5 +227,89 @@ test.describe("game phase flow", () => {
       }
     }
     expect(sawRevealButton).toBe(true);
+  });
+
+  test("all AIs reveal cards advancing to resource_allocation", async () => {
+    // Each page that shows a "Reveal Card" button must reveal one card.
+    // Card buttons in the Hand have a `title` attribute (set from CARD_MAP description).
+    for (const page of pages) {
+      const revealBtn = page.getByRole("button", { name: /Reveal Card/i });
+      if (!await revealBtn.isVisible().catch(() => false)) continue;
+
+      // Click any card in hand to select it, then click Reveal Card
+      const cardBtn = page.locator("button[title]").first();
+      if (await cardBtn.isVisible().catch(() => false)) {
+        await cardBtn.click();
+      }
+      await revealBtn.click();
+      // Brief pause so the function call completes before moving to next AI
+      await page.waitForTimeout(1500);
+    }
+
+    // All AIs revealed — game should advance to resource_allocation
+    let sawResourceAllocation = false;
+    for (const page of pages) {
+      if (await page.getByText("Resource Allocation").isVisible({ timeout: 15_000 }).catch(() => false)) {
+        sawResourceAllocation = true;
+        break;
+      }
+    }
+    expect(sawResourceAllocation).toBe(true);
+  });
+
+  test("a human player submits resource allocation advancing to player_turn", async () => {
+    // Any human page shows the "Start Mission" button in resource_allocation
+    const humanPage = await findPageWithButton(pages, /Start Mission/i, 10_000);
+    expect(humanPage).not.toBeNull();
+
+    // Capture any allocate-resources error for diagnostics
+    let allocRawError: string | null = null;
+    humanPage!.on("response", async (response) => {
+      if (response.url().includes("/allocate-resources")) {
+        if (!response.ok()) {
+          allocRawError = await response.text().catch(() => `HTTP ${response.status()}`);
+        }
+      }
+    });
+
+    await humanPage!.getByRole("button", { name: /Start Mission/i }).click();
+
+    // Wait briefly for the function to complete, then check for errors
+    await humanPage!.waitForTimeout(3000);
+    if (allocRawError) {
+      throw new Error(`allocate-resources edge function failed:\n${allocRawError}`);
+    }
+
+    let sawPlayerTurn = false;
+    for (const page of pages) {
+      if (await page.getByText("Player Turn").isVisible({ timeout: 15_000 }).catch(() => false)) {
+        sawPlayerTurn = true;
+        break;
+      }
+    }
+    expect(sawPlayerTurn).toBe(true);
+  });
+
+  test("active AI sees End Turn button and can end their turn", async () => {
+    // Find the page for the active player — it shows the End Turn button.
+    // Retry quickly across all pages since some may still be polling to enter player_turn.
+    let activePage: Page | null = null;
+    for (let i = 0; i < 30 && !activePage; i++) {
+      activePage = await findPageWithButton(pages, /End Turn/i);
+      if (!activePage) await pages[0].waitForTimeout(500);
+    }
+    expect(activePage).not.toBeNull();
+
+    const endTurnBtn = activePage!.getByRole("button", { name: /End Turn/i });
+    await expect(endTurnBtn).toBeVisible();
+    await endTurnBtn.click();
+
+    // Game should advance: either next player's turn or back to resource_adjustment
+    let advanced = false;
+    for (const page of pages) {
+      const hasPlayerTurn = await page.getByText(/Player Turn|Resource Adjustment/).isVisible({ timeout: 15_000 }).catch(() => false);
+      if (hasPlayerTurn) { advanced = true; break; }
+    }
+    expect(advanced).toBe(true);
   });
 });

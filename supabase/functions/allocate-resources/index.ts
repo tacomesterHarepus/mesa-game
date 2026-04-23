@@ -35,10 +35,7 @@ Deno.serve(async (req) => {
     if (!game) throw new Error("Game not found");
     if (game.phase !== "resource_allocation") throw new Error("Not in resource_allocation phase");
 
-    // Verify caller is host (allocation is a single decision)
-    if (game.host_user_id !== userId) throw new Error("Only the host may submit allocations");
-
-    // Validate caller is a human player
+    // Verify caller is a human player in this game
     const { data: callerPlayer } = await admin
       .from("players")
       .select("*")
