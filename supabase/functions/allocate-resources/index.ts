@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { drawCardsForPlayer } from "../_shared/advanceTurnOrPhase.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -95,6 +96,15 @@ Deno.serve(async (req) => {
       current_turn_player_id: firstPlayerId,
       current_round: 1,
     }).eq("id", game_id);
+
+    // Draw cards for the first player of round 1 — advanceTurnOrPhase only draws
+    // for players 2+ (when advancing to the next turn). The first player would
+    // otherwise start with their start-game hand, which may be smaller than their
+    // post-allocation RAM if the human just bumped it.
+    if (firstPlayerId) {
+      const { data: firstPlayer } = await admin.from("players").select("*").eq("id", firstPlayerId).single();
+      if (firstPlayer) await drawCardsForPlayer(admin, game_id, firstPlayer);
+    }
 
     await admin.from("game_log").insert({
       game_id,

@@ -3,7 +3,7 @@ import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 const SUPABASE_URL = "https://qpoakdiwmpaxvvzpqqdh.supabase.co";
 const ANON_KEY = "sb_publishable_Kz82SiJlbKrdJ0ZtAQPEkg_mm-0aapD";
 
-// ── Helpers (mirrors virus-system.spec.ts) ────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function fillLobby(ctx: BrowserContext, hostName = "Bot1"): Promise<{ page: Page; gameId: string }> {
   const page = await ctx.newPage();
@@ -77,16 +77,14 @@ async function collectPlayerIds(page: Page): Promise<{ humanId: string | null; a
   return { humanId, aiIds };
 }
 
-// Advances mission_selection → card_reveal → resource_allocation → player_turn.
-// Allocates zero CPU/RAM so all AIs keep CPU=1 (no virus generation during draw test).
-async function advanceToPlayerTurnNoBump(
+// Advances from mission_selection through card_reveal, stops at resource_allocation.
+async function advanceThroughCardReveal(
   page: Page,
   gameId: string,
   token: string,
   aiIds: string[],
   humanId: string,
 ): Promise<void> {
-  // Mission selection: switch to human and pick any mission
   await page.getByText("Mission Selection").waitFor({ state: "visible", timeout: 30000 });
   const switcherPanel = page.locator(".fixed.top-7");
   const playerButtons = switcherPanel.getByRole("button");
@@ -100,7 +98,6 @@ async function advanceToPlayerTurnNoBump(
   await page.locator("button:not([name])").filter({ hasText: /Compute|Data|Validation/ }).first().click();
   await page.getByRole("button", { name: "Select Mission" }).click();
 
-  // Card reveal: each AI reveals their first hand card via direct API
   await page.getByText("Card Reveal").waitFor({ state: "visible", timeout: 15000 });
   for (const playerId of aiIds) {
     const handResp = await fetch(
@@ -118,18 +115,27 @@ async function advanceToPlayerTurnNoBump(
     await page.waitForTimeout(300);
   }
 
-  // Resource allocation: zero CPU/RAM deltas — advance phase without changing stats
   await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 15000 });
+}
+
+// Zero-allocation path: advances all the way to player_turn without bumping any stats.
+async function advanceToPlayerTurnNoBump(
+  page: Page,
+  gameId: string,
+  token: string,
+  aiIds: string[],
+  humanId: string,
+): Promise<void> {
+  await advanceThroughCardReveal(page, gameId, token, aiIds, humanId);
   await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ game_id: gameId, allocations: [], override_player_id: humanId }),
   });
-
   await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
 }
 
-// ── Test ──────────────────────────────────────────────────────────────────────
+// ── Tests ─────────────────────────────────────────────────────────────────────
 
 test.describe("draw cards", () => {
   test("AI hand is replenished to RAM at the start of each new turn", async ({ browser }) => {
@@ -148,7 +154,6 @@ test.describe("draw cards", () => {
 
       await advanceToPlayerTurnNoBump(page, gameId, token!, aiIds, humanId!);
 
-      // Fetch the actual turn order from the game row
       const gameResp = await fetch(
         `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=turn_order_ids`,
         { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
@@ -156,7 +161,6 @@ test.describe("draw cards", () => {
       const [gameRow] = (await gameResp.json()) as Array<{ turn_order_ids: string[] }>;
       const turnOrder = gameRow.turn_order_ids;
 
-      // Fetch the first AI's RAM (starting value before any allocation)
       const firstPlayerId = turnOrder[0];
       const p1Resp = await fetch(
         `${SUPABASE_URL}/rest/v1/players?id=eq.${firstPlayerId}&select=ram`,
@@ -194,18 +198,13 @@ test.describe("draw cards", () => {
         await page.waitForTimeout(600);
       }
 
-      // Wait for round 2 to begin (advanceTurnOrPhase draws for the first AI before setting phase)
       await page.waitForTimeout(1000);
 
       if (!firstAiPlayedCard) {
-        // First AI had no progress cards — draw amount was 0, test is vacuous. Skip.
         test.skip();
         return;
       }
 
-      // The first AI played a card in round 1 (hand went from ram → ram-1).
-      // advanceTurnOrPhase should have drawn 1 card when advancing to round 2,
-      // restoring the hand to ram.
       const hand2Resp = await fetch(
         `${SUPABASE_URL}/rest/v1/hands?player_id=eq.${firstPlayerId}&game_id=eq.${gameId}&select=id`,
         { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
@@ -213,6 +212,187 @@ test.describe("draw cards", () => {
       const hand2 = (await hand2Resp.json()) as Array<{ id: string }>;
 
       expect(hand2.length).toBe(ram);
+    } finally {
+      await ctx.close().catch(() => {});
+    }
+  });
+
+  test("first player hand filled to new RAM after allocation bump", async ({ browser }) => {
+    const ctx: BrowserContext = await browser.newContext();
+
+    try {
+      const { page, gameId } = await fillLobby(ctx, "Bot1");
+      await startDevGame(page);
+
+      const token = await extractAuthToken(page);
+      expect(token).not.toBeNull();
+
+      const { humanId, aiIds } = await collectPlayerIds(page);
+      expect(humanId).not.toBeNull();
+
+      await advanceThroughCardReveal(page, gameId, token!, aiIds, humanId!);
+
+      // Identify first player and their pre-allocation RAM
+      const gameResp = await fetch(
+        `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=turn_order_ids`,
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+      );
+      const [gameRow] = (await gameResp.json()) as Array<{ turn_order_ids: string[] }>;
+      const firstPlayerId = gameRow.turn_order_ids[0];
+
+      const p1Resp = await fetch(
+        `${SUPABASE_URL}/rest/v1/players?id=eq.${firstPlayerId}&select=ram`,
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+      );
+      const [p1Row] = (await p1Resp.json()) as Array<{ ram: number }>;
+      const ramBefore = p1Row.ram;
+
+      // Allocate +2 RAM to first player and advance to player_turn
+      await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          game_id: gameId,
+          allocations: [{ player_id: firstPlayerId, cpu_delta: 0, ram_delta: 2 }],
+          override_player_id: humanId,
+        }),
+      });
+
+      await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
+      await page.waitForTimeout(500);
+
+      // Verify post-allocation RAM and hand size both reflect the bump
+      const p1AfterResp = await fetch(
+        `${SUPABASE_URL}/rest/v1/players?id=eq.${firstPlayerId}&select=ram`,
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+      );
+      const [p1AfterRow] = (await p1AfterResp.json()) as Array<{ ram: number }>;
+      expect(p1AfterRow.ram).toBe(ramBefore + 2);
+
+      const handResp = await fetch(
+        `${SUPABASE_URL}/rest/v1/hands?player_id=eq.${firstPlayerId}&game_id=eq.${gameId}&select=id`,
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+      );
+      const hand = (await handResp.json()) as Array<{ id: string }>;
+      expect(hand.length).toBe(p1AfterRow.ram);
+    } finally {
+      await ctx.close().catch(() => {});
+    }
+  });
+
+  test("next player hand filled after virus-path turn advancement", async ({ browser }) => {
+    const ctx: BrowserContext = await browser.newContext();
+
+    try {
+      const { page, gameId } = await fillLobby(ctx, "Bot1");
+      await startDevGame(page);
+
+      const token = await extractAuthToken(page);
+      expect(token).not.toBeNull();
+
+      const { humanId, aiIds } = await collectPlayerIds(page);
+      expect(humanId).not.toBeNull();
+
+      await advanceThroughCardReveal(page, gameId, token!, aiIds, humanId!);
+
+      const gameResp = await fetch(
+        `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=turn_order_ids`,
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+      );
+      const [gameRow] = (await gameResp.json()) as Array<{ turn_order_ids: string[] }>;
+      const firstPlayerId = gameRow.turn_order_ids[0];
+      const secondPlayerId = gameRow.turn_order_ids[1];
+
+      // Allocate +1 CPU to first AI so they have CPU=2 (triggers 1 virus per end-of-turn)
+      await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          game_id: gameId,
+          allocations: [{ player_id: firstPlayerId, cpu_delta: 1, ram_delta: 0 }],
+          override_player_id: humanId,
+        }),
+      });
+
+      await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
+
+      // Find a progress card in the first player's hand to play
+      const handResp = await fetch(
+        `${SUPABASE_URL}/rest/v1/hands?player_id=eq.${firstPlayerId}&game_id=eq.${gameId}&select=id,card_type`,
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+      );
+      const hand = (await handResp.json()) as Array<{ id: string; card_type: string }>;
+      const progressCard = hand.find((c) => c.card_type === "progress");
+      if (!progressCard) {
+        test.skip();
+        return;
+      }
+
+      // Play one card and end turn — CPU=2 with 1 card → 1 virus → virus_resolution
+      await fetch(`${SUPABASE_URL}/functions/v1/play-card`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ game_id: gameId, card_id: progressCard.id, override_player_id: firstPlayerId }),
+      });
+
+      await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ game_id: gameId, override_player_id: firstPlayerId }),
+      });
+      await page.waitForTimeout(1000);
+
+      // Fetch second player's RAM before they receive drawn cards
+      const p2Resp = await fetch(
+        `${SUPABASE_URL}/rest/v1/players?id=eq.${secondPlayerId}&select=ram`,
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+      );
+      const [p2Row] = (await p2Resp.json()) as Array<{ ram: number }>;
+      const secondPlayerRam = p2Row.ram;
+
+      // Resolve all queued virus cards by calling resolve-next-virus in a loop.
+      // Stop when the game advances to player_turn (second player's turn).
+      for (let i = 0; i < 10; i++) {
+        const stateResp = await fetch(
+          `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=phase,current_turn_player_id`,
+          { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+        );
+        const [stateRow] = (await stateResp.json()) as Array<{ phase: string; current_turn_player_id: string }>;
+        if (stateRow.phase === "player_turn") break;
+        if (stateRow.phase === "secret_targeting") {
+          test.skip();
+          return;
+        }
+        if (stateRow.phase !== "virus_resolution") break;
+
+        await fetch(`${SUPABASE_URL}/functions/v1/resolve-next-virus`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ game_id: gameId, override_player_id: firstPlayerId }),
+        });
+        await page.waitForTimeout(500);
+      }
+
+      // Confirm the game is now in player_turn with secondPlayer as active
+      const finalStateResp = await fetch(
+        `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=phase,current_turn_player_id`,
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+      );
+      const [finalState] = (await finalStateResp.json()) as Array<{ phase: string; current_turn_player_id: string }>;
+
+      if (finalState.phase !== "player_turn" || finalState.current_turn_player_id !== secondPlayerId) {
+        // Mission completed or unexpected phase transition — skip rather than assert wrong target
+        test.skip();
+        return;
+      }
+
+      // advanceTurnOrPhase in resolve-next-virus should have drawn cards for secondPlayer
+      const hand2Resp = await fetch(
+        `${SUPABASE_URL}/rest/v1/hands?player_id=eq.${secondPlayerId}&game_id=eq.${gameId}&select=id`,
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+      );
+      const hand2 = (await hand2Resp.json()) as Array<{ id: string }>;
+      expect(hand2.length).toBe(secondPlayerRam);
     } finally {
       await ctx.close().catch(() => {});
     }
