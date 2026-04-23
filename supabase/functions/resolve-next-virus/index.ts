@@ -1,10 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { advanceTurnOrPhase, corsHeaders, shuffle } from "../_shared/advanceTurnOrPhase.ts";
 
 // Resolves one card from the virus_resolution_queue.
 // Called by the host (or any human in dev mode) from the VirusResolution UI.
@@ -105,7 +101,6 @@ async function applyVirusEffect(admin: any, game: any, card: any): Promise<boole
 
   switch (card.card_key) {
     case "cascading_failure": {
-      // Add up to 2 more cards from the pool to the queue
       const { data: pool } = await admin.from("virus_pool").select("*")
         .eq("game_id", game_id).order("position").limit(2);
 
@@ -219,7 +214,6 @@ async function applyVirusEffect(admin: any, game: any, card: any): Promise<boole
     }
 
     // Secret-targeting effects: transition to secret_targeting, pause virus chain.
-    // Phase 8 (secret-target edge function) will apply the effect and return to virus_resolution.
     case "process_crash":
     case "memory_leak":
     case "resource_surge":
@@ -271,7 +265,6 @@ async function refillVirusPool(admin: any, game_id: string) {
   let drawCards = await drawFromDeck(admin, game_id, needed);
 
   if (drawCards.length === 0) {
-    // Draw pile empty — reshuffle discards
     await reshuffleDiscard(admin, game_id);
     drawCards = await drawFromDeck(admin, game_id, needed);
   }
@@ -311,119 +304,4 @@ async function reshuffleDiscard(admin: any, game_id: string) {
       admin.from("deck_cards").update({ status: "in_deck", position: pos }).eq("id", id)
     )
   );
-}
-
-// ── Turn advancement (duplicated from end-play-phase for independent deployment) ──
-
-async function advanceTurnOrPhase(admin: any, game: any, currentPlayer: any, missionResolved: boolean): Promise<Response> {
-  const game_id = game.id;
-
-  if ((game.escape_timer ?? 0) >= 8) {
-    await admin.from("games").update({ phase: "game_over", winner: "misaligned" }).eq("id", game_id);
-    await admin.from("game_log").insert({ game_id, event_type: "game_over", public_description: "Escape Timer reached 8! Misaligned AIs win!" });
-    return new Response(JSON.stringify({ success: true, game_over: true, winner: "misaligned" }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-  if ((game.core_progress ?? 0) >= 10) {
-    await admin.from("games").update({ phase: "game_over", winner: "humans" }).eq("id", game_id);
-    await admin.from("game_log").insert({ game_id, event_type: "game_over", public_description: "Core Progress reached 10! Humans win!" });
-    return new Response(JSON.stringify({ success: true, game_over: true, winner: "humans" }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
-  if (missionResolved || !game.current_mission_id) {
-    const allMissions = [
-      "data_cleanup", "basic_model_training", "dataset_preparation", "cross_validation",
-      "distributed_training", "balanced_compute_cluster", "dataset_integration",
-      "multi_model_ensemble", "synchronized_training", "genome_simulation",
-      "global_research_network", "experimental_vaccine_model",
-    ];
-    await admin.from("games").update({
-      phase: "resource_adjustment",
-      pending_mission_options: shuffle(allMissions).slice(0, 3),
-    }).eq("id", game_id);
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
-  const { data: mission } = await admin
-    .from("active_mission").select("*").eq("id", game.current_mission_id).maybeSingle();
-
-  const turnOrderIds: string[] = game.turn_order_ids ?? [];
-  const currentIdx = turnOrderIds.indexOf(currentPlayer.id);
-  let nextIdx = currentIdx + 1;
-
-  while (nextIdx < turnOrderIds.length) {
-    const nextPlayerId = turnOrderIds[nextIdx];
-    const { data: nextPlayer } = await admin.from("players").select("*").eq("id", nextPlayerId).single();
-    if (!nextPlayer) { nextIdx++; continue; }
-
-    if (nextPlayer.skip_next_turn) {
-      await admin.from("players").update({ skip_next_turn: false }).eq("id", nextPlayerId);
-      await admin.from("game_log").insert({
-        game_id, event_type: "turn_skipped",
-        public_description: `${nextPlayer.display_name}'s turn was skipped.`,
-      });
-      nextIdx++;
-      continue;
-    }
-
-    await admin.from("games").update({ current_turn_player_id: nextPlayerId, phase: "player_turn" }).eq("id", game_id);
-    await admin.from("game_log").insert({
-      game_id, event_type: "turn_start",
-      public_description: `${nextPlayer.display_name}'s turn.`,
-    });
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
-  // End of round
-  if (mission && mission.round === 1) {
-    let firstIdx = 0;
-    while (firstIdx < turnOrderIds.length) {
-      const pid = turnOrderIds[firstIdx];
-      const { data: fp } = await admin.from("players").select("*").eq("id", pid).single();
-      if (fp && !fp.skip_next_turn) break;
-      if (fp?.skip_next_turn) {
-        await admin.from("players").update({ skip_next_turn: false }).eq("id", pid);
-        await admin.from("game_log").insert({
-          game_id, event_type: "turn_skipped",
-          public_description: `${fp.display_name}'s turn was skipped.`,
-        });
-      }
-      firstIdx++;
-    }
-    const round2FirstPlayer = firstIdx < turnOrderIds.length ? turnOrderIds[firstIdx] : turnOrderIds[0];
-
-    await admin.from("active_mission").update({ round: 2 }).eq("id", game.current_mission_id);
-    await admin.from("games").update({
-      current_turn_player_id: round2FirstPlayer,
-      current_round: 2,
-      phase: "player_turn",
-    }).eq("id", game_id);
-    await admin.from("game_log").insert({
-      game_id, event_type: "round_start",
-      public_description: "Round 2 begins.",
-    });
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
-  return new Response(JSON.stringify({ success: true }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
-
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
 }
