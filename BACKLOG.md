@@ -8,6 +8,8 @@ Ideas and polish items that aren't blocking current phases. Add freely; prioriti
 
 - **Active turn indicator** — Unclear whose turn it is in the player roster. Add a solid coloured ring/border around the active AI's player card during `player_turn` phase. *(Reported: first dev-mode playthrough)*
 
+- **ResourceAllocation base-stat clarity** — The allocation UI only shows the delta controls (+CPU / +RAM, starting at 0), which caused playtester to misread AI stats as 0/0. Should clearly show each AI's current CPU/RAM, plus a live preview of the post-allocation value (current + delta) as the human adjusts. *(Reported: first dev-mode playthrough)*
+
 ---
 
 ## Game Balance
@@ -18,11 +20,17 @@ Ideas and polish items that aren't blocking current phases. Add freely; prioriti
 
 ## Tech Debt
 
-- **CardReveal `selectedCard` not reset on dev-mode player switch** — `CardReveal.tsx` holds
-  `selectedCard` in local state; React doesn't remount the component when `currentPlayer` changes,
-  so the previous player's card key persists. Currently harmless (Phase 7 tests bypass the UI via
-  direct API calls), but any future UI-driven dev-mode test for card reveal would submit the wrong
-  card. Fix: `useEffect(() => { setSelectedCard(null); }, [currentPlayer?.id])` in CardReveal.
+- **`place-virus` leaves deck_cards rows in 'drawn' status** — When an AI places a card into the virus pool, `place-virus` removes it from `hands` but never updates the corresponding `deck_cards` row (stays `status='drawn'` indefinitely). The draw-cards reshuffle logic ignores 'drawn' rows so it won't accidentally re-deal them, but the `deck_cards` table is inconsistent. Should transition to a new status (e.g. `'in_virus_pool'`) or clean up so reshuffle logic doesn't treat virus pool cards as held-but-available. *(Surfaced during Bug 2 diagnosis)*
+
+- **CardReveal `selectedCard` not reset on dev-mode player switch** — Fixed as part of Bug 3 (the `useEffect` reset now handles both `selectedCard` and `loading`). *(Resolved)*
+
+- **`loading` not reset on success path — MissionSelection, ResourceAllocation, ResourceAdjustment** — All three components have the same bug as CardReveal Bug 3: `handleSelect` / `handleSubmit` / `handleConfirm` call `setLoading(true)` but the success path never calls `setLoading(false)`. In practice this is harmless because the phase changes immediately after submission (the button disappears), but it is the same root cause and should be cleaned up in the UI polish phase. *(Surfaced during Bug 3 audit)*
+
+- **SecretTargeting `selectedTargetId` not reset on dev-mode player switch** — `SecretTargeting.tsx` initialises `selectedTargetId` to the first AI's ID at mount. When switching between misaligned AIs via PlayerSwitcher the selected target carries over, so voting as misaligned AI 2 after misaligned AI 1 could accidentally submit the same (possibly wrong) target without the user noticing. Fix: `useEffect(() => { setSelectedTargetId(aiTargets[0]?.id ?? ""); }, [currentPlayer?.id])`. Actionable before any UI-driven secret-targeting testing. *(Surfaced during Bug 3 audit)*
+
+- **PlayerTurn `error` persists when switching away and back** — `error` state in `PlayerTurn.tsx` is not reset on player switch. If AI X gets a play-card error, switching to another player and back shows the stale error. Minor UX annoyance; only visible when `isMyTurn && isAI`, so it cannot bleed to a different player. Low priority. *(Surfaced during Bug 3 audit)*
+
+- **ResourceAdjustment and ResourceAllocation initialise from stale props** — Both components initialise their adjustment/delta state from `aiPlayers` props at mount time. If the component is reused across missions without unmounting (or if player stats change between mount and interaction), the initial values may be stale. No regression path identified yet; worth verifying when ResourceAdjustment is first exercised in a multi-mission playtest. *(Surfaced during Bug 3 audit)*
 
 ---
 

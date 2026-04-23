@@ -58,10 +58,16 @@ Deno.serve(async (req) => {
     ];
     const shuffledPlayers = shuffle(players!);
 
-    // Assign roles in parallel
-    await Promise.all(shuffledPlayers.map((player, i) =>
-      admin.from("players").update({ role: roles[i], turn_order: i }).eq("id", player.id)
-    ));
+    // Assign roles in parallel; also pin starting CPU/RAM so game logic never
+    // depends on DB column defaults being in a specific state.
+    await Promise.all(shuffledPlayers.map((player, i) => {
+      const isAI = roles[i] !== "human";
+      return admin.from("players").update({
+        role: roles[i],
+        turn_order: i,
+        ...(isAI ? { cpu: 1, ram: 4 } : {}),
+      }).eq("id", player.id);
+    }));
 
     const aiPlayers = shuffledPlayers.filter((_, i) => roles[i] !== "human");
 

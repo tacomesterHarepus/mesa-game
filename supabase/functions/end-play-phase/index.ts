@@ -275,6 +275,7 @@ export async function advanceTurnOrPhase(
       continue;
     }
 
+    await drawCardsForPlayer(admin, game_id, nextPlayer);
     await admin.from("games").update({ current_turn_player_id: nextPlayerId, phase: "player_turn" }).eq("id", game_id);
     await admin.from("game_log").insert({
       game_id, event_type: "turn_start",
@@ -303,6 +304,8 @@ export async function advanceTurnOrPhase(
       firstIdx++;
     }
     const round2FirstPlayer = firstIdx < turnOrderIds.length ? turnOrderIds[firstIdx] : turnOrderIds[0];
+    const { data: r2Player } = await admin.from("players").select("*").eq("id", round2FirstPlayer).single();
+    if (r2Player) await drawCardsForPlayer(admin, game_id, r2Player);
 
     await admin.from("active_mission").update({ round: 2 }).eq("id", game.current_mission_id);
     await admin.from("games").update({
@@ -338,6 +341,85 @@ async function resetPlayersForNextMission(admin: any, game_id: string) {
     has_revealed_card: false,
     revealed_card_key: null,
   }).eq("game_id", game_id).neq("role", "human");
+}
+
+async function drawCardsForPlayer(admin: any, game_id: string, player: any): Promise<void> {
+  const { count: handSizeRaw } = await admin
+    .from("hands")
+    .select("id", { count: "exact", head: true })
+    .eq("player_id", player.id);
+
+  const handSize = handSizeRaw ?? 0;
+  const cardsNeeded = (player.ram ?? 4) - handSize;
+  if (cardsNeeded <= 0) return;
+
+  // Draw from the top of the in_deck pile
+  const { data: deckCards } = await admin
+    .from("deck_cards")
+    .select("*")
+    .eq("game_id", game_id)
+    .eq("status", "in_deck")
+    .order("position")
+    .limit(cardsNeeded);
+
+  let toDraw: any[] = deckCards ?? [];
+
+  // Deck exhaustion: reshuffle discards into a new in_deck pile then draw remainder
+  if (toDraw.length < cardsNeeded) {
+    const { data: discarded } = await admin
+      .from("deck_cards")
+      .select("*")
+      .eq("game_id", game_id)
+      .eq("status", "discarded");
+
+    if (discarded && discarded.length > 0) {
+      const { data: maxPosRow } = await admin
+        .from("deck_cards")
+        .select("position")
+        .eq("game_id", game_id)
+        .eq("status", "in_deck")
+        .order("position", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const startPos = (maxPosRow?.position ?? -1) + 1;
+      const reshuffled = shuffle([...discarded]);
+
+      await Promise.all(
+        reshuffled.map((card: any, i: number) =>
+          admin.from("deck_cards")
+            .update({ status: "in_deck", position: startPos + i })
+            .eq("id", card.id)
+        )
+      );
+
+      const stillNeeded = cardsNeeded - toDraw.length;
+      const { data: moreCards } = await admin
+        .from("deck_cards")
+        .select("*")
+        .eq("game_id", game_id)
+        .eq("status", "in_deck")
+        .order("position")
+        .limit(stillNeeded);
+
+      toDraw = [...toDraw, ...(moreCards ?? [])];
+    }
+  }
+
+  if (toDraw.length === 0) return;
+
+  await admin.from("hands").insert(
+    toDraw.map((card: any) => ({
+      game_id,
+      player_id: player.id,
+      card_key: card.card_key,
+      card_type: card.card_type,
+    }))
+  );
+
+  await admin.from("deck_cards")
+    .update({ status: "drawn" })
+    .in("id", toDraw.map((c: any) => c.id));
 }
 
 function shuffle<T>(arr: T[]): T[] {

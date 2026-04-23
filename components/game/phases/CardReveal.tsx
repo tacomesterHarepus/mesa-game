@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Hand } from "@/components/game/Hand";
@@ -26,6 +26,12 @@ export function CardReveal({ gameId, players, currentPlayer, hand, overridePlaye
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setLoading(false);
+    setSelectedCard(null);
+    setError(null);
+  }, [currentPlayer?.id]);
+
   const isAI = currentPlayer?.role !== "human" && currentPlayer !== null;
   const alreadyRevealed = currentPlayer?.has_revealed_card ?? false;
   const aiPlayers = players.filter((p) => p.role !== "human");
@@ -41,8 +47,8 @@ export function CardReveal({ gameId, players, currentPlayer, hand, overridePlaye
     });
     if (fnError) {
       setError(fnError.message);
-      setLoading(false);
     }
+    setLoading(false);
   }
 
   return (

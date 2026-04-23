@@ -16,13 +16,14 @@
 | Dev Mode | ✓ | Fill Lobby, PlayerSwitcher, override_player_id in all edge functions |
 | 7. Virus system | ✓ | place-virus, end-play-phase v4, resolve-next-virus; VirusResolution UI |
 | 8. Secret actions | ✓ | secret-target function; SecretTargeting UI |
-| 9. Mission special rules | ✓ | play-card v5 + end-play-phase v5; 30/41 pass, 11 skip (expected) |
+| 9. Mission special rules | ✓ | play-card v5 + end-play-phase v5; mission rules enforced server-side |
+| Bug fixes (post-P9) | ✓ | Bug 1 (cpu/ram defaults), Bug 2 (draw cards), Bug 3 (CardReveal loading) |
 | 10. Human controls | **NEXT UP** | |
 | 11. Game log | pending | |
 | 12. Chat system | pending | |
 | 13. UI polish | pending | |
 
-**Test suite: 30/41 passing** (11 skip = test.skip() branches that only run when specific missions/viruses appear in random game — expected)
+**Test suite: 31/43 passing** (12 skip = test.skip() branches that only run when specific missions/viruses appear in random game — expected)
 
 ## Deployed Edge Functions
 
@@ -30,18 +31,16 @@ All functions use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in 
 
 | Function | Version | Notes |
 |----------|---------|-------|
-| start-game | v6 | |
+| start-game | v7 | Defensive: explicitly sets cpu=1, ram=4 for AI players |
 | adjust-resources | v3 | override_player_id support |
 | select-mission | v3 | override_player_id support |
 | reveal-card | v4 | override_player_id support |
 | allocate-resources | v4 | override_player_id support |
-| play-card | v4 | turn_play_count tracking |
 | place-virus | v1 | AI places cards into pending_viruses |
-| end-play-phase | v4 | full virus pipeline: shuffle → queue → virus_resolution phase |
+| end-play-phase | v6 | draw cards on turn advance (drawCardsForPlayer helper) |
 | resolve-next-virus | v2 | secret-targeting case: sets current_targeting_resolution_id + current_targeting_card_key |
 | secret-target | v1 | vote mode + force-resolve mode; tally + effect; clears state → virus_resolution |
 | play-card | v5 | all 10 mission special rules + pipeline_breakdown + dependency_error_active |
-| end-play-phase | v5 | distributed_training contributor check in mission completion gate |
 
 ## Dev Mode (DONE)
 
@@ -54,59 +53,26 @@ Single-user multi-player testing without needing 6 browsers.
 - All edge functions: `override_player_id` accepted, gated by `MESA_ENVIRONMENT !== "production"` AND caller owns all players
 - **TODO (manual):** Set `MESA_ENVIRONMENT=production` in Supabase Dashboard → Project Settings → Edge Functions → Environment Variables
 
-## Phase 8 Completed — Key Technical Notes
+## Bug Fix Session (post-Phase 9) — Key Technical Notes
 
-**Schema additions (migration 010):**
-- `games.current_targeting_resolution_id uuid REFERENCES virus_resolution_queue` — FK to the queue row that triggered targeting; used as `resolution_id` in `secret_target_votes`
-- `games.current_targeting_card_key text` — card key string for UI display and effect lookup
+Three bugs found during first full dev-mode playthrough. Fixed one at a time.
 
-**`resolve-next-virus` v2 changes:**
-- Secret-targeting case now sets both new fields + `targeting_deadline` (60s from now) and transitions phase to `secret_targeting`
-- Returns `{ paused: "secret_targeting" }` so callers know resolution is paused
+**Bug 1 — AI stats showed 0/0 (false alarm):**
+- Root cause: playtester misread the `+CPU 0 / +RAM 0` allocation delta controls in `ResourceAllocation.tsx` as base stats. DB always had correct defaults (cpu=1, ram=4).
+- Fix: defensive change in `start-game` to explicitly set `cpu: 1, ram: 4` during role assignment rather than relying on DB defaults. Deployed as v7.
+- BACKLOG: ResourceAllocation UI should show current stat + post-allocation preview, not just the delta.
 
-**`secret-target` flow:**
-1. Vote mode (`target_player_id` provided): caller must be misaligned_ai; upsert into `secret_target_votes` (unique on `resolution_id,voter_player_id` so votes can be changed)
-2. After vote: check if all misaligned AIs voted OR deadline passed; if yes, tally
-3. Force-resolve mode (`force_resolve: true`): any player can trigger; tallies immediately
-4. Tally: count votes per target_player_id, random tiebreak among tied candidates; if no votes → random AI
-5. Apply effect respecting limits (CPU 1–4, RAM 3–7), write game_log entry
-6. Clear: phase = virus_resolution, targeting_deadline = null, current_targeting_* = null
+**Bug 2 — Cards not drawn to hand after round 1:**
+- Root cause: the draw step was never implemented. `advanceTurnOrPhase` in `end-play-phase` transitioned turn order correctly but never refilled hands.
+- Fix: added `drawCardsForPlayer` helper to `end-play-phase`. Called in both turn-advance locations (within-round and round-2 start). Handles deck exhaustion by reshuffling `discarded` cards. Deployed as v6.
+- Regression test: `tests/e2e/draw-cards.spec.ts` — verifies first AI's hand count equals RAM at the start of round 2.
+- BACKLOG: `place-virus` leaves `deck_cards` rows in `'drawn'` status after moving card to virus pool; inconsistent but harmless.
 
-**`SecretTargeting.tsx` component:**
-- Misaligned AIs see: card label + effect description, countdown, target AI dropdown, "Submit Vote" button
-- Non-misaligned AIs/humans see: countdown + "Misaligned AIs are selecting a target…" message
-- Countdown via `useEffect`/`setInterval`; fires `handleDeadline()` (force_resolve call) at 0
-- `deadlineTriggeredRef` prevents double-firing on deadline
-
-**Test approach for secret_targeting:**
-- Tests 1–2: phase guard — reject vote/force_resolve when not in secret_targeting (always runs)
-- Tests 3–4: drive game to secret_targeting via end-play-phase → resolve-next-virus loop; skip if targeting card never appears (random deck)
-- Test 5: UI smoke — checks MESA board renders; checks targeting UI if phase happens to be secret_targeting
-
-## Phase 9 Completed — Key Technical Notes
-
-**play-card v5 — special rules checklist:**
-- `dependency_error_active` (virus): blocks Compute; cleared when Data successfully contributed
-- `pipeline_breakdown_active` (virus): 50% random fail; card consumed, `failed=true` row inserted; counts NOT updated; flag cleared
-- `experimental_vaccine_model` round 2: `cpuLimit = min(cpu, 1)` before normal CPU check
-- `dataset_preparation`: Compute blocked until `data_contributed >= 4`
-- `cross_validation`: Validation blocked if player already has a Validation contribution this mission
-- `balanced_compute_cluster`: any card blocked if player already has 2 total contributions
-- `dataset_integration`: Compute blocked when `compute_contributed >= data_contributed * 2`
-- `multi_model_ensemble`: Data/Validation each capped at 1 per AI
-- `synchronized_training`: `compute_round` set in special_state on first Compute play; blocks Compute in any other round
-- `genome_simulation`: Validation only allowed when `compute_contributed >= 5 && data_contributed >= 3`
-- `global_research_network`: each AI limited to 3 per resource type (tracked via mission_contributions query)
-- `distributed_training`: no per-card block; completion check requires `distinct(player_ids) >= 3` (queried in both play-card and end-play-phase)
-
-**special_state JSON keys used:**
-- `pipeline_breakdown_active: boolean` (set by resolve-next-virus)
-- `dependency_error_active: boolean` (set by resolve-next-virus)
-- `compute_round: number | null` (set by play-card on first Compute for synchronized_training)
-
-**end-play-phase v5:** Added distributed_training contributor check before awarding mission reward. Mission fails at end of round 2 if requirements met but <3 distinct contributors.
-
-**Test approach:** mission-rules.spec.ts has 13 tests; 11 are conditioned on the active mission being the testable one, so they `test.skip()` otherwise. Only 3 general tests (virus card rejection, CPU limit, wrong-turn rejection) always run. This is the right approach for games with random mission selection.
+**Bug 3 — CardReveal "Reveal Card" button shows "···" for subsequent AIs:**
+- Root cause: `handleReveal()` in `CardReveal.tsx` called `setLoading(true)` but the success path never called `setLoading(false)`. In dev mode, CardReveal doesn't remount on PlayerSwitcher switch, so `loading=true` persisted for every player after the first reveal.
+- Fix: moved `setLoading(false)` outside the error branch (runs on success and error). Added `useEffect` that resets `loading`, `selectedCard`, and `error` on `currentPlayer?.id` change — handles dev-mode switches cleanly.
+- Regression test: `tests/e2e/card-reveal.spec.ts` — verifies "Reveal Card" button text is visible (not "···") after switching to the next AI.
+- BACKLOG: same `loading`-not-reset-on-success pattern exists in MissionSelection, ResourceAllocation, ResourceAdjustment; SecretTargeting `selectedTargetId` not reset on player switch.
 
 ## Phase 10 Plan — Human Controls
 
@@ -134,7 +100,6 @@ Humans have three control points in the game where they take active actions:
 
 **5. Card Reveal Phase UI** (humans observe, AIs reveal)
 - Already implemented: `reveal-card` edge function, `CardReveal.tsx`
-- Humans can post in chat; AIs cannot during this phase
 - Status: DONE
 
 **What's actually missing for Phase 10:**
@@ -147,34 +112,6 @@ Humans have three control points in the game where they take active actions:
 - Abort only between turns (phase=player_turn, not mid-virus-resolution)
 - Normal fail penalty applies (same as mission failure at end of round 2)
 - After abort: same flow as mission failure → resource_adjustment for next mission
-
-The 12 missions each have special rules enforced server-side in `play-card`. Currently `play-card` v4 has no mission rule validation — it accepts all cards.
-
-**Rules to implement (all validated in `play-card`):**
-
-| Mission | Special Rule | State Key |
-|---------|-------------|-----------|
-| Dataset Preparation | Compute locked until Data requirement met | `dependency_error_active` (reuse from virus) |
-| Cross Validation | Each Validation played by different AI | `validation_contributors: [player_id, ...]` |
-| Distributed Training | At least 3 different AIs must contribute | `contributors: { player_id: count }` |
-| Balanced Compute Cluster | Each AI ≤ 2 cards total | `contributors: { player_id: count }` |
-| Dataset Integration | Each Data unlocks 2 Compute slots globally | `dataset_integration_compute_slots: int` |
-| Multi-Model Ensemble | Each AI ≤ 1 Data, ≤ 1 Validation | `contributors: { player_id: data_count/val_count }` |
-| Synchronized Training | All Compute must be in same round | `compute_round: 1 or 2` |
-| Genome Simulation | Validation must be the final contribution | validate at completion time |
-| Experimental Vaccine Model | Each AI ≤ 1 card in final round | `final_round_plays: { player_id: count }` |
-| Global Research Network | Each AI ≤ 3 of one resource type | per-player per-type tracking |
-
-**What's needed:**
-1. Update `play-card` edge function to enforce all 10 mission special rules
-2. The `active_mission.special_state` JSONB field already carries all needed tracking keys
-3. UI: show relevant mission rule and current state in `PlayerTurn` / `MissionBoard`
-4. Tests: `mission-rules.spec.ts` (one test per mission rule)
-
-**Key architecture notes:**
-- `play-card` already reads `active_mission.special_state` for `pipeline_breakdown_active` and `dependency_error_active`
-- All rules should be additive checks — return early with an error string if rule violated
-- `dependency_error_active` from virus and Dataset Preparation's compute lock are different: the virus one is a one-time flag that fires on a 50% chance; Dataset Preparation's is a permanent constraint for that mission
 
 ## Key Architecture Notes
 
