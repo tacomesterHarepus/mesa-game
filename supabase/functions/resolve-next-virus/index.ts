@@ -229,6 +229,8 @@ async function applyVirusEffect(admin: any, game: any, card: any): Promise<boole
       await admin.from("games").update({
         phase: "secret_targeting",
         targeting_deadline: deadline,
+        current_targeting_resolution_id: card.id,
+        current_targeting_card_key: card.card_key,
       }).eq("id", game_id);
       await admin.from("game_log").insert({
         game_id, event_type: "virus_resolved",

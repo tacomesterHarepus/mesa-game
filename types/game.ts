@@ -26,6 +26,8 @@ export interface Game {
   current_mission_id: string | null
   pending_mission_options: string[]
   targeting_deadline: string | null
+  current_targeting_resolution_id: string | null
+  current_targeting_card_key: string | null
   winner: Winner
   host_user_id: string
   created_at: string

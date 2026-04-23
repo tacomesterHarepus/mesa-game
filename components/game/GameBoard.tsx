@@ -283,6 +283,8 @@ export function GameBoard({
             players={players}
             currentPlayer={effectiveCurrentPlayer}
             targetingDeadline={game.targeting_deadline}
+            cardKey={game.current_targeting_card_key}
+            overridePlayerId={overridePlayerId}
           />
         );
       case "game_over":

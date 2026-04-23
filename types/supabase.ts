@@ -15,6 +15,8 @@ export type Database = {
           current_mission_id: string | null
           pending_mission_options: string[]
           targeting_deadline: string | null
+          current_targeting_resolution_id: string | null
+          current_targeting_card_key: string | null
           winner: "humans" | "misaligned" | null
           host_user_id: string
           previous_game_id: string | null
@@ -31,6 +33,8 @@ export type Database = {
           current_mission_id?: string | null
           pending_mission_options?: string[]
           targeting_deadline?: string | null
+          current_targeting_resolution_id?: string | null
+          current_targeting_card_key?: string | null
           winner?: "humans" | "misaligned" | null
           host_user_id: string
           previous_game_id?: string | null
