@@ -152,22 +152,25 @@ async function advanceToPlayerTurnWithCpu2(page: Page, gameId: string): Promise<
   await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
 }
 
-// Finds the active turn player in the switcher and ends their turn.
-// Returns true if End Turn was clicked.
-async function endCurrentPlayerTurn(page: Page): Promise<boolean> {
-  const switcherPanel = page.locator(".fixed.top-7");
-  const playerButtons = switcherPanel.getByRole("button");
-  const count = await playerButtons.count();
-  for (let i = 0; i < count; i++) {
-    await playerButtons.nth(i).click();
-    await page.waitForTimeout(300);
-    const endBtn = page.getByRole("button", { name: "End Turn" });
-    if (await endBtn.isVisible().catch(() => false)) {
-      await endBtn.click();
-      return true;
-    }
-  }
-  return false;
+// Calls end-play-phase for the current turn player via REST, bypassing any virus-staging
+// UI requirements. Returns true if the call succeeded, false if not in player_turn phase.
+// Using REST (not UI button click) because CPU=2 players require staging a card before
+// the End Turn button enables — REST skips that requirement and lets end-play-phase
+// compute virus counts server-side, which is what triggers virus_resolution.
+async function endCurrentPlayerTurn(gameId: string, token: string): Promise<boolean> {
+  const gameResp = await fetch(
+    `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=current_turn_player_id,phase`,
+    { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+  );
+  const [gameRow] = (await gameResp.json()) as Array<{ current_turn_player_id: string; phase: string }>;
+  if (gameRow?.phase !== "player_turn" || !gameRow?.current_turn_player_id) return false;
+
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ game_id: gameId, override_player_id: gameRow.current_turn_player_id }),
+  });
+  return resp.status === 200;
 }
 
 // ── Shared setup ──────────────────────────────────────────────────────────────
@@ -188,20 +191,28 @@ test.describe("virus resolution system", () => {
 
     // End turns (up to 8) until virus_resolution phase appears.
     // With 2 of 4 AIs having CPU=2, we expect ~50% of turns to trigger virus_resolution.
+    const token = await extractAuthToken(sharedPage);
+    if (!token) throw new Error("Could not extract auth token from Supabase SSR cookies");
+
     for (let turn = 0; turn < 8; turn++) {
-      const ended = await endCurrentPlayerTurn(sharedPage);
-      if (!ended) break;
+      const ended = await endCurrentPlayerTurn(gameId, token);
 
-      // Wait for phase change
-      await sharedPage.waitForTimeout(2000);
+      // Check phase via REST — avoids false negatives from UI polling lag (3s interval).
+      await sharedPage.waitForTimeout(1500);
+      const phaseResp = await fetch(
+        `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=phase`,
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+      );
+      const [phaseRow] = (await phaseResp.json()) as Array<{ phase: string }>;
+      const phase = phaseRow?.phase;
 
-      if (await sharedPage.getByText("Virus Resolution").isVisible().catch(() => false)) {
+      if (phase === "virus_resolution") {
+        await sharedPage.getByRole("heading", { name: "Virus Resolution" }).waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
         reachedVirusResolution = true;
         break;
       }
 
-      // Still player_turn — continue loop
-      if (!await sharedPage.getByText("Player Turn").isVisible().catch(() => false)) break;
+      if (!ended || phase !== "player_turn") break;
     }
   });
 
@@ -211,7 +222,7 @@ test.describe("virus resolution system", () => {
 
   test("VirusResolution phase renders heading and Resolve button", async () => {
     if (!reachedVirusResolution) test.skip();
-    await expect(sharedPage.getByText("Virus Resolution")).toBeVisible();
+    await expect(sharedPage.getByRole("heading", { name: "Virus Resolution" })).toBeVisible();
     await expect(
       sharedPage.getByRole("button", { name: /Resolve Virus|Continue/ })
     ).toBeVisible();
@@ -236,9 +247,9 @@ test.describe("virus resolution system", () => {
     // virus_resolution (more cards), player_turn (turn advance), resource_adjustment (mission ended)
     await sharedPage.waitForTimeout(3000);
 
-    const stillResolving = await sharedPage.getByText("Virus Resolution").isVisible().catch(() => false);
-    const playerTurn = await sharedPage.getByText("Player Turn").isVisible().catch(() => false);
-    const resourceAdj = await sharedPage.getByText("Resource Adjustment").isVisible().catch(() => false);
+    const stillResolving = await sharedPage.getByRole("heading", { name: "Virus Resolution" }).isVisible().catch(() => false);
+    const playerTurn = await sharedPage.getByRole("heading", { name: "Player Turn" }).isVisible().catch(() => false);
+    const resourceAdj = await sharedPage.getByRole("heading", { name: "Resource Adjustment" }).isVisible().catch(() => false);
     expect(stillResolving || playerTurn || resourceAdj).toBe(true);
   });
 });
