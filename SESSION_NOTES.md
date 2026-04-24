@@ -20,7 +20,7 @@
 | 8. Secret actions | ✓ | secret-target function; SecretTargeting UI |
 | 9. Mission special rules | ✓ | play-card v5 + end-play-phase v5; mission rules enforced server-side |
 | Bug fixes (post-P9) | ✓ | Bug 1 (cpu/ram defaults), Bug 2 (draw cards), Bug 3 (CardReveal loading) |
-| 7.5. Virus placement + fixes | **IN PROGRESS** | Items C/D/E/F done; Item B (virus placement UI) is next |
+| 7.5. Virus placement + fixes | **IN PROGRESS** | Items C/D/E/F done; Item B Phase 2 (UI) done — Phase 3 (backend wiring) next |
 | 10. Human controls | pending | |
 | 11. Game log | pending | |
 | 12. Chat system | pending | |
@@ -130,9 +130,10 @@ RLS allows each player to always read their own `role` field — no policy chang
 3. ~~**Item D**~~ ✓ allocate-resources draw fix + 2 new regression tests
 4. ~~**Item E**~~ ✓ active_mission + hands added to 3s polling loop
 5. ~~**Item F**~~ ✓ Role banner shown to AI players in right panel
-6. **Item B** — Virus placement UI ← **NEXT UP** (requires user present)
+6. **Item B Phase 2** ✓ Staging UI built in `PlayerTurn.tsx` — full hand, staging zone, live virusCount, End Turn blocking
+7. **Item B Phase 3** — Backend wiring: call `place-virus` for each staged card before `end-play-phase` ← **NEXT UP**
 
-Remaining effort: **~3–4 hours** (Item B only).
+Remaining effort: **~1–2 hours** (Item B Phase 3: backend wiring + E2E test).
 
 ---
 

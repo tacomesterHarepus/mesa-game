@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Hand } from "@/components/game/Hand";
@@ -22,27 +22,58 @@ interface Props {
   overridePlayerId?: string;
 }
 
+function calcVirusCount(cpu: number, cardsPlayedThisTurn: number): number {
+  const base = cpu >= 2 ? 1 : 0;
+  const bonus = cardsPlayedThisTurn >= 3 ? 1 : 0;
+  return Math.min(2, base + bonus);
+}
+
 export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, round, overridePlayerId }: Props) {
   const isMyTurn = currentPlayer?.id === currentTurnPlayer?.id;
   const isAI = currentPlayer?.role !== "human" && currentPlayer !== null;
 
   const [selectedCardKey, setSelectedCardKey] = useState<string | null>(null);
+  const [stagedCardIds, setStagedCardIds] = useState<Set<string>>(new Set());
+  const [cardsPlayedThisTurn, setCardsPlayedThisTurn] = useState(0);
   const [playLoading, setPlayLoading] = useState(false);
   const [endLoading, setEndLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const playableHand = hand.filter((c) => c.card_type === "progress");
+  // Reset turn-local state when the active player changes
+  useEffect(() => {
+    setCardsPlayedThisTurn(0);
+    setSelectedCardKey(null);
+    setStagedCardIds(new Set());
+    setError(null);
+  }, [currentTurnPlayer?.id]);
+
   const cpu = currentPlayer?.cpu ?? 1;
+  const virusCount = calcVirusCount(cpu, cardsPlayedThisTurn);
+
+  const stagedCards = hand.filter((c) => stagedCardIds.has(c.id));
+  const unstagedCards = hand.filter((c) => !stagedCardIds.has(c.id));
+  const selectedCard = selectedCardKey
+    ? unstagedCards.find((c) => c.card_key === selectedCardKey) ?? null
+    : null;
+
+  const playsRemaining = cpu - cardsPlayedThisTurn;
+  const stagingNeeded = virusCount - stagedCards.length;
+  const handExhausted = unstagedCards.length === 0;
+  const endTurnBlocked = stagingNeeded > 0 && !handExhausted;
+
+  // Virus cards in hand are non-interactive when no staging is required
+  const virusDisabledKeys =
+    virusCount === 0
+      ? Array.from(new Set(unstagedCards.filter((c) => c.card_type === "virus").map((c) => c.card_key)))
+      : [];
 
   async function handlePlayCard() {
-    if (!selectedCardKey) return;
-    const card = hand.find((c) => c.card_key === selectedCardKey && c.card_type === "progress");
-    if (!card) return;
+    if (!selectedCard || selectedCard.card_type !== "progress" || playsRemaining <= 0) return;
     setError(null);
     setPlayLoading(true);
     const supabase = createClient();
     const { data, error: fnError } = await supabase.functions.invoke("play-card", {
-      body: { game_id: gameId, card_id: card.id, override_player_id: overridePlayerId },
+      body: { game_id: gameId, card_id: selectedCard.id, override_player_id: overridePlayerId },
     });
     if (fnError) {
       setError(fnError.message);
@@ -50,8 +81,23 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
       setError(data.error);
     } else {
       setSelectedCardKey(null);
+      setCardsPlayedThisTurn((n) => n + 1);
     }
     setPlayLoading(false);
+  }
+
+  function handleStageCard() {
+    if (!selectedCard || stagedCards.length >= virusCount) return;
+    setStagedCardIds((prev) => new Set(Array.from(prev).concat(selectedCard.id)));
+    setSelectedCardKey(null);
+  }
+
+  function handleUnstageCard(id: string) {
+    setStagedCardIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   }
 
   async function handleEndTurn() {
@@ -84,35 +130,87 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
 
       {isMyTurn && isAI && (
         <div className="space-y-4">
-          {playableHand.length > 0 ? (
-            <div>
-              <p className="text-muted text-xs font-mono mb-2">
-                Select a card to play (CPU: {cpu}):
-              </p>
+          {/* Hand */}
+          <div>
+            <p className="text-muted text-xs font-mono mb-2">
+              Your hand —{" "}
+              {playsRemaining > 0
+                ? `${playsRemaining} play${playsRemaining !== 1 ? "s" : ""} remaining (CPU ${cpu})`
+                : `no plays remaining (CPU ${cpu})`}
+            </p>
+            {unstagedCards.length > 0 ? (
               <Hand
-                cards={playableHand}
+                cards={unstagedCards}
                 selectable
                 selectedKey={selectedCardKey}
                 onSelect={setSelectedCardKey}
+                disabledKeys={virusDisabledKeys}
               />
-              {selectedCardKey && (
-                <div className="mt-2 text-xs font-mono text-faint">
-                  Selected: {CARD_MAP[selectedCardKey]?.name ?? selectedCardKey}
-                </div>
+            ) : (
+              <p className="text-faint text-xs font-mono">No cards remaining in hand.</p>
+            )}
+          </div>
+
+          {/* Selected card actions */}
+          {selectedCard && (
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-xs font-mono text-faint">
+                {CARD_MAP[selectedCard.card_key]?.name ?? selectedCard.card_key}:
+              </span>
+              {selectedCard.card_type === "progress" && playsRemaining > 0 && (
+                <Button onClick={handlePlayCard} loading={playLoading} className="py-1">
+                  Play Card
+                </Button>
               )}
-              <Button
-                onClick={handlePlayCard}
-                loading={playLoading}
-                disabled={!selectedCardKey}
-                className="w-full mt-3"
-              >
-                Play Card
-              </Button>
+              {virusCount > 0 && stagedCards.length < virusCount && (
+                <Button variant="secondary" onClick={handleStageCard} className="py-1">
+                  Stage for Pool
+                </Button>
+              )}
             </div>
-          ) : (
-            <p className="text-faint text-xs font-mono text-center">
-              No progress cards in hand.
-            </p>
+          )}
+
+          {/* Staging zone — shown when this turn generates viruses */}
+          {virusCount > 0 && (
+            <div>
+              <p className="text-muted text-xs font-mono mb-2">
+                Virus pool staging — {stagedCards.length} / {virusCount} staged
+                {stagingNeeded > 0 && !handExhausted && (
+                  <span className="text-virus ml-1">(stage {stagingNeeded} more)</span>
+                )}
+              </p>
+              {stagedCards.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {stagedCards.map((card) => {
+                    const def = CARD_MAP[card.card_key];
+                    return (
+                      <button
+                        key={card.id}
+                        type="button"
+                        onClick={() => handleUnstageCard(card.id)}
+                        title="Click to unstage"
+                        className={`
+                          px-2 py-1 rounded border text-xs font-mono transition-colors cursor-pointer
+                          ring-1 ring-virus
+                          ${card.card_type === "virus"
+                            ? "text-virus border-virus bg-surface"
+                            : "text-amber border-amber-border bg-surface"}
+                          hover:opacity-70
+                        `}
+                      >
+                        {def?.name ?? card.card_key}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-faint text-xs font-mono">
+                  {handExhausted
+                    ? "No cards left to stage."
+                    : 'Select a card from your hand and click "Stage for Pool".'}
+                </p>
+              )}
+            </div>
           )}
 
           {error && <p className="text-virus text-xs font-mono">{error}</p>}
@@ -121,9 +219,12 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
             variant="secondary"
             onClick={handleEndTurn}
             loading={endLoading}
+            disabled={endTurnBlocked}
             className="w-full"
           >
-            End Turn
+            {endTurnBlocked
+              ? `Stage ${stagingNeeded} more card${stagingNeeded !== 1 ? "s" : ""} to end turn`
+              : "End Turn"}
           </Button>
         </div>
       )}
