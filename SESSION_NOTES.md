@@ -1,6 +1,12 @@
 # Session Notes
 
 ## Current Phase
+**Phase 10 — Human Controls** (next up)
+
+> **PENDING FIXES (need approval before implementing):** Two proposed fixes from the 2026-04-25 playtest in `DIAGNOSIS_2026-04-25.md`. Bug A: add `invokeWithRetry` wrapper around all `supabase.functions.invoke` calls to handle edge-function cold-start silently. Bug B: sort hand by `id` in `GameBoard.tsx` polling + Realtime handler to eliminate visual card-reorder artifact. Both are low-risk, ~1 hour total. Confirm before starting Phase 10 or address first if the cold-start bug is painful.
+
+---
+
 **Phase 7.5 — Virus placement UI + bug fixes** (DONE)
 
 > **DIAGNOSIS REFERENCE:** Second playtest (2026-04-24) uncovered that Phase 7 is NOT fully complete and has multiple real bugs. Full root-cause analysis is in `DIAGNOSIS_2026-04-24.md`. Read that file before touching any of the issues listed in Phase 7.5.
@@ -42,7 +48,7 @@ All items below are diagnosed in `DIAGNOSIS_2026-04-24.md`. Do NOT start impleme
 
 ---
 
-### Item B — Virus placement UI in `PlayerTurn.tsx` ← IN PROGRESS
+### Item B — Virus placement UI in `PlayerTurn.tsx` ✓ DONE
 
 **Phase 2 (UI) — DONE (commit 9266673)**
 
@@ -142,10 +148,10 @@ RLS allows each player to always read their own `role` field — no policy chang
 3. ~~**Item D**~~ ✓ allocate-resources draw fix + 2 new regression tests
 4. ~~**Item E**~~ ✓ active_mission + hands added to 3s polling loop
 5. ~~**Item F**~~ ✓ Role banner shown to AI players in right panel
-6. **Item B Phase 2** ✓ Staging UI built in `PlayerTurn.tsx` — full hand, staging zone, live virusCount, End Turn blocking
-7. **Item B Phase 3** — Backend wiring: call `place-virus` for each staged card before `end-play-phase` ← **NEXT UP**
+6. ~~**Item B Phase 2**~~ ✓ Staging UI built in `PlayerTurn.tsx` — full hand, staging zone, live virusCount, End Turn blocking
+7. ~~**Item B Phase 3**~~ ✓ Backend wiring: `place-virus` called for each staged card before `end-play-phase`; E2E test passing
 
-Remaining effort: **~1–2 hours** (Item B Phase 3: backend wiring + E2E test).
+**Phase 7.5 is complete.**
 
 ---
 
