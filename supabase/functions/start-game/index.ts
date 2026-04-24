@@ -60,11 +60,13 @@ Deno.serve(async (req) => {
 
     // Assign roles in parallel; also pin starting CPU/RAM so game logic never
     // depends on DB column defaults being in a specific state.
+    // turn_order = AI seat-order index (0, 1, 2, …); null for humans (they don't take turns).
+    let aiRank = 0;
     await Promise.all(shuffledPlayers.map((player, i) => {
       const isAI = roles[i] !== "human";
       return admin.from("players").update({
         role: roles[i],
-        turn_order: i,
+        turn_order: isAI ? aiRank++ : null,
         ...(isAI ? { cpu: 1, ram: 4 } : {}),
       }).eq("id", player.id);
     }));
@@ -113,7 +115,8 @@ Deno.serve(async (req) => {
     // ── Start game ────────────────────────────────────────────────────────────
     // Mission 1: skip resource_adjustment — go directly to mission_selection.
     // resource_adjustment only occurs between missions (mission 2+).
-    const turnOrderIds = shuffle(aiPlayers.map((p: any) => p.id));
+    // aiPlayers is already in seat order (derived from shuffledPlayers — no second shuffle).
+    const turnOrderIds = aiPlayers.map((p: any) => p.id);
     const allMissions = [
       "data_cleanup", "basic_model_training", "dataset_preparation", "cross_validation",
       "distributed_training", "balanced_compute_cluster", "dataset_integration",
