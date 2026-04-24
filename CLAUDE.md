@@ -16,6 +16,10 @@ When a substantial investigation produces analysis worth preserving (root cause 
 
 `HISTORY.md` contains full implementation details for completed phases and bug-fix sessions. Read only when referencing past decisions — not on every session start.
 
+## Reviewer context file
+
+`reviewer/REVIEWER_CONTEXT.md` is context for Claude.ai chat acting as a code reviewer — ignore it entirely. It contains instructions for a different Claude instance and does not apply here.
+
 ## What is MESA?
 
 MESA is a 6–10 player social deduction + cooperative board game built as a web app.
@@ -191,6 +195,20 @@ Checked **after every state change** (each virus resolves, each card contributed
 - **Core Progress reaches 10** → Humans + Aligned AIs win, but only after the active AI's full virus resolution chain completes. A Cascading Failure that follows a completing contribution can still flip the result.
 
 Timer check always takes priority over Progress check.
+
+---
+
+## Seat Order and Turn Rotation
+
+**Seat order** is the fixed sequence of AI players established once at game start by a random shuffle. It never changes across missions.
+
+**`players.turn_order`** encodes each AI's seat-order index (0, 1, 2, …). It is `null` for human players — humans do not have a turn position.
+
+**`games.turn_order_ids`** is the ordered array of AI player IDs for the current mission. For mission 1 it equals seat order. After each mission it is updated by rotating seat order so the completing (or last-acting) AI goes first.
+
+**Cyclic rotation example:** seat order [A, B, C, D]. C completes mission 1 → mission 2 turn order is [C, D, A, B].
+
+**`advanceTurnOrPhase` contract:** `currentPlayer` must be the completing AI (mission success) or the last AI to act in round 2 (mission failure or abort). `abort-mission` (Phase 10) must also pass the last-acting AI as `currentPlayer`.
 
 ---
 
