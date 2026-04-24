@@ -104,6 +104,23 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
     setError(null);
     setEndLoading(true);
     const supabase = createClient();
+
+    for (const card of stagedCards) {
+      const { data, error: fnError } = await supabase.functions.invoke("place-virus", {
+        body: { game_id: gameId, card_id: card.id, override_player_id: overridePlayerId },
+      });
+      if (fnError) {
+        setError(fnError.message);
+        setEndLoading(false);
+        return;
+      }
+      if (data?.error) {
+        setError(data.error);
+        setEndLoading(false);
+        return;
+      }
+    }
+
     const { data, error: fnError } = await supabase.functions.invoke("end-play-phase", {
       body: { game_id: gameId, override_player_id: overridePlayerId },
     });
