@@ -12,6 +12,10 @@ When the user asks a question during a planning or design phase, respond with an
 
 When a substantial investigation produces analysis worth preserving (root cause traces, architectural findings, state audits), save to `DIAGNOSIS_YYYY-MM-DD.md` in the project root and reference from SESSION_NOTES.md. These files are historical record, not instructions - read them when SESSION_NOTES references them for context on past decisions.
 
+## History file
+
+`HISTORY.md` contains full implementation details for completed phases and bug-fix sessions. Read only when referencing past decisions — not on every session start.
+
 ## What is MESA?
 
 MESA is a 6–10 player social deduction + cooperative board game built as a web app.
