@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { invokeWithRetry } from "@/lib/supabase/invokeWithRetry";
 import { Button } from "@/components/ui/Button";
 import { Hand } from "@/components/game/Hand";
 import { CARD_MAP } from "@/lib/game/cards";
@@ -41,9 +41,8 @@ export function CardReveal({ gameId, players, currentPlayer, hand, overridePlaye
     if (!selectedCard) return;
     setError(null);
     setLoading(true);
-    const supabase = createClient();
-    const { error: fnError } = await supabase.functions.invoke("reveal-card", {
-      body: { game_id: gameId, card_key: selectedCard, override_player_id: overridePlayerId },
+    const { error: fnError } = await invokeWithRetry("reveal-card", {
+      game_id: gameId, card_key: selectedCard, override_player_id: overridePlayerId,
     });
     if (fnError) {
       setError(fnError.message);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { invokeWithRetry } from "@/lib/supabase/invokeWithRetry";
 import { Button } from "@/components/ui/Button";
 import { MISSION_MAP } from "@/lib/game/missions";
 import type { Player } from "@/types/game";
@@ -23,9 +23,8 @@ export function MissionSelection({ gameId, pendingOptions, currentPlayer, overri
     if (!selected) return;
     setError(null);
     setLoading(true);
-    const supabase = createClient();
-    const { error: fnError } = await supabase.functions.invoke("select-mission", {
-      body: { game_id: gameId, mission_key: selected, override_player_id: overridePlayerId },
+    const { error: fnError } = await invokeWithRetry("select-mission", {
+      game_id: gameId, mission_key: selected, override_player_id: overridePlayerId,
     });
     if (fnError) {
       setError(fnError.message);

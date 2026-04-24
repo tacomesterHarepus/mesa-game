@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { invokeWithRetry } from "@/lib/supabase/invokeWithRetry";
 import { Button } from "@/components/ui/Button";
 import type { Player } from "@/types/game";
 
@@ -72,9 +72,8 @@ export function SecretTargeting({
     if (!selectedTargetId) return;
     setError(null);
     setLoading(true);
-    const supabase = createClient();
-    const { data, error: fnError } = await supabase.functions.invoke("secret-target", {
-      body: { game_id: gameId, target_player_id: selectedTargetId, override_player_id: overridePlayerId },
+    const { data, error: fnError } = await invokeWithRetry("secret-target", {
+      game_id: gameId, target_player_id: selectedTargetId, override_player_id: overridePlayerId,
     });
     if (fnError) {
       setError(fnError.message);
@@ -85,9 +84,8 @@ export function SecretTargeting({
   }
 
   async function handleDeadline() {
-    const supabase = createClient();
-    await supabase.functions.invoke("secret-target", {
-      body: { game_id: gameId, force_resolve: true, override_player_id: overridePlayerId },
+    await invokeWithRetry("secret-target", {
+      game_id: gameId, force_resolve: true, override_player_id: overridePlayerId,
     });
   }
 

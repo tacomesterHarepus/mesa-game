@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { invokeWithRetry } from "@/lib/supabase/invokeWithRetry";
 import { Button } from "@/components/ui/Button";
 import { MISSION_MAP } from "@/lib/game/missions";
 import type { Player } from "@/types/game";
@@ -61,7 +61,6 @@ export function ResourceAllocation({ gameId, players, currentPlayer, missionKey,
   async function handleSubmit() {
     setError(null);
     setLoading(true);
-    const supabase = createClient();
 
     const allocations = aiPlayers.map((p) => ({
       player_id: p.id,
@@ -69,8 +68,8 @@ export function ResourceAllocation({ gameId, players, currentPlayer, missionKey,
       ram_delta: ramAlloc[p.id] ?? 0,
     }));
 
-    const { error: fnError } = await supabase.functions.invoke("allocate-resources", {
-      body: { game_id: gameId, allocations, override_player_id: overridePlayerId },
+    const { error: fnError } = await invokeWithRetry("allocate-resources", {
+      game_id: gameId, allocations, override_player_id: overridePlayerId,
     });
 
     if (fnError) {

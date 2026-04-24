@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { invokeWithRetry } from "@/lib/supabase/invokeWithRetry";
 import { Button } from "@/components/ui/Button";
 import { Hand } from "@/components/game/Hand";
 import { CARD_MAP } from "@/lib/game/cards";
@@ -71,9 +71,8 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
     if (!selectedCard || selectedCard.card_type !== "progress" || playsRemaining <= 0) return;
     setError(null);
     setPlayLoading(true);
-    const supabase = createClient();
-    const { data, error: fnError } = await supabase.functions.invoke("play-card", {
-      body: { game_id: gameId, card_id: selectedCard.id, override_player_id: overridePlayerId },
+    const { data, error: fnError } = await invokeWithRetry("play-card", {
+      game_id: gameId, card_id: selectedCard.id, override_player_id: overridePlayerId,
     });
     if (fnError) {
       setError(fnError.message);
@@ -103,11 +102,10 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
   async function handleEndTurn() {
     setError(null);
     setEndLoading(true);
-    const supabase = createClient();
 
     for (const card of stagedCards) {
-      const { data, error: fnError } = await supabase.functions.invoke("place-virus", {
-        body: { game_id: gameId, card_id: card.id, override_player_id: overridePlayerId },
+      const { data, error: fnError } = await invokeWithRetry("place-virus", {
+        game_id: gameId, card_id: card.id, override_player_id: overridePlayerId,
       });
       if (fnError) {
         setError(fnError.message);
@@ -121,8 +119,8 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
       }
     }
 
-    const { data, error: fnError } = await supabase.functions.invoke("end-play-phase", {
-      body: { game_id: gameId, override_player_id: overridePlayerId },
+    const { data, error: fnError } = await invokeWithRetry("end-play-phase", {
+      game_id: gameId, override_player_id: overridePlayerId,
     });
     if (fnError) {
       setError(fnError.message);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { invokeWithRetry } from "@/lib/supabase/invokeWithRetry";
 import { Button } from "@/components/ui/Button";
 import type { Player } from "@/types/game";
 
@@ -31,14 +31,13 @@ export function ResourceAdjustment({ gameId, players, currentPlayer, overridePla
   async function handleConfirm() {
     setError(null);
     setLoading(true);
-    const supabase = createClient();
 
     const adjustments = aiPlayers
       .filter((p) => cpuValues[p.id] !== p.cpu || ramValues[p.id] !== p.ram)
       .map((p) => ({ player_id: p.id, cpu: cpuValues[p.id], ram: ramValues[p.id] }));
 
-    const { error: fnError } = await supabase.functions.invoke("adjust-resources", {
-      body: { game_id: gameId, adjustments, confirm_ready: true, override_player_id: overridePlayerId },
+    const { error: fnError } = await invokeWithRetry("adjust-resources", {
+      game_id: gameId, adjustments, confirm_ready: true, override_player_id: overridePlayerId,
     });
 
     if (fnError) {

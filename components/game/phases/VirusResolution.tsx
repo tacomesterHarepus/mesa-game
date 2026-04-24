@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { invokeWithRetry } from "@/lib/supabase/invokeWithRetry";
 import { Button } from "@/components/ui/Button";
 import type { Player } from "@/types/game";
 
@@ -69,9 +70,8 @@ export function VirusResolution({ gameId, currentPlayer, overridePlayerId }: Pro
   async function handleResolve() {
     setError(null);
     setLoading(true);
-    const supabase = createClient();
-    const { data, error: fnError } = await supabase.functions.invoke("resolve-next-virus", {
-      body: { game_id: gameId, override_player_id: overridePlayerId },
+    const { data, error: fnError } = await invokeWithRetry("resolve-next-virus", {
+      game_id: gameId, override_player_id: overridePlayerId,
     });
     if (fnError) {
       setError(fnError.message);

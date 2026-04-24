@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ensureSession } from "@/lib/supabase/anon";
+import { invokeWithRetry } from "@/lib/supabase/invokeWithRetry";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import type { Database } from "@/types/supabase";
@@ -208,10 +209,7 @@ export function LobbyPhase({
   async function handleStart() {
     setError(null);
     setStartLoading(true);
-    const supabase = createClient();
-    const { data, error: fnError } = await supabase.functions.invoke("start-game", {
-      body: { game_id: gameId },
-    });
+    const { data, error: fnError } = await invokeWithRetry("start-game", { game_id: gameId });
     if (fnError) {
       let message = fnError.message;
       try {
