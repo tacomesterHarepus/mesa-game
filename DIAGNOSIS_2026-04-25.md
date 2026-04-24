@@ -231,3 +231,120 @@ stabilization is the right minimal fix.
 - Bug B: Backend draw logic is correct. UI ordering artifact is the likely cause.
   Fix proposed (sort hand by ID). Not applied.
 - All findings added to this file per diagnosis protocol.
+
+---
+
+## Bug A Revisit — "Edge Function returned a non-2xx status code" (2026-04-25)
+
+### What changed
+
+Original diagnosis: cold start → TCP failure → `FunctionsFetchError` ("Failed to send").
+Original fix: `invokeWithRetry` retries on `FunctionsFetchError`.
+New symptom: "Edge Function returned a non-2xx status code" in the PlayerTurn UI.
+
+These are different error classes from `@supabase/functions-js`:
+
+| Class | Message | When thrown |
+|---|---|---|
+| `FunctionsFetchError` | "Failed to send a request…" | `fetch()` itself throws — TCP/TLS failure, no HTTP response |
+| `FunctionsRelayError` | "Relay Error invoking the Edge Function" | HTTP response with `x-relay-error: true` header |
+| `FunctionsHttpError` | "Edge Function returned a non-2xx status code" | HTTP response, no relay header, `!response.ok` |
+
+The new error is `FunctionsHttpError`. `invokeWithRetry` only retries `FunctionsFetchError`, so the new failure mode falls through to the UI as-is.
+
+### Is auth the root cause?
+
+Ruled out. Source analysis of `@supabase/supabase-js` confirms that every `functions.invoke()` call goes through a custom fetch wrapper (`rn`) that calls `await this._getAccessToken()` before the request and injects `Authorization: Bearer <token>`. `getSession()` is called inside `_getAccessToken`. Auth is always present — either the user JWT or the anon key as fallback. The edge function's `if (!authHeader) throw new Error("Unauthorized")` path cannot be reached in normal operation.
+
+Relevant detail: `createBrowserClient` from `@supabase/ssr` is a singleton in browser environments (`cachedBrowserClient`), so `createClient()` in `invokeWithRetry` always returns the same instance. No auth-initialization race.
+
+### Root cause: cold start manifesting as relay HTTP error
+
+Cold start can produce either failure mode depending on Supabase infrastructure internals:
+
+**Mode 1 (original):** The TCP connection to the Deno worker fails before a response is sent. `fetch()` throws. `FunctionsFetchError`. Retried by the existing fix.
+
+**Mode 2 (new):** The Supabase relay accepts the HTTP connection but times out waiting for the Deno worker to start. The relay returns a 502 or 503 without the `x-relay-error` header. `!response.ok` → `FunctionsHttpError`. Not retried.
+
+Both modes are cold-start symptoms. Which one fires is non-deterministic and depends on whether the relay gives up before or after the TCP handshake completes.
+
+Pattern fit:
+
+| Observation | Explanation |
+|---|---|
+| "First card ever played in a session" | `play-card` is cold — all earlier functions (start-game, reveal-card, allocate-resources) are different containers; each function cools independently |
+| "Random mid-session turn" | A long pause between turns (virus resolution, player deliberation) re-cools `play-card`; Supabase containers typically warm for ~10 min |
+| Error changed from "Failed to send" to non-2xx | The two cold-start modes are non-deterministic; the previous playtest hit Mode 1, this one hit Mode 2 |
+
+### MCP logs — not accessible
+
+Supabase MCP OAuth flow state is ephemeral and does not persist across tool call boundaries. The `complete_authentication` call arrives after the flow state is discarded. Could not confirm HTTP status code from server logs. Diagnosis rests on source analysis + pattern match.
+
+### Secondary bug: error message display
+
+When `FunctionsHttpError` is returned, all callers do:
+```typescript
+if (fnError) {
+  setError(fnError.message);  // always "Edge Function returned a non-2xx status code"
+}
+```
+
+`fnError.context` is the raw `Response` object (body unconsumed). For a 400 response, the actual message (e.g. `{ error: "Not your turn" }`) is in the response body, accessible via `await fnError.context.json()`. The UI never reads it. This means ALL 400 game-logic validation errors also show the generic wrapper message — a separate bug that's been present since shipping.
+
+### Proposed fix
+
+Two changes to `invokeWithRetry`, no changes to callers:
+
+**1 — Retry on 5xx FunctionsHttpError (cold start relay error)**
+
+```typescript
+function isRetryableError(error: InvokeError): boolean {
+  if (error.name === "FunctionsFetchError" || error.message.includes("Failed to send")) {
+    return true;
+  }
+  if (error.name === "FunctionsHttpError") {
+    const status = (error.context as Response | undefined)?.status;
+    return status !== undefined && status >= 500;
+  }
+  return false;
+}
+```
+
+**2 — Extract actual error message for non-retryable FunctionsHttpError (4xx)**
+
+On exit from the retry loop (either not retryable or retries exhausted):
+```typescript
+// For 4xx FunctionsHttpError: read the body, return the actual message
+if (error !== null && error.name === "FunctionsHttpError") {
+  const status = (error.context as Response | undefined)?.status;
+  if (status !== undefined && status < 500) {
+    try {
+      const body = await (error.context as Response).json();
+      if (typeof body?.error === "string") {
+        return { data: null, error: { ...error, message: body.error } };
+      }
+    } catch { /* body not JSON; keep generic message */ }
+  }
+}
+return { data, error: error as InvokeError | null };
+```
+
+The 5xx case (cold start) keeps the generic message since the body is infrastructure HTML, not a function error object.
+
+**Why this is safe for non-idempotent operations:**
+
+The idempotency guarantee from the original comment still holds:
+- `FunctionsFetchError`: `fetch()` threw → request never reached the server
+- `FunctionsHttpError` with 5xx: the relay returned an error before routing to the function handler → no handler ran, no writes occurred
+
+A 4xx is NOT retried — it means the request reached the function and the function rejected it intentionally.
+
+**Updated comment for `invokeWithRetry`:**
+
+```typescript
+// Retries on two cold-start failure modes:
+//   1. FunctionsFetchError: fetch() threw (TCP failure) — request never reached the server
+//   2. FunctionsHttpError 5xx: relay timed out before reaching the handler — no writes occurred
+// Does NOT retry 4xx — those are intentional rejections from the function handler.
+// For 4xx FunctionsHttpError, reads the response body to surface the actual error message.
+```

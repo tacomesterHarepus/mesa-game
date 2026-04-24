@@ -63,6 +63,14 @@ Template:
 **Category:** spatial, feedback, tension
 **Severity:** major
 
+### 2026-04-25 — Cards appear instantly instead of being drawn
+**What I noticed:** When an AI's turn starts, their hand just updates — cards appear or disappear without any visual transition.
+**What made it feel off:** In a physical card game the act of drawing is visible and meaningful. Watching cards snap into existence removes any sense that a hidden deck is being consulted. Draw bugs (wrong count, wrong cards) are also invisible to observers.
+**Possible category:** feedback, spatial
+**Severity:** medium — acceptable for playtesting, but important for game feel in the final build. Also a practical debugging aid: animated draws make draw-count bugs immediately obvious to observers.
+
+---
+
 ### 2026-04-24 — Virus resolution feels like paperwork
 **What I noticed:** Viruses resolve via a "Next virus card: X" + "Resolve virus" button screen.
 **What made it feel off:** This should be one of the most dramatic moments in the game — the AIs' hidden actions being revealed and potentially sabotaging the mission. Instead it's a form.

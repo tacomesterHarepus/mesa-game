@@ -6,6 +6,8 @@ Ideas and polish items that aren't blocking current phases. Add freely; prioriti
 
 ## UX Polish
 
+- **Draw cards animation** — When an AI's turn starts, cards should visibly draw from a deck into the hand rather than snapping in. Reinforces the physical card game metaphor and makes draw-count bugs obvious to observers without checking the DB. Priority: medium. Scope: part of the broader game-feel pass, not a standalone feature. *(Reported: 2026-04-25 playtest)*
+
 - **Active turn indicator** — *(Resolved: ring-2 ring-amber/40 added to isActive branch in PlayerRoster.tsx, 2026-04-24)*
 
 - **ResourceAllocation base-stat clarity** — The allocation UI only shows the delta controls (+CPU / +RAM, starting at 0), which caused playtester to misread AI stats as 0/0. Should clearly show each AI's current CPU/RAM, plus a live preview of the post-allocation value (current + delta) as the human adjusts. *(Reported: first dev-mode playthrough)*
