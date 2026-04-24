@@ -1,9 +1,11 @@
 # Session Notes
 
 ## Current Phase
-**Phase 7.5 — Virus placement UI + bug fixes** (in progress)
+**Phase 7.5 — Virus placement UI + bug fixes** (DONE)
 
 > **DIAGNOSIS REFERENCE:** Second playtest (2026-04-24) uncovered that Phase 7 is NOT fully complete and has multiple real bugs. Full root-cause analysis is in `DIAGNOSIS_2026-04-24.md`. Read that file before touching any of the issues listed in Phase 7.5.
+
+> **DIAGNOSIS REFERENCE (2026-04-25):** Phase 2 playtest surfaced two new observations. Root-cause analysis in `DIAGNOSIS_2026-04-25.md`. Bug A: "Failed to send a request to the Edge Function" on `play-card` — confirmed cold-start; proposed fix is `invokeWithRetry` wrapper. Bug B: hand appearing replaced — backend draw logic is correct; likely UI ordering artifact; proposed fix is sort-by-id in polling + Realtime handlers. Neither fix applied yet — awaiting approval.
 
 ## Build Status
 
@@ -20,13 +22,13 @@
 | 8. Secret actions | ✓ | secret-target function; SecretTargeting UI |
 | 9. Mission special rules | ✓ | play-card v5 + end-play-phase v5; mission rules enforced server-side |
 | Bug fixes (post-P9) | ✓ | Bug 1 (cpu/ram defaults), Bug 2 (draw cards), Bug 3 (CardReveal loading) |
-| 7.5. Virus placement + fixes | **IN PROGRESS** | Items C/D/E/F done; Item B Phase 2 (UI) done — Phase 3 (backend wiring) next |
+| 7.5. Virus placement + fixes | **DONE** | Items C/D/E/F done; Item B Phase 2+3 done — backend wired, E2E test added |
 | 10. Human controls | pending | |
 | 11. Game log | pending | |
 | 12. Chat system | pending | |
 | 13. UI polish | pending | |
 
-**Test suite: 29/45 passing, 13 skip, 1 fail** (skips = test.skip() branches for random card conditions; 1 persistent fail = virus-system cold-start timeout, pre-existing flakiness not caused by recent changes)
+**Test suite: 33/46 passing, 10 skip, 1 fail** (skips = test.skip() branches for random card conditions; 1 persistent fail = virus-system cold-start timeout, pre-existing flakiness not caused by recent changes; +1 new virus-placement.spec.ts passing)
 
 ---
 
@@ -40,19 +42,29 @@ All items below are diagnosed in `DIAGNOSIS_2026-04-24.md`. Do NOT start impleme
 
 ---
 
-### Item B — Virus placement UI in `PlayerTurn.tsx` (Phase 7 gap)
+### Item B — Virus placement UI in `PlayerTurn.tsx` ← IN PROGRESS
 
-**What's broken:** `place-virus` edge function is deployed and correct. `pending_viruses` is always empty because there is no UI. The end-play-phase shuffle step that moves `pending_viruses` into the virus pool is implemented and correct — it just never has anything to shuffle. The core strategic mechanic (pool dilution by good AIs, sabotage by bad AIs) is completely absent.
+**Phase 2 (UI) — DONE (commit 9266673)**
 
-**What to build:**
-- Show full hand in `PlayerTurn.tsx`, not just progress cards
-- Let AI select 0–N cards to stage for virus placement (staging area below the hand)
-- Staged cards show as "will be placed into pool"
-- "End Turn" flow: call `place-virus` for all staged cards first, then call `end-play-phase`
+Design confirmed and built. Key decisions:
+- N = `min(2, (cpu >= 2 ? 1 : 0) + (cardsPlayedThisTurn >= 3 ? 1 : 0))`
+- CPU 1: N=0, staging zone never shown
+- CPU 2: N=1 always (can't play 3 cards)
+- CPU 3/4: N=1 initially, becomes N=2 when 3rd card played (live recalculation)
+- Staging is local UI state until End Turn — other players see nothing during staging
+- If hand exhausted before staging quota met, End Turn unblocks (can't stage what you don't have)
+- Staged cards: virus-colored ring, click to unstage
+- Virus cards in hand are non-interactive (greyed) when virusCount=0
 
-**Effort:** ~3–4 hours (UI wiring + staging state + sequential API calls + test coverage)
+**Phase 3 (backend wiring) — DONE (commit c379eba)**
 
-**Test needed:** E2E test that verifies a staged card appears in `virus_pool` after end-play-phase runs.
+`handleEndTurn` now:
+1. Calls `place-virus` for each staged card sequentially (if any fail, shows error and aborts)
+2. Then calls `end-play-phase`
+
+`tests/e2e/virus-placement.spec.ts` added: sets up game with CPU=2 AI, stages a card via UI,
+clicks End Turn, verifies `pool.count(K) + queue.count(K)` increased by exactly 1 (mathematical
+proof ensures this regardless of which card is drawn from pool top).
 
 ---
 

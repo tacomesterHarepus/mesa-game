@@ -10,6 +10,8 @@ Ideas and polish items that aren't blocking current phases. Add freely; prioriti
 
 - **ResourceAllocation base-stat clarity** — The allocation UI only shows the delta controls (+CPU / +RAM, starting at 0), which caused playtester to misread AI stats as 0/0. Should clearly show each AI's current CPU/RAM, plus a live preview of the post-allocation value (current + delta) as the human adjusts. *(Reported: first dev-mode playthrough)*
 
+- **VirusResolution should auto-resolve without user clicks** — The VirusResolution UI requires a manual "Resolve Virus" button click per card. Per spec: "Cards equal to viruses generated are revealed and resolved one at a time from the top of the pool." The intended UX is automatic sequential resolution with brief delays between cards (for log/drama), not a manual click-to-advance flow. Each card should be revealed and its effect applied automatically; only the final state (next phase) requires acknowledgement. *(Reported: Phase 2 playtest 2026-04-25)*
+
 ---
 
 ## Game Balance
