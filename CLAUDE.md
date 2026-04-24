@@ -368,6 +368,11 @@ hands (
 )
 
 active_mission (
+  -- Despite the name, this table accumulates one row per mission played in the game.
+  -- It is mission history, not a single-row "current mission" table.
+  -- The currently active mission is identified by games.current_mission_id.
+  -- Old rows are retained intentionally — mission_contributions references them for End Game Screen stats.
+  -- Consequence: never query active_mission by game_id with maybeSingle(); always query by games.current_mission_id.
   id uuid PRIMARY KEY,
   game_id uuid REFERENCES games,
   mission_key text,

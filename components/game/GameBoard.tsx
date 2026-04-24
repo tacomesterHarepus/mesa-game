@@ -77,12 +77,19 @@ export function GameBoard({
 
     const poll = async () => {
       await supabase.auth.getSession();
-      const [{ data: g }, { data: p }, { data: m }] = await Promise.all([
-        supabase.from("games").select("*").eq("id", gameId).single(),
-        supabase.from("players").select("*").eq("game_id", gameId),
-        supabase.from("active_mission").select("*").eq("game_id", gameId).maybeSingle(),
-      ]);
+      // Fetch game first — need current_mission_id to query active_mission by ID.
+      // active_mission is a history table (one row per completed mission); querying
+      // by game_id with maybeSingle() returns PGRST116 (multiple rows) on mission 2+.
+      const { data: g } = await supabase.from("games").select("*").eq("id", gameId).single();
       if (g) setGame((prev) => ({ ...prev, ...g }));
+
+      const missionId = g?.current_mission_id ?? null;
+      const [{ data: p }, { data: m }] = await Promise.all([
+        supabase.from("players").select("*").eq("game_id", gameId),
+        missionId
+          ? supabase.from("active_mission").select("*").eq("id", missionId).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
       if (p && p.length > 0) setPlayers(p);
       // m is null when there is no active mission (lobby, resource_adjustment, etc.) — that is valid
       if (m !== undefined) setMission(m);
