@@ -87,12 +87,19 @@ export function GameBoard({
       // m is null when there is no active mission (lobby, resource_adjustment, etc.) — that is valid
       if (m !== undefined) setMission(m);
 
-      // Hand poll backup: avoids invisible cards when Realtime INSERT/DELETE is dropped
+      // Hand poll backup: avoids invisible cards when Realtime INSERT/DELETE is dropped.
+      // Sort by id ensures stable display order across polls (hands table has no position column).
       if (handPlayerId && handPlayerRole !== "human") {
         const { data: h } = await supabase
           .from("hands").select("*")
           .eq("player_id", handPlayerId).eq("game_id", gameId);
-        if (h) setHand(h);
+        if (h) {
+          const sorted = [...h].sort((a, b) => a.id.localeCompare(b.id));
+          if (process.env.NODE_ENV !== "production") {
+            console.log(`[hand poll] ${new Date().toISOString()} player=${handPlayerId.slice(0, 8)} ids=${sorted.map((c) => c.id.slice(0, 8)).join(",")}`);
+          }
+          setHand(sorted);
+        }
       }
     };
 
@@ -172,7 +179,11 @@ export function GameBoard({
               filter: `player_id=eq.${handPlayerId}`,
             },
             (payload) => {
-              setHand((prev) => [...prev, payload.new as HandCard]);
+              const newCard = payload.new as HandCard;
+              if (process.env.NODE_ENV !== "production") {
+                console.log(`[hand insert] ${new Date().toISOString()} card=${newCard.id.slice(0, 8)}`);
+              }
+              setHand((prev) => [...prev, newCard].sort((a, b) => a.id.localeCompare(b.id)));
             }
           )
           .on(
@@ -205,11 +216,20 @@ export function GameBoard({
   useEffect(() => {
     if (!devMode || !activeDevPlayer) return;
     const supabase = createClient();
+    const pid = activeDevPlayer.id;
     supabase
       .from("hands")
       .select("*")
-      .eq("player_id", activeDevPlayer.id)
-      .then(({ data }) => { if (data) setHand(data); });
+      .eq("player_id", pid)
+      .then(({ data }) => {
+        if (data) {
+          const sorted = [...data].sort((a, b) => a.id.localeCompare(b.id));
+          if (process.env.NODE_ENV !== "production") {
+            console.log(`[hand switch] ${new Date().toISOString()} player=${pid.slice(0, 8)} ids=${sorted.map((c) => c.id.slice(0, 8)).join(",")}`);
+          }
+          setHand(sorted);
+        }
+      });
   }, [devMode, activeDevPlayer?.id]);
 
   const isHost = game.host_user_id === userId;

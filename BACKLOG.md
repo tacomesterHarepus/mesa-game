@@ -32,6 +32,8 @@ Ideas and polish items that aren't blocking current phases. Add freely; prioriti
 
 - **PlayerTurn `error` persists when switching away and back** — `error` state in `PlayerTurn.tsx` is not reset on player switch. If AI X gets a play-card error, switching to another player and back shows the stale error. Minor UX annoyance; only visible when `isMyTurn && isAI`, so it cannot bleed to a different player. Low priority. *(Surfaced during Bug 3 audit)*
 
+- **`hands` table has no stable ordering column** — Using sort-by-id as a UI workaround to prevent card reordering across polling cycles. If we ever want meaningful ordering (draw order, card type grouping), add a `position` column to `hands` and update `drawCardsForPlayer` to assign sequential positions on INSERT. Low priority while the sort-by-id UX is acceptable. *(Added during Bug B fix, 2026-04-25)*
+
 - **ResourceAdjustment and ResourceAllocation initialise from stale props** — Both components initialise their adjustment/delta state from `aiPlayers` props at mount time. If the component is reused across missions without unmounting (or if player stats change between mount and interaction), the initial values may be stale. No regression path identified yet; worth verifying when ResourceAdjustment is first exercised in a multi-mission playtest. *(Surfaced during Bug 3 audit)*
 
 ---
