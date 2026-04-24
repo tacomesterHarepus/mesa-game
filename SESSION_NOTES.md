@@ -34,7 +34,7 @@ Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2
 | 12. Chat system | pending | |
 | 13. UI polish | pending | |
 
-**Test suite: 37/50 passing, 10 skip, 1 fail** (+1 new turn-order test passing. virus-system beforeAll timeout is pre-existing fragility — not caused by Phase 10.5; was previously masked as skip.)
+**Test suite: 40/50 passing, 10 skip, 0 fail** (+3 virus-system tests now passing. Phase 10.5 caused the virus-system failure by aligning aiIds[0] with turn_order_ids[0], making the CPU=2/disabled-button bug deterministic. Fixed by switching endCurrentPlayerTurn to REST + using REST phase detection instead of UI timing.)
 
 ---
 
