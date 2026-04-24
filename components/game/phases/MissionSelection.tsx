@@ -76,6 +76,10 @@ export function MissionSelection({ gameId, pendingOptions, currentPlayer, overri
                 <span className="font-mono text-xs text-amber">+{def.reward}</span>
               </div>
               <div className="text-xs font-mono text-faint">{reqs}</div>
+              <div className="text-xs font-mono text-muted mt-1">
+                Allocate: +{def.allocation.cpu} CPU, +{def.allocation.ram} RAM
+                <span className="ml-2 text-virus">Fail: +{def.failTimerPenalty} Timer</span>
+              </div>
               {def.specialRule && (
                 <div className="text-xs font-mono text-muted mt-1 italic">{def.specialRule}</div>
               )}
