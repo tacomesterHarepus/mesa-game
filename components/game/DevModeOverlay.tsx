@@ -32,6 +32,7 @@ export function DevModeOverlay({ players, activePlayer, onSwitch }: Props) {
               onClick={() => onSwitch(p)}
               className={[
                 "px-2 py-1 text-xs font-mono rounded border transition-colors",
+                p.role === "misaligned_ai" ? "ring-1 ring-virus" : "",
                 isActive
                   ? "border-amber text-amber bg-surface"
                   : "border-border text-muted bg-base hover:border-muted hover:text-primary",
