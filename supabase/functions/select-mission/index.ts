@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { drawCardsForPlayer } from "../_shared/advanceTurnOrPhase.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,18 +56,33 @@ Deno.serve(async (req) => {
     }).select().single();
     if (missionErr || !mission) throw new Error("Failed to create active mission");
 
-    // Reset all AI players' has_revealed_card and revealed_card_key
+    // Fetch all AI players (full row needed for drawCardsForPlayer's ram check)
     const { data: aiPlayers } = await admin
       .from("players")
-      .select("id")
+      .select("*")
       .eq("game_id", game_id)
       .neq("role", "human");
 
+    // Reset card-reveal flags
     if (aiPlayers && aiPlayers.length > 0) {
       await admin.from("players").update({
         has_revealed_card: false,
         revealed_card_key: null,
       }).eq("game_id", game_id).neq("role", "human");
+    }
+
+    // Refill all AI hands to RAM before card_reveal.
+    // This is the right insertion point: resource_adjustment is complete (RAM may have
+    // been reduced by humans, but that's now finalised), the mission is confirmed, and
+    // every AI is about to need cards for their reveal choice. Refilling in
+    // advanceTurnOrPhase's missionResolved branch would be too early (humans haven't
+    // confirmed the new mission yet and RAM could still change in resource_adjustment).
+    // drawCardsForPlayer is idempotent — safe for mission 1 where start-game already
+    // dealt full hands.
+    if (aiPlayers) {
+      for (const ai of aiPlayers) {
+        await drawCardsForPlayer(admin, game_id, ai);
+      }
     }
 
     await admin.from("games").update({
