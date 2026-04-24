@@ -3,7 +3,9 @@
 ## Current Phase
 **Phase 10 — Human Controls** (next up)
 
-> **PENDING FIXES (need approval before implementing):** Two proposed fixes from the 2026-04-25 playtest in `DIAGNOSIS_2026-04-25.md`. Bug A: add `invokeWithRetry` wrapper around all `supabase.functions.invoke` calls to handle edge-function cold-start silently. Bug B: sort hand by `id` in `GameBoard.tsx` polling + Realtime handler to eliminate visual card-reorder artifact. Both are low-risk, ~1 hour total. Confirm before starting Phase 10 or address first if the cold-start bug is painful.
+Bugs A and B from `DIAGNOSIS_2026-04-25.md` are now **fixed and committed**:
+- **Bug A (commit 24be693):** `lib/supabase/invokeWithRetry.ts` — silently retries network-level edge-function cold-start failures up to 2×. Applied to all 8 callers (PlayerTurn, VirusResolution, CardReveal, ResourceAllocation, ResourceAdjustment, SecretTargeting, LobbyPhase, MissionSelection).
+- **Bug B (commit 998c700):** Hand sorted by `id` in all 3 update paths in `GameBoard.tsx`. Dev-mode console logging added. `tests/e2e/hand-stability.spec.ts` added with backend correctness + UI stability tests.
 
 ---
 
@@ -34,7 +36,7 @@
 | 12. Chat system | pending | |
 | 13. UI polish | pending | |
 
-**Test suite: 33/46 passing, 10 skip, 1 fail** (skips = test.skip() branches for random card conditions; 1 persistent fail = virus-system cold-start timeout, pre-existing flakiness not caused by recent changes; +1 new virus-placement.spec.ts passing)
+**Test suite: 34/48 passing, 11 skip, 1 fail, 2 did-not-run** (skips = test.skip() branches for random card conditions; 1 persistent fail = virus-system cold-start timeout, pre-existing; 2 did-not-run = virus-system tests after the cold-start failure; +2 new hand-stability.spec.ts: 1 passed, 1 skipped)
 
 ---
 
