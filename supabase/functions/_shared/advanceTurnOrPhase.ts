@@ -115,6 +115,22 @@ export async function advanceTurnOrPhase(
   }
 
   if (missionResolved || !game.current_mission_id) {
+    // Rotate turn order so currentPlayer goes first in the next mission.
+    // Contract: currentPlayer must be the completing AI (success) or the last AI to act
+    // in round 2 (mission failure). abort-mission (Phase 10) must pass the same contract.
+    const { data: aiPlayers } = await admin
+      .from("players")
+      .select("id, turn_order")
+      .eq("game_id", game_id)
+      .neq("role", "human")
+      .order("turn_order", { ascending: true });
+
+    const seats: string[] = (aiPlayers ?? []).map((p: any) => p.id);
+    const completingIdx = seats.indexOf(currentPlayer.id);
+    const rotated = completingIdx >= 0
+      ? [...seats.slice(completingIdx), ...seats.slice(0, completingIdx)]
+      : seats;
+
     const allMissions = [
       "data_cleanup", "basic_model_training", "dataset_preparation", "cross_validation",
       "distributed_training", "balanced_compute_cluster", "dataset_integration",
@@ -124,6 +140,7 @@ export async function advanceTurnOrPhase(
     await admin.from("games").update({
       phase: "resource_adjustment",
       pending_mission_options: shuffle(allMissions).slice(0, 3),
+      turn_order_ids: rotated,
     }).eq("id", game_id);
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
