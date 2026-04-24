@@ -243,6 +243,16 @@ export function GameBoard({
     : null;
   const effectiveCurrentPlayer = devMode ? syncedActiveDevPlayer : syncedCurrentPlayer;
 
+  // Humans first (stable by id), then AIs ascending by turn_order (seat order).
+  // Human turn_order is null; do not use it for sorting.
+  const sortedPlayers = [...players].sort((a, b) => {
+    const aHuman = a.role === "human";
+    const bHuman = b.role === "human";
+    if (aHuman !== bHuman) return aHuman ? -1 : 1;
+    if (aHuman) return a.id.localeCompare(b.id);
+    return (a.turn_order ?? 0) - (b.turn_order ?? 0);
+  });
+
   const isAI = effectiveCurrentPlayer?.role !== "human" && effectiveCurrentPlayer !== null;
   const isMisaligned = effectiveCurrentPlayer?.role === "misaligned_ai";
   const misalignedPlayers = players.filter((p) => p.role === "misaligned_ai");
@@ -259,7 +269,7 @@ export function GameBoard({
         return (
           <ResourceAdjustment
             gameId={gameId}
-            players={players}
+            players={sortedPlayers}
             currentPlayer={effectiveCurrentPlayer}
             overridePlayerId={overridePlayerId}
           />
@@ -277,7 +287,7 @@ export function GameBoard({
         return (
           <CardReveal
             gameId={gameId}
-            players={players}
+            players={sortedPlayers}
             currentPlayer={effectiveCurrentPlayer}
             hand={hand}
             overridePlayerId={overridePlayerId}
@@ -287,7 +297,7 @@ export function GameBoard({
         return (
           <ResourceAllocation
             gameId={gameId}
-            players={players}
+            players={sortedPlayers}
             currentPlayer={effectiveCurrentPlayer}
             missionKey={mission?.mission_key ?? ""}
             overridePlayerId={overridePlayerId}
@@ -317,7 +327,7 @@ export function GameBoard({
         return (
           <SecretTargeting
             gameId={gameId}
-            players={players}
+            players={sortedPlayers}
             currentPlayer={effectiveCurrentPlayer}
             targetingDeadline={game.targeting_deadline}
             cardKey={game.current_targeting_card_key}
@@ -329,7 +339,7 @@ export function GameBoard({
           <GameOver
             gameId={gameId}
             winner={game.winner}
-            players={players}
+            players={sortedPlayers}
             currentPlayer={effectiveCurrentPlayer}
             isHost={isHost}
           />
@@ -347,7 +357,7 @@ export function GameBoard({
     <div className={`min-h-screen bg-deep flex flex-col ${devMode ? "pt-6" : ""}`}>
       {devMode && (
         <DevModeOverlay
-          players={players}
+          players={sortedPlayers}
           activePlayer={activeDevPlayer}
           onSwitch={setActiveDevPlayer}
         />
@@ -378,7 +388,7 @@ export function GameBoard({
         {/* Right panel — roster, hand, log, chat */}
         <div className="md:w-64 border-t md:border-t-0 md:border-l border-border p-4 flex flex-col gap-4 overflow-y-auto">
           <PlayerRoster
-            players={players}
+            players={sortedPlayers}
             currentUserId={userId}
             currentTurnPlayerId={game.current_turn_player_id}
             phase={game.phase}
@@ -415,7 +425,7 @@ export function GameBoard({
           <PublicChat
             gameId={gameId}
             currentPlayer={effectiveCurrentPlayer}
-            players={players}
+            players={sortedPlayers}
             canPost={canPostChat}
           />
         </div>
