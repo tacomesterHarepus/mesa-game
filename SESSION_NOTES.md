@@ -5,10 +5,12 @@
 
 Recent completed work:
 - **Phase 7.5** — Virus placement UI + bug fixes. All items done. See `HISTORY.md` for full details.
-- **Bug A (commit 24be693)** — `lib/supabase/invokeWithRetry.ts` retries edge-function cold-start failures; applied to all 8 callers.
+- **Bug A v1 (commit 24be693)** — `invokeWithRetry` retries TCP-level cold-start failures (`FunctionsFetchError`).
+- **Bug A v2 (commit 7a5d762)** — Extended to also retry relay-level cold-start failures (`FunctionsHttpError` 5xx); 4xx responses now surface actual server error message instead of generic wrapper. `tests/e2e/error-handling.spec.ts` added.
 - **Bug B (commit 998c700)** — Hand sorted by `id` in all 3 update paths in `GameBoard.tsx`; `tests/e2e/hand-stability.spec.ts` added.
+- **Phase 10.5 (commits 80c85b8–1c51e00)** — Seat order + turn rotation. Migration 011, start-game v8, advanceTurnOrPhase rotation, GameBoard sort, DevModeOverlay red ring, turn-order.spec.ts. All deployed. ⚠️ Abandon any dev games created before this deploy.
 
-Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2026-04-25.md` (Bug A cold-start, Bug B hand ordering).
+Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2026-04-25.md` (Bug A cold-start, Bug B hand ordering; appendix: Bug A revisit — FunctionsHttpError 5xx path; Phase 10.5 investigation).
 
 ## Build Status
 
@@ -26,12 +28,13 @@ Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2
 | 9. Mission special rules | ✓ | play-card v5 + end-play-phase v5; mission rules enforced server-side |
 | Bug fixes (post-P9) | ✓ | Bug 1 (cpu/ram), Bug 2 (draw cards), Bug 3 (CardReveal loading) |
 | 7.5. Virus placement + fixes | ✓ | Items A–F done; virus placement UI + backend wired; E2E tests added |
+| 10.5. Seat order + turn rotation | ✓ | Migration 011, start-game v8, rotation logic, sorted roster, red ring, E2E test |
 | 10. Human controls | **NEXT** | abort-mission edge function + UI button |
 | 11. Game log | pending | |
 | 12. Chat system | pending | |
 | 13. UI polish | pending | |
 
-**Test suite: 34/48 passing, 11 skip, 1 fail, 2 did-not-run** (1 persistent fail = virus-system cold-start timeout; skips = random card conditions; 2 did-not-run = virus-system tests after cold-start failure)
+**Test suite: 37/50 passing, 10 skip, 1 fail** (+1 new turn-order test passing. virus-system beforeAll timeout is pre-existing fragility — not caused by Phase 10.5; was previously masked as skip.)
 
 ---
 
@@ -63,14 +66,14 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 
 | Function | Version | Notes |
 |----------|---------|-------|
-| start-game | v7 | Sets cpu=1, ram=4 explicitly during role assignment |
+| start-game | v8 | Removes double shuffle; turn_order null for humans; turnOrderIds = seat order |
 | adjust-resources | v3 | override_player_id support |
 | select-mission | v3 | override_player_id support |
 | reveal-card | v4 | override_player_id support |
 | allocate-resources | v5 | Draws cards for first player after transition |
 | place-virus | v1 | Moves card from hands → pending_viruses |
-| end-play-phase | v7 | Imports drawCardsForPlayer from _shared/ |
-| resolve-next-virus | v3 | Imports advanceTurnOrPhase from _shared/ |
+| end-play-phase | v8 | Imports drawCardsForPlayer + advanceTurnOrPhase from _shared/ (rotation added) |
+| resolve-next-virus | v4 | Imports advanceTurnOrPhase from _shared/ (rotation added) |
 | secret-target | v1 | Vote mode + force-resolve mode |
 | play-card | v5 | All 10 mission special rules |
 
@@ -96,7 +99,10 @@ const userId: string = payload.sub;
 
 **Hand lookups:** `.limit(1).maybeSingle()` — multiple rows per `card_key` are possible; `.single()` errors.
 
-**Cold-start retry:** `lib/supabase/invokeWithRetry.ts` wraps all `functions.invoke` calls; retries on `FunctionsFetchError` or "Failed to send" up to 2×.
+**Cold-start retry:** `lib/supabase/invokeWithRetry.ts` wraps all `functions.invoke` calls. Retries up to 2× on:
+- `FunctionsFetchError` / "Failed to send" — TCP failure before any HTTP response
+- `FunctionsHttpError` with `status >= 500` — relay timeout returning 502/503/504
+For non-retryable `FunctionsHttpError` (4xx), reads `error.context.json().error` and returns the actual server message instead of the generic Supabase wrapper.
 
 **E2E test patterns:**
 - Auth token: cookie `sb-<ref>-auth-token` → strip `base64-` prefix → decode → `access_token`
