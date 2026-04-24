@@ -174,7 +174,7 @@ export function LobbyPhase({
           role: null,
           cpu: 1,
           ram: 4,
-          turn_order: 0,
+          turn_order: null,
           skip_next_turn: false,
           has_revealed_card: false,
           revealed_card_key: null,

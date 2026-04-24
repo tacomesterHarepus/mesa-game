@@ -52,7 +52,7 @@ export type Database = {
           role: "human" | "aligned_ai" | "misaligned_ai" | null
           cpu: number
           ram: number
-          turn_order: number
+          turn_order: number | null
           skip_next_turn: boolean
           has_revealed_card: boolean
           revealed_card_key: string | null
@@ -65,7 +65,7 @@ export type Database = {
           role?: "human" | "aligned_ai" | "misaligned_ai" | null
           cpu?: number
           ram?: number
-          turn_order?: number
+          turn_order?: number | null
           skip_next_turn?: boolean
           has_revealed_card?: boolean
           revealed_card_key?: string | null

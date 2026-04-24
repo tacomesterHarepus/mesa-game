@@ -41,7 +41,7 @@ export interface Player {
   role: Role | null
   cpu: number
   ram: number
-  turn_order: number
+  turn_order: number | null
   skip_next_turn: boolean
   has_revealed_card: boolean
   revealed_card_key: string | null
