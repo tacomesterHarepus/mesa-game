@@ -45,4 +45,5 @@ export interface Player {
   skip_next_turn: boolean
   has_revealed_card: boolean
   revealed_card_key: string | null
+  has_discarded_this_turn: boolean
 }
