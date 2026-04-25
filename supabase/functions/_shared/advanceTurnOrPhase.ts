@@ -169,6 +169,7 @@ export async function advanceTurnOrPhase(
       continue;
     }
 
+    await admin.from("players").update({ has_discarded_this_turn: false }).eq("id", nextPlayerId);
     await drawCardsForPlayer(admin, game_id, nextPlayer);
     await admin.from("games").update({ current_turn_player_id: nextPlayerId, phase: "player_turn" }).eq("id", game_id);
     await admin.from("game_log").insert({
@@ -198,7 +199,10 @@ export async function advanceTurnOrPhase(
     }
     const round2FirstPlayer = firstIdx < turnOrderIds.length ? turnOrderIds[firstIdx] : turnOrderIds[0];
     const { data: r2Player } = await admin.from("players").select("*").eq("id", round2FirstPlayer).single();
-    if (r2Player) await drawCardsForPlayer(admin, game_id, r2Player);
+    if (r2Player) {
+      await admin.from("players").update({ has_discarded_this_turn: false }).eq("id", round2FirstPlayer);
+      await drawCardsForPlayer(admin, game_id, r2Player);
+    }
 
     await admin.from("active_mission").update({ round: 2 }).eq("id", game.current_mission_id);
     await admin.from("games").update({

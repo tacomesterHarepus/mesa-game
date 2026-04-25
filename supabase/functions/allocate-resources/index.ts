@@ -102,6 +102,7 @@ Deno.serve(async (req) => {
     // otherwise start with their start-game hand, which may be smaller than their
     // post-allocation RAM if the human just bumped it.
     if (firstPlayerId) {
+      await admin.from("players").update({ has_discarded_this_turn: false }).eq("id", firstPlayerId);
       const { data: firstPlayer } = await admin.from("players").select("*").eq("id", firstPlayerId).single();
       if (firstPlayer) await drawCardsForPlayer(admin, game_id, firstPlayer);
     }

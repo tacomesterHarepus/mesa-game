@@ -348,3 +348,81 @@ A 4xx is NOT retried — it means the request reached the function and the funct
 // Does NOT retry 4xx — those are intentional rejections from the function handler.
 // For 4xx FunctionsHttpError, reads the response body to surface the actual error message.
 ```
+
+---
+
+## Phase 10.5 — Seat order and turn rotation investigation (2026-04-25)
+
+Diagnosis only. No changes applied. Spec clarification from user:
+
+- **Seat order**: set ONCE at game start, random shuffle, never changes.
+- **Mission turn order**: cyclic rotation of seat order. The completing (or last-acting) AI goes first in the next mission. Example: seats [A,B,C,D], C completes mission 1 → mission 2 order is [C,D,A,B].
+
+### Investigation #1 — players.turn_order consistency with games.turn_order_ids
+
+**Finding: double shuffle bug.**
+
+`start-game/index.ts` lines 59–70: `shuffledPlayers = shuffle(players!)` (shuffle 1). Each player gets `turn_order: i` based on their index in this shuffle.
+
+`start-game/index.ts` line 116: `turnOrderIds = shuffle(aiPlayers.map(p => p.id))` (shuffle 2). This is a **second independent shuffle** of the AI player IDs.
+
+`players.turn_order` reflects shuffle 1. `games.turn_order_ids` reflects shuffle 2. They are unrelated arrays.
+
+**Impact:** `turn_order_ids[0]` is not the player with `turn_order = lowest-AI-index`. Any UI or logic that uses one to infer the other will be wrong.
+
+### Investigation #2 — Turn order rotation between missions
+
+**Finding: rotation logic is completely missing.**
+
+`_shared/advanceTurnOrPhase.ts`, `missionResolved` branch: sets `phase: 'resource_adjustment'` (or `game_over`). Does NOT update `turn_order_ids`. No function anywhere computes a rotation. The same `turn_order_ids` set during `start-game` is used for every mission.
+
+**Impact:** All missions use the same turn order. The completing player does not become first in the next mission. Spec is violated from mission 2 onward.
+
+### Investigation #3 — UI player ordering
+
+**Finding: no ordering applied anywhere.**
+
+`GameBoard.tsx` passes `players` state (from DB query with no `.order()` clause) directly to `PlayerRoster` and `DevModeOverlay`. Neither component reads `turn_order` or sorts. `PlayerRoster` separates humans from AIs via `.filter()` but does not sort within groups. `DevModeOverlay` renders in arrival order.
+
+**Impact:** Both panels display AIs in arbitrary DB-row order, not seat order.
+
+### Investigation #4 — Misaligned AI indicator in dev panel
+
+**Finding: data path already works, styling only.**
+
+`DevModeOverlay.tsx` reads `p.role === "misaligned_ai"` directly and appends "M" suffix to the label. In dev mode all players share one anonymous `user_id` → RLS ownership check passes → all roles are readable. No data path changes needed. Change 6 is a one-line `ring-1 ring-red-500` style addition.
+
+### Proposed implementation plan
+
+Six changes, all required:
+
+**Change 1 — CLAUDE.md spec clarification**
+Add seat order + cyclic rotation spec with the [A,B,C,D] → [C,D,A,B] example.
+
+**Change 2 — start-game v8: remove second shuffle**
+`start-game/index.ts` line 116:
+```typescript
+// Before:
+const turnOrderIds = shuffle(aiPlayers.map((p: any) => p.id));
+// After:
+const turnOrderIds = aiPlayers.map((p: any) => p.id);
+```
+`aiPlayers` is already derived from `shuffledPlayers` (shuffle 1), so this preserves seat order without a second shuffle.
+
+**Change 3 — advanceTurnOrPhase: add rotation logic**
+In the `missionResolved` branch, after determining `completingPlayerId`:
+1. Query all AI players for the game sorted by `turn_order`
+2. Find the index of `completingPlayerId` in that list (or use index 0 if not found)
+3. Rotate: `[completingPlayer, ...remaining in seat order]`
+4. Write the new `turn_order_ids` array to `games`
+
+**Change 4 — GameBoard.tsx: sort players by turn_order**
+Sort the `players` array by `p.turn_order` before passing to `PlayerRoster` and `DevModeOverlay`. Human `turn_order` values are set by the same shuffle, so this produces consistent seat-order display.
+
+**Change 5 — DevModeOverlay.tsx: red ring for misaligned**
+Add `ring-1 ring-red-500` (or equivalent) to entries where `p.role === "misaligned_ai"`.
+
+**Change 6 — E2E test: turn-order.spec.ts**
+Play two missions (complete mission 1), verify `games.turn_order_ids[0]` equals the completing player's ID after mission 1 resolves.
+
+No schema migration required. Deploy: `start-game` and functions that import from `_shared/` via CLI. Frontend via Vercel.

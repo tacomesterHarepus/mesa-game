@@ -9,8 +9,9 @@ Recent completed work:
 - **Bug A v2 (commit 7a5d762)** — Extended to also retry relay-level cold-start failures (`FunctionsHttpError` 5xx); 4xx responses now surface actual server error message instead of generic wrapper. `tests/e2e/error-handling.spec.ts` added.
 - **Bug B (commit 998c700)** — Hand sorted by `id` in all 3 update paths in `GameBoard.tsx`; `tests/e2e/hand-stability.spec.ts` added.
 - **Phase 10.5 (commits 80c85b8–1c51e00)** — Seat order + turn rotation. Migration 011, start-game v8, advanceTurnOrPhase rotation, GameBoard sort, DevModeOverlay red ring, turn-order.spec.ts. All deployed. ⚠️ Abandon any dev games created before this deploy.
+- **Post-10.5 bugs (commits c760b46, 8edfe02, d2089a2)** — Three Mission 2+ bugs fixed. Bug 3 (c760b46): GameBoard poll now fetches game first then queries active_mission by `current_mission_id` to avoid PGRST116 on mission 2+; CLAUDE.md updated with active_mission history-table clarification. Bug 2 (8edfe02): `select-mission` now refills all AI hands to RAM before transitioning to card_reveal; select-mission deployed as v4. Bug 1 (d2089a2): MissionSelection UI now shows allocation pool and fail timer penalty per card. Regression tests in `tests/e2e/multi-mission.spec.ts`. ⚠️ mission-rules.spec.ts has a pre-existing flaky timeout (test 28, `advanceToPlayerTurnForMission` 15s limit) — passes on isolated re-run, not a regression.
 
-Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2026-04-25.md` (Bug A cold-start, Bug B hand ordering; appendix: Bug A revisit — FunctionsHttpError 5xx path; Phase 10.5 investigation).
+Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2026-04-25.md` (Bug A cold-start, Bug B hand ordering; appendix: Bug A revisit — FunctionsHttpError 5xx path; Phase 10.5 investigation), `DIAGNOSIS_2026-04-26.md` (three post-Phase-10.5 playtest bugs — all pre-existing, all Mission 2+; **appendix: missing discard step — full investigation + implementation plan**).
 
 ## Build Status
 
@@ -29,12 +30,13 @@ Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2
 | Bug fixes (post-P9) | ✓ | Bug 1 (cpu/ram), Bug 2 (draw cards), Bug 3 (CardReveal loading) |
 | 7.5. Virus placement + fixes | ✓ | Items A–F done; virus placement UI + backend wired; E2E tests added |
 | 10.5. Seat order + turn rotation | ✓ | Migration 011, start-game v8, rotation logic, sorted roster, red ring, E2E test |
+| Post-10.5 bugs | ✓ | Bug 3 c760b46, Bug 2 8edfe02, Bug 1 d2089a2. Regression tests in multi-mission.spec.ts. select-mission deployed as v4. |
 | 10. Human controls | **NEXT** | abort-mission edge function + UI button |
 | 11. Game log | pending | |
 | 12. Chat system | pending | |
 | 13. UI polish | pending | |
 
-**Test suite: 40/50 passing, 10 skip, 0 fail** (+3 virus-system tests now passing. Phase 10.5 caused the virus-system failure by aligning aiIds[0] with turn_order_ids[0], making the CPU=2/disabled-button bug deterministic. Fixed by switching endCurrentPlayerTurn to REST + using REST phase detection instead of UI timing.)
+**Test suite: 43/53 passing, 10 skip, 0 genuine fail** (+3 multi-mission regression tests. mission-rules.spec.ts has a pre-existing flaky timeout on test 28 in full-suite runs — passes in isolation. virus-system fixed by REST-based phase detection + REST endCurrentPlayerTurn.)
 
 ---
 
@@ -68,7 +70,7 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 |----------|---------|-------|
 | start-game | v8 | Removes double shuffle; turn_order null for humans; turnOrderIds = seat order |
 | adjust-resources | v3 | override_player_id support |
-| select-mission | v3 | override_player_id support |
+| select-mission | v4 | override_player_id support; refills all AI hands before card_reveal |
 | reveal-card | v4 | override_player_id support |
 | allocate-resources | v5 | Draws cards for first player after transition |
 | place-virus | v1 | Moves card from hands → pending_viruses |
