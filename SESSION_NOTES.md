@@ -31,12 +31,13 @@ Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2
 | 7.5. Virus placement + fixes | ✓ | Items A–F done; virus placement UI + backend wired; E2E tests added |
 | 10.5. Seat order + turn rotation | ✓ | Migration 011, start-game v8, rotation logic, sorted roster, red ring, E2E test |
 | Post-10.5 bugs | ✓ | Bug 3 c760b46, Bug 2 8edfe02, Bug 1 d2089a2. Regression tests in multi-mission.spec.ts. select-mission deployed as v4. |
+| Discard step | ✓ | Migration 012, discard-cards v1, play-card v6 strict mode, PlayerTurn discard UI. 6 commits be74806–df76279. |
 | 10. Human controls | **NEXT** | abort-mission edge function + UI button |
 | 11. Game log | pending | |
 | 12. Chat system | pending | |
 | 13. UI polish | pending | |
 
-**Test suite: 43/53 passing, 10 skip, 0 genuine fail** (+3 multi-mission regression tests. mission-rules.spec.ts has a pre-existing flaky timeout on test 28 in full-suite runs — passes in isolation. virus-system fixed by REST-based phase detection + REST endCurrentPlayerTurn.)
+**Test suite: 46/56 passing, 13 skip, 0 genuine fail** (+3 discard tests, +3 updated tests handling discard step in mission-flow + virus-placement. mission-rules.spec.ts has a pre-existing flaky timeout on test 28 in full-suite runs — passes in isolation.)
 
 ---
 
@@ -72,12 +73,13 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 | adjust-resources | v3 | override_player_id support |
 | select-mission | v4 | override_player_id support; refills all AI hands before card_reveal |
 | reveal-card | v4 | override_player_id support |
-| allocate-resources | v5 | Draws cards for first player after transition |
+| allocate-resources | v7 | Draws cards + resets has_discarded_this_turn for first player |
+| discard-cards | v1 | DISCARD→DRAW step; sets has_discarded_this_turn; rejects if already done |
 | place-virus | v1 | Moves card from hands → pending_viruses |
-| end-play-phase | v8 | Imports drawCardsForPlayer + advanceTurnOrPhase from _shared/ (rotation added) |
-| resolve-next-virus | v4 | Imports advanceTurnOrPhase from _shared/ (rotation added) |
+| end-play-phase | v9 | Picks up _shared reset for has_discarded_this_turn |
+| resolve-next-virus | v5 | Picks up _shared reset for has_discarded_this_turn |
 | secret-target | v1 | Vote mode + force-resolve mode |
-| play-card | v5 | All 10 mission special rules |
+| play-card | v6 | All 10 mission special rules + strict discard-before-play check |
 
 ## Dev Mode
 
