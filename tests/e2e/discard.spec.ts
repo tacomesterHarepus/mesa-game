@@ -246,6 +246,70 @@ test.describe("discard step", () => {
     }
   });
 
+  // Test 4: turn advance resets has_discarded_this_turn for the next player
+  test("turn advance resets has_discarded_this_turn for next player", async ({ browser }) => {
+    const ctx: BrowserContext = await browser.newContext();
+    try {
+      const { page, gameId } = await fillLobby(ctx, "Bot1");
+      await startDevGame(page);
+      const token = await extractAuthToken(page);
+      expect(token).not.toBeNull();
+
+      const { humanId, aiIds } = await collectPlayerIds(page);
+      expect(humanId).not.toBeNull();
+      expect(aiIds.length).toBeGreaterThan(1);
+
+      const currentTurnId = await advanceToPlayerTurn(page, gameId, token!, aiIds, humanId!);
+      expect(currentTurnId).toBeTruthy();
+
+      // Identify the next player in turn order
+      const gameResp = await fetch(
+        `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=turn_order_ids`,
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+      );
+      const [gameRow] = (await gameResp.json()) as Array<{ turn_order_ids: string[] }>;
+      const turnOrder = gameRow.turn_order_ids;
+      const currentIdx = turnOrder.indexOf(currentTurnId);
+      if (currentIdx < 0 || currentIdx >= turnOrder.length - 1) { test.skip(); return; }
+      const nextPlayerId = turnOrder[currentIdx + 1];
+
+      // Skip discard for current player → has_discarded_this_turn becomes true
+      const skipResp = await fetch(`${SUPABASE_URL}/functions/v1/discard-cards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ game_id: gameId, card_ids: [], override_player_id: currentTurnId }),
+      });
+      expect((await skipResp.json() as Record<string, unknown>).error).toBeUndefined();
+
+      // End current player's turn (CPU=1, numViruses=0 → advanceTurnOrPhase runs)
+      const endResp = await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ game_id: gameId, override_player_id: currentTurnId }),
+      });
+      expect((await endResp.json() as Record<string, unknown>).error).toBeUndefined();
+
+      // Next player's has_discarded_this_turn must be false — the backend reset it
+      const nextPlayerResp = await fetch(
+        `${SUPABASE_URL}/rest/v1/players?id=eq.${nextPlayerId}&select=has_discarded_this_turn,id`,
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+      );
+      const [nextPlayerRow] = (await nextPlayerResp.json()) as Array<{ has_discarded_this_turn: boolean; id: string }>;
+      expect(nextPlayerRow.has_discarded_this_turn).toBe(false);
+
+      // Game should have advanced to next player's turn
+      const freshGameResp = await fetch(
+        `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=current_turn_player_id,phase`,
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+      );
+      const [freshGame] = (await freshGameResp.json()) as Array<{ current_turn_player_id: string; phase: string }>;
+      expect(freshGame.phase).toBe("player_turn");
+      expect(freshGame.current_turn_player_id).toBe(nextPlayerId);
+    } finally {
+      await ctx.close().catch(() => {});
+    }
+  });
+
   // Test 3: play-card before discard → 400 "Must complete discard step"
   test("play-card is rejected with 400 when discard step not yet completed", async ({ browser }) => {
     const ctx: BrowserContext = await browser.newContext();

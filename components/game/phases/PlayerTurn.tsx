@@ -55,9 +55,9 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
     setError(null);
   }, [currentTurnPlayer?.id]);
 
-  // Sync discard state from server (one-way: only set true, never false)
+  // Sync discard state from server (bidirectional: true and false both reflected)
   useEffect(() => {
-    if (currentPlayer?.has_discarded_this_turn) setHasDiscarded(true);
+    setHasDiscarded(currentPlayer?.has_discarded_this_turn ?? false);
   }, [currentPlayer?.has_discarded_this_turn]);
 
   const cpu = currentPlayer?.cpu ?? 1;

@@ -32,12 +32,13 @@ Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2
 | 10.5. Seat order + turn rotation | ✓ | Migration 011, start-game v8, rotation logic, sorted roster, red ring, E2E test |
 | Post-10.5 bugs | ✓ | Bug 3 c760b46, Bug 2 8edfe02, Bug 1 d2089a2. Regression tests in multi-mission.spec.ts. select-mission deployed as v4. |
 | Discard step | ✓ | Migration 012, discard-cards v1, play-card v6 strict mode, PlayerTurn discard UI. 6 commits be74806–df76279. |
+| Discard bug fix | ✓ | UI server-sync bidirectional (PlayerTurn.tsx); end-play-phase pool-empty path calls advanceTurnOrPhase. DIAGNOSIS_2026-04-26.md appendix 2. end-play-phase deployed v10. |
 | 10. Human controls | **NEXT** | abort-mission edge function + UI button |
 | 11. Game log | pending | |
 | 12. Chat system | pending | |
 | 13. UI polish | pending | |
 
-**Test suite: 46/56 passing, 13 skip, 0 genuine fail** (+3 discard tests, +3 updated tests handling discard step in mission-flow + virus-placement. mission-rules.spec.ts has a pre-existing flaky timeout on test 28 in full-suite runs — passes in isolation.)
+**Test suite: 47/57 passing, 13 skip, 0 genuine fail** (+1 discard test 4: turn advance resets has_discarded for next player. mission-rules.spec.ts has a pre-existing flaky timeout on test 28 in full-suite runs — passes in isolation.)
 
 ---
 
@@ -76,7 +77,7 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 | allocate-resources | v7 | Draws cards + resets has_discarded_this_turn for first player |
 | discard-cards | v1 | DISCARD→DRAW step; sets has_discarded_this_turn; rejects if already done |
 | place-virus | v1 | Moves card from hands → pending_viruses |
-| end-play-phase | v9 | Picks up _shared reset for has_discarded_this_turn |
+| end-play-phase | v10 | Pool-empty path now calls advanceTurnOrPhase (was stuck-turn bug) |
 | resolve-next-virus | v5 | Picks up _shared reset for has_discarded_this_turn |
 | secret-target | v1 | Vote mode + force-resolve mode |
 | play-card | v6 | All 10 mission special rules + strict discard-before-play check |

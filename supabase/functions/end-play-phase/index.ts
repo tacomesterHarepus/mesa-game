@@ -176,18 +176,15 @@ Deno.serve(async (req) => {
           public_description: `${callerPlayer.display_name} generated ${pool.length} virus${pool.length > 1 ? "es" : ""}.`,
         });
         gameUpdates.phase = "virus_resolution";
-      } else {
-        // Pool was empty — no viruses to resolve, advance directly
-        gameUpdates.phase = "player_turn";
+        await admin.from("games").update(gameUpdates).eq("id", game_id);
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-
-      await admin.from("games").update(gameUpdates).eq("id", game_id);
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Pool was empty — fall through to advance turn directly (same as numViruses=0)
     }
 
-    // No viruses — advance turn directly
+    // No viruses (or pool empty) — advance turn directly
     await admin.from("games").update(gameUpdates).eq("id", game_id);
     const updatedGame = { ...game, ...gameUpdates };
     return await advanceTurnOrPhase(admin, updatedGame, callerPlayer, missionResolved);
