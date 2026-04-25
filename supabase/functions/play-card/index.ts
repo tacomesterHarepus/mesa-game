@@ -50,6 +50,7 @@ Deno.serve(async (req) => {
 
     const callerPlayer = await resolvePlayer(admin, game_id, userId, override_player_id);
     if (callerPlayer.id !== game.current_turn_player_id) throw new Error("Not your turn");
+    if (!callerPlayer.has_discarded_this_turn) throw new Error("Must complete discard step before playing cards");
 
     // Verify card is in player's hand
     const { data: handCard } = await admin
