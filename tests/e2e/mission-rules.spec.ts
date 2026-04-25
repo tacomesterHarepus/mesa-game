@@ -117,6 +117,19 @@ async function playCard(gameId: string, cardId: string, overridePlayerId: string
   return resp.json() as Promise<Record<string, unknown>>;
 }
 
+async function discardIfNeeded(gameId: string, playerId: string, token: string): Promise<void> {
+  const players = await fetchPlayers(gameId, token);
+  const player = players.find((p) => p.id === playerId);
+  if (player && !(player.has_discarded_this_turn as boolean)) {
+    await fetch(`${SUPABASE_URL}/functions/v1/discard-cards`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ game_id: gameId, card_ids: [], override_player_id: playerId }),
+    });
+    await new Promise((r) => setTimeout(r, 300));
+  }
+}
+
 // Advances past mission_selection and card_reveal to player_turn, selecting a specific mission if offered.
 // Returns the selected mission_key, or null if the desired mission wasn't available.
 async function advanceToPlayerTurnForMission(
@@ -188,6 +201,11 @@ async function advanceToPlayerTurnForMission(
   }
 
   await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
+
+  // Discard for the first active player so tests can call play-card immediately
+  const freshGame = await fetchGame(gameId, token);
+  const firstTurnId = freshGame.current_turn_player_id as string;
+  if (firstTurnId) await discardIfNeeded(gameId, firstTurnId, token);
 
   const mission = await fetchActiveMission(gameId, token);
   return { missionKey: (mission?.mission_key as string) ?? chosenMission, humanId, aiIds };
@@ -571,6 +589,8 @@ test.describe("mission special rules", () => {
       if (phase === "player_turn" || phase === "between_turns") {
         const currentTurnId = gameState.current_turn_player_id as string;
         if (!currentTurnId) break;
+
+        await discardIfNeeded(sharedGameId, currentTurnId, sharedToken);
 
         // Play a progress card if available (try to complete mission)
         const hand = await fetchHand(currentTurnId, sharedGameId, sharedToken);

@@ -135,6 +135,15 @@ async function advanceToPlayerTurnNoBump(
   await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
 }
 
+async function discardCards(gameId: string, playerId: string, token: string): Promise<void> {
+  await fetch(`${SUPABASE_URL}/functions/v1/discard-cards`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ game_id: gameId, card_ids: [], override_player_id: playerId }),
+  });
+  await new Promise((r) => setTimeout(r, 300));
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 test.describe("draw cards", () => {
@@ -181,6 +190,7 @@ test.describe("draw cards", () => {
         const progressCard = hand.find((c) => c.card_type === "progress");
 
         if (progressCard) {
+          await discardCards(gameId, playerId, token!);
           await fetch(`${SUPABASE_URL}/functions/v1/play-card`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -334,6 +344,7 @@ test.describe("draw cards", () => {
       }
 
       // Play one card and end turn — CPU=2 with 1 card → 1 virus → virus_resolution
+      await discardCards(gameId, firstPlayerId, token!);
       await fetch(`${SUPABASE_URL}/functions/v1/play-card`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

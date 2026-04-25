@@ -265,6 +265,17 @@ test.describe("game phase flow", () => {
   });
 
   test("active AI sees End Turn button and can end their turn", async () => {
+    // First, complete the discard step for the active player (new DISCARD → DRAW sub-step).
+    let discardPage: Page | null = null;
+    for (let i = 0; i < 20 && !discardPage; i++) {
+      discardPage = await findPageWithButton(pages, /Skip Discard/i);
+      if (!discardPage) await pages[0].waitForTimeout(500);
+    }
+    if (discardPage) {
+      await discardPage.getByRole("button", { name: /Skip Discard/i }).click();
+      await discardPage.waitForTimeout(500);
+    }
+
     // Find the page for the active player — it shows the End Turn button.
     // Retry quickly across all pages since some may still be polling to enter player_turn.
     let activePage: Page | null = null;

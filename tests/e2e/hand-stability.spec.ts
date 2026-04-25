@@ -173,6 +173,15 @@ async function advanceSingleAiTurn(
   return "skip";
 }
 
+async function discardCards(gameId: string, playerId: string, token: string): Promise<void> {
+  await fetch(`${SUPABASE_URL}/functions/v1/discard-cards`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ game_id: gameId, card_ids: [], override_player_id: playerId }),
+  });
+  await new Promise((r) => setTimeout(r, 300));
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 test.describe("hand stability", () => {
@@ -239,6 +248,7 @@ test.describe("hand stability", () => {
       const oldHandIds = new Set(oldHand.map((c) => c.id));
 
       // Play progress card via API
+      await discardCards(gameId, firstPlayerId, token!);
       await fetch(`${SUPABASE_URL}/functions/v1/play-card`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
