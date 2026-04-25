@@ -32,6 +32,11 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
   const isMyTurn = currentPlayer?.id === currentTurnPlayer?.id;
   const isAI = currentPlayer?.role !== "human" && currentPlayer !== null;
 
+  const [hasDiscarded, setHasDiscarded] = useState(false);
+  const [discardSelectedIds, setDiscardSelectedIds] = useState<Set<string>>(new Set());
+  const [discardLoading, setDiscardLoading] = useState(false);
+  const [discardError, setDiscardError] = useState<string | null>(null);
+
   const [selectedCardKey, setSelectedCardKey] = useState<string | null>(null);
   const [stagedCardIds, setStagedCardIds] = useState<Set<string>>(new Set());
   const [cardsPlayedThisTurn, setCardsPlayedThisTurn] = useState(0);
@@ -41,11 +46,19 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
 
   // Reset turn-local state when the active player changes
   useEffect(() => {
+    setHasDiscarded(false);
+    setDiscardSelectedIds(new Set());
+    setDiscardError(null);
     setCardsPlayedThisTurn(0);
     setSelectedCardKey(null);
     setStagedCardIds(new Set());
     setError(null);
   }, [currentTurnPlayer?.id]);
+
+  // Sync discard state from server (one-way: only set true, never false)
+  useEffect(() => {
+    if (currentPlayer?.has_discarded_this_turn) setHasDiscarded(true);
+  }, [currentPlayer?.has_discarded_this_turn]);
 
   const cpu = currentPlayer?.cpu ?? 1;
   const virusCount = calcVirusCount(cpu, cardsPlayedThisTurn);
@@ -66,6 +79,35 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
     virusCount === 0
       ? Array.from(new Set(unstagedCards.filter((c) => c.card_type === "virus").map((c) => c.card_key)))
       : [];
+
+  function toggleDiscardCard(id: string) {
+    setDiscardSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else if (next.size < 3) {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  async function handleDiscard(cardIds: string[]) {
+    setDiscardError(null);
+    setDiscardLoading(true);
+    const { data, error: fnError } = await invokeWithRetry("discard-cards", {
+      game_id: gameId, card_ids: cardIds, override_player_id: overridePlayerId,
+    });
+    if (fnError) {
+      setDiscardError(fnError.message);
+    } else if (data?.error) {
+      setDiscardError(data.error);
+    } else {
+      setHasDiscarded(true);
+      setDiscardSelectedIds(new Set());
+    }
+    setDiscardLoading(false);
+  }
 
   async function handlePlayCard() {
     if (!selectedCard || selectedCard.card_type !== "progress" || playsRemaining <= 0) return;
@@ -143,7 +185,64 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
         )}
       </div>
 
-      {isMyTurn && isAI && (
+      {isMyTurn && isAI && !hasDiscarded && (
+        <div className="space-y-4">
+          <div>
+            <p className="text-muted text-xs font-mono mb-2">
+              Discard step — select up to 3 cards to discard, then draw to RAM
+            </p>
+            {hand.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {hand.map((card) => {
+                  const def = CARD_MAP[card.card_key];
+                  const selected = discardSelectedIds.has(card.id);
+                  return (
+                    <button
+                      key={card.id}
+                      type="button"
+                      onClick={() => toggleDiscardCard(card.id)}
+                      className={`
+                        px-2 py-1 rounded border text-xs font-mono transition-colors cursor-pointer
+                        ${selected
+                          ? "ring-2 ring-offset-1 ring-primary text-primary border-primary bg-surface"
+                          : card.card_type === "virus"
+                          ? "text-virus border-virus bg-surface hover:opacity-80"
+                          : "text-amber border-amber-border bg-surface hover:opacity-80"}
+                      `}
+                    >
+                      {def?.name ?? card.card_key}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-faint text-xs font-mono">No cards in hand.</p>
+            )}
+          </div>
+          {discardError && <p className="text-virus text-xs font-mono">{discardError}</p>}
+          <div className="flex gap-2">
+            {discardSelectedIds.size > 0 && (
+              <Button
+                onClick={() => handleDiscard(Array.from(discardSelectedIds))}
+                loading={discardLoading}
+                className="flex-1"
+              >
+                Discard {discardSelectedIds.size} card{discardSelectedIds.size !== 1 ? "s" : ""}
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              onClick={() => handleDiscard([])}
+              loading={discardLoading}
+              className="flex-1"
+            >
+              Skip Discard
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isMyTurn && isAI && hasDiscarded && (
         <div className="space-y-4">
           {/* Hand */}
           <div>

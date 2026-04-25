@@ -178,6 +178,7 @@ export function LobbyPhase({
           skip_next_turn: false,
           has_revealed_card: false,
           revealed_card_key: null,
+          has_discarded_this_turn: false,
         };
 
         setCurrentPlayer(player);
