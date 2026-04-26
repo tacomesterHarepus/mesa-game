@@ -31,6 +31,7 @@ function calcVirusCount(cpu: number, cardsPlayedThisTurn: number): number {
 export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, round, overridePlayerId }: Props) {
   const isMyTurn = currentPlayer?.id === currentTurnPlayer?.id;
   const isAI = currentPlayer?.role !== "human" && currentPlayer !== null;
+  const isHuman = currentPlayer?.role === "human";
 
   const [hasDiscarded, setHasDiscarded] = useState(false);
   const [discardSelectedIds, setDiscardSelectedIds] = useState<Set<string>>(new Set());
@@ -44,6 +45,10 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
   const [endLoading, setEndLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [abortConfirming, setAbortConfirming] = useState(false);
+  const [abortLoading, setAbortLoading] = useState(false);
+  const [abortError, setAbortError] = useState<string | null>(null);
+
   // Reset turn-local state when the active player changes
   useEffect(() => {
     setHasDiscarded(false);
@@ -53,6 +58,8 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
     setSelectedCardKey(null);
     setStagedCardIds(new Set());
     setError(null);
+    setAbortConfirming(false);
+    setAbortError(null);
   }, [currentTurnPlayer?.id]);
 
   // Sync discard state from server (bidirectional: true and false both reflected)
@@ -139,6 +146,21 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
       next.delete(id);
       return next;
     });
+  }
+
+  async function handleAbortMission() {
+    setAbortError(null);
+    setAbortLoading(true);
+    const { data, error: fnError } = await invokeWithRetry("abort-mission", {
+      game_id: gameId, override_player_id: overridePlayerId,
+    });
+    if (fnError) {
+      setAbortError(fnError.message);
+    } else if (data?.error) {
+      setAbortError(data.error);
+    }
+    setAbortLoading(false);
+    setAbortConfirming(false);
   }
 
   async function handleEndTurn() {
@@ -344,12 +366,43 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
       )}
 
       {!isMyTurn && (
-        <div className="border border-border rounded p-4 bg-surface text-center">
-          <p className="font-mono text-xs text-faint">
-            {isAI
-              ? `Waiting for ${currentTurnPlayer?.display_name ?? "…"} to finish their turn.`
-              : `${currentTurnPlayer?.display_name ?? "An AI"} is taking their turn.`}
-          </p>
+        <div className="space-y-3">
+          <div className="border border-border rounded p-4 bg-surface text-center">
+            <p className="font-mono text-xs text-faint">
+              {isAI
+                ? `Waiting for ${currentTurnPlayer?.display_name ?? "…"} to finish their turn.`
+                : `${currentTurnPlayer?.display_name ?? "An AI"} is taking their turn.`}
+            </p>
+          </div>
+
+          {isHuman && round === 2 && (
+            <div className="space-y-2">
+              {!abortConfirming ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => setAbortConfirming(true)}
+                  className="w-full text-virus border-virus hover:border-virus"
+                >
+                  Abort Mission
+                </Button>
+              ) : (
+                <div className="border border-virus rounded p-3 space-y-2 bg-surface">
+                  <p className="text-xs font-mono text-virus">
+                    Abort mission? The normal fail penalty applies (Escape Timer increases).
+                  </p>
+                  <div className="flex gap-2">
+                    <Button onClick={handleAbortMission} loading={abortLoading} className="flex-1 bg-virus/10 border-virus text-virus hover:bg-virus/20">
+                      Confirm Abort
+                    </Button>
+                    <Button variant="secondary" onClick={() => setAbortConfirming(false)} className="flex-1">
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {abortError && <p className="text-virus text-xs font-mono">{abortError}</p>}
+            </div>
+          )}
         </div>
       )}
     </div>
