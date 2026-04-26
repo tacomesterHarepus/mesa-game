@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { advanceTurnOrPhase, corsHeaders, shuffle } from "../_shared/advanceTurnOrPhase.ts";
-import type { GameLogInsert, CardType, EffectType, LogWinner } from "../_shared/gameLogTypes.ts";
+import type { GameLogInsert, CardType, EffectType, LogWinner, MissionOutcome } from "../_shared/gameLogTypes.ts";
 
 // Resolves one card from the virus_resolution_queue.
 // Called by the host (or any human in dev mode) from the VirusResolution UI.
@@ -46,12 +46,15 @@ Deno.serve(async (req) => {
       .order("position").limit(1).maybeSingle();
 
     if (!nextCard) {
-      // Queue empty — refill pool and advance turn
+      // Queue empty — refill pool and advance turn.
+      // Read pending_mission_outcome before refill so advanceTurnOrPhase can emit
+      // mission_transition; it is cleared atomically inside advanceTurnOrPhase.
       await refillVirusPool(admin, game_id);
       const { data: freshGame } = await admin.from("games").select("*").eq("id", game_id).single();
       const missionResolved = !freshGame.current_mission_id;
       const fakeCurrentPlayer = { id: game.current_turn_player_id };
-      return await advanceTurnOrPhase(admin, freshGame, fakeCurrentPlayer, missionResolved);
+      const pendingOutcome = (freshGame.pending_mission_outcome ?? null) as MissionOutcome | null;
+      return await advanceTurnOrPhase(admin, freshGame, fakeCurrentPlayer, missionResolved, pendingOutcome ?? undefined);
     }
 
     // Mark resolved first to prevent double-resolution
