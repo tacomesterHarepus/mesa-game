@@ -84,6 +84,49 @@ async function getLogEntries(
   return (await resp.json()) as Array<{ event_type: string; metadata: Record<string, unknown> }>;
 }
 
+// Queries all game_log entries with created_at for ordering checks.
+async function getAllLogEntriesWithTimestamp(
+  gameId: string,
+  token: string,
+): Promise<Array<{ event_type: string; created_at: string }>> {
+  const resp = await fetch(
+    `${SUPABASE_URL}/rest/v1/game_log?game_id=eq.${gameId}&select=event_type,created_at&order=created_at.asc`,
+    { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+  );
+  return (await resp.json()) as Array<{ event_type: string; created_at: string }>;
+}
+
+// Calls resolve-next-virus until the game leaves virus_resolution.
+// Also force-resolves any secret_targeting interruptions (targeting cards in the pool
+// cause resolve-next-virus to pause the chain — we skip the vote and pick randomly).
+async function drainVirusQueue(gameId: string, token: string, overridePlayerId?: string): Promise<void> {
+  for (let i = 0; i < 25; i++) {
+    const phaseResp = await fetch(
+      `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=phase`,
+      { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+    );
+    const [row] = (await phaseResp.json()) as Array<{ phase: string }>;
+    if (row?.phase === "secret_targeting") {
+      // secret-target uses .single() to resolve the caller — in dev mode all players
+      // share the same user_id, so override_player_id is required to avoid a multi-row error.
+      await fetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ game_id: gameId, force_resolve: true, override_player_id: overridePlayerId }),
+      });
+      await new Promise((r) => setTimeout(r, 400));
+      continue;
+    }
+    if (row?.phase !== "virus_resolution") break;
+    await fetch(`${SUPABASE_URL}/functions/v1/resolve-next-virus`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ game_id: gameId }),
+    });
+    await new Promise((r) => setTimeout(r, 400));
+  }
+}
+
 // ── Suite ─────────────────────────────────────────────────────────────────────
 // Runs one full failed mission (2 rounds, no requirements met) to populate
 // game_log with the widest possible set of event types.
@@ -361,5 +404,141 @@ test.describe("game_log metadata coverage", () => {
     const meta = entries[0].metadata;
     expect(typeof meta.card_key).toBe("string");
     expect(typeof meta.card_type).toBe("string");
+  });
+});
+
+// ── CPU≥2 ordering suite ──────────────────────────────────────────────────────
+// Verifies that mission_transition fires AFTER all virus events when the
+// completing player has CPU≥2 (virus path through resolve-next-virus).
+// Uses a separate game so the queue-drain calls don't affect the first suite.
+
+test.describe("game_log mission_transition ordering (CPU≥2 virus path)", () => {
+  test.describe.configure({ mode: "serial" });
+
+  let ctx2: BrowserContext;
+  let page2: Page;
+  let gameId2: string;
+  let token2: string;
+  let humanId2: string | null;
+  let aiIds2: string[];
+  let turnOrderIds2: string[];
+
+  test.beforeAll(async ({ browser }) => {
+    ctx2 = await browser.newContext();
+    ({ page: page2, gameId: gameId2 } = await fillLobby(ctx2));
+    await startDevGame(page2);
+
+    token2 = (await extractAuthToken(page2))!;
+    expect(token2).not.toBeNull();
+
+    ({ humanId: humanId2, aiIds: aiIds2 } = await collectPlayerIds(page2));
+    expect(aiIds2.length).toBeGreaterThan(0);
+
+    // ── Mission Selection ──────────────────────────────────────────────────────
+    await page2.getByText("Mission Selection").waitFor({ state: "visible", timeout: 30000 });
+    const switcherPanel2 = page2.locator(".fixed.top-7");
+    const playerButtons2 = switcherPanel2.getByRole("button");
+    const btnCount2 = await playerButtons2.count();
+    for (let i = 0; i < btnCount2; i++) {
+      await playerButtons2.nth(i).click();
+      await page2.waitForTimeout(200);
+      const label = await playerButtons2.nth(i).textContent();
+      if (label?.includes("H")) break;
+    }
+    await page2.locator("button:not([name])").filter({ hasText: /Compute|Data|Validation/ }).first().click();
+    await page2.getByRole("button", { name: "Select Mission" }).click();
+
+    // ── Card Reveal ────────────────────────────────────────────────────────────
+    await page2.getByText("Card Reveal").waitFor({ state: "visible", timeout: 30000 });
+    for (const playerId of aiIds2) {
+      const handResp = await fetch(
+        `${SUPABASE_URL}/rest/v1/hands?player_id=eq.${playerId}&game_id=eq.${gameId2}&select=id,card_key,card_type`,
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token2}` } }
+      );
+      const hand = (await handResp.json()) as Array<{ id: string; card_key: string; card_type: string }>;
+      if (!hand.length) continue;
+      await fetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token2}` },
+        body: JSON.stringify({ game_id: gameId2, card_key: hand[0].card_key, override_player_id: playerId }),
+      });
+      await page2.waitForTimeout(300);
+    }
+
+    // ── Resource Allocation — give LAST player in turn order +1 CPU ────────────
+    await page2.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 30000 });
+
+    const gameResp = await fetch(
+      `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId2}&select=turn_order_ids`,
+      { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token2}` } }
+    );
+    const [gameRow] = (await gameResp.json()) as Array<{ turn_order_ids: string[] }>;
+    turnOrderIds2 = gameRow.turn_order_ids;
+    const lastAiId = turnOrderIds2[turnOrderIds2.length - 1];
+
+    await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token2}` },
+      body: JSON.stringify({
+        game_id: gameId2,
+        allocations: [{ player_id: lastAiId, cpu_delta: 1, ram_delta: 0 }],
+        override_player_id: humanId2,
+      }),
+    });
+    await page2.getByText("Player Turn").waitFor({ state: "visible", timeout: 30000 });
+
+    // ── Round 1: all players end-play-phase; drain viruses after each ────────────
+    for (const playerId of turnOrderIds2) {
+      await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token2}` },
+        body: JSON.stringify({ game_id: gameId2, override_player_id: playerId }),
+      });
+      await page2.waitForTimeout(400);
+      // Last player in round 1 has CPU=2 and will generate viruses — drain them.
+      // Pass humanId2 as override so secret-target's .single() resolves correctly in dev mode.
+      await drainVirusQueue(gameId2, token2, humanId2 ?? aiIds2[0]);
+    }
+
+    // ── Round 2: same; last player triggers mission_failed + virus path ─────────
+    for (const playerId of turnOrderIds2) {
+      await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token2}` },
+        body: JSON.stringify({ game_id: gameId2, override_player_id: playerId }),
+      });
+      await page2.waitForTimeout(400);
+      // After last player's end-play-phase: mission_failed + virus path.
+      // drainVirusQueue triggers resolve-next-virus, which reads pending_mission_outcome
+      // and emits mission_transition after all virus events.
+      await drainVirusQueue(gameId2, token2, humanId2 ?? aiIds2[0]);
+    }
+
+    await page2.getByText("Resource Adjustment").waitFor({ state: "visible", timeout: 20000 });
+  });
+
+  test.afterAll(async () => {
+    await ctx2?.close().catch(() => {});
+  });
+
+  test("mission_transition fires and appears after all virus events in created_at order", async () => {
+    const allEntries = await getAllLogEntriesWithTimestamp(gameId2, token2);
+
+    const transitionEntry = allEntries.find((e) => e.event_type === "mission_transition");
+    expect(transitionEntry).toBeDefined();
+
+    // The last player (CPU=2) must have generated viruses in round 2 — verify the log shows it.
+    const virusQueueEntries = allEntries.filter((e) => e.event_type === "virus_queue_start");
+    expect(virusQueueEntries.length).toBeGreaterThan(0);
+
+    // mission_transition must appear after every virus_queue_start, virus_effect, virus_no_effect.
+    const transitionTime = new Date(transitionEntry!.created_at).getTime();
+    const virusEventTypes = new Set(["virus_queue_start", "virus_effect", "virus_no_effect"]);
+    const allVirusEntries = allEntries.filter((e) => virusEventTypes.has(e.event_type));
+
+    for (const virusEntry of allVirusEntries) {
+      const virusTime = new Date(virusEntry.created_at).getTime();
+      expect(transitionTime).toBeGreaterThanOrEqual(virusTime);
+    }
   });
 });
