@@ -34,11 +34,11 @@ Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2
 | Discard step | ✓ | Migration 012, discard-cards v1, play-card v6 strict mode, PlayerTurn discard UI. 6 commits be74806–df76279. |
 | Discard bug fix | ✓ | UI server-sync bidirectional (PlayerTurn.tsx); end-play-phase pool-empty path calls advanceTurnOrPhase. DIAGNOSIS_2026-04-26.md appendix 2. end-play-phase deployed v10. |
 | 10. Human controls | ✓ | abort-mission v1 deployed; Abort Mission button in PlayerTurn; 3 E2E tests in abort-mission.spec.ts. |
-| 11. Game log | **NEXT** | |
+| 11. Game log | **DONE** | Migration 013 (metadata jsonb), gameLogTypes.ts, 7-commit instrumentation. All edge functions emit typed metadata. E2E test game-log.spec.ts covers 12 guaranteed + 3 conditional event types. |
 | 12. Chat system | pending | |
 | 13. UI polish | pending | |
 
-**Test suite: 50/60 passing, 13 skip, 0 genuine fail** (+3 abort-mission tests. mission-rules.spec.ts has a pre-existing flaky timeout on test 28 in full-suite runs — passes in isolation.)
+**Test suite: ~65/75 passing (est.), 13 skip, 0 genuine fail** (+15 game-log tests. mission-rules.spec.ts has a pre-existing flaky timeout on test 28 in full-suite runs — passes in isolation.)
 
 ---
 
@@ -53,13 +53,13 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 | select-mission | v4 | override_player_id support; refills all AI hands before card_reveal |
 | reveal-card | v4 | override_player_id support |
 | allocate-resources | v7 | Draws cards + resets has_discarded_this_turn for first player |
-| discard-cards | v1 | DISCARD→DRAW step; sets has_discarded_this_turn; rejects if already done |
+| discard-cards | v2 | Phase 11: typed `discard` log with metadata |
 | place-virus | v1 | Moves card from hands → pending_viruses |
-| end-play-phase | v10 | Pool-empty path now calls advanceTurnOrPhase (was stuck-turn bug) |
-| resolve-next-virus | v5 | Picks up _shared reset for has_discarded_this_turn |
-| secret-target | v1 | Vote mode + force-resolve mode |
-| play-card | v6 | All 10 mission special rules + strict discard-before-play check |
-| abort-mission | v1 | Round 2 human abort; applies fail penalty; calls advanceTurnOrPhase |
+| end-play-phase | v12 | Phase 11: typed mission_complete/failed logs + missionOutcome param to advanceTurnOrPhase |
+| resolve-next-virus | v7 | Phase 11: typed virus_effect/virus_no_effect/game_over logs |
+| secret-target | v2 | Phase 11: typed targeting_resolved log |
+| play-card | v7 | Phase 11: typed card_played log with mission_progress snapshot |
+| abort-mission | v2 | Phase 11: typed mission_aborted log; passes "aborted" to advanceTurnOrPhase |
 
 ## Dev Mode
 
