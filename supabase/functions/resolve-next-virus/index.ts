@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { advanceTurnOrPhase, corsHeaders, shuffle } from "../_shared/advanceTurnOrPhase.ts";
+import type { GameLogInsert, CardType, EffectType } from "../_shared/gameLogTypes.ts";
 
 // Resolves one card from the virus_resolution_queue.
 // Called by the host (or any human in dev mode) from the VirusResolution UI.
@@ -117,15 +118,21 @@ async function applyVirusEffect(admin: any, game: any, card: any): Promise<boole
           }))
         );
         await admin.from("virus_pool").delete().in("id", pool.map((c: any) => c.id));
-        await admin.from("game_log").insert({
-          game_id, event_type: "virus_resolved",
+        const cascadeLog: GameLogInsert<"virus_effect"> = {
+          game_id,
+          event_type: "virus_effect",
           public_description: `Cascading Failure! ${pool.length} more virus${pool.length > 1 ? "es" : ""} triggered.`,
-        });
+          metadata: { card_key: card.card_key, effect_type: "cascading_failure", cascade_count: pool.length, pool_was_empty: false },
+        };
+        await admin.from("game_log").insert(cascadeLog);
       } else {
-        await admin.from("game_log").insert({
-          game_id, event_type: "virus_resolved",
+        const cascadeEmptyLog: GameLogInsert<"virus_effect"> = {
+          game_id,
+          event_type: "virus_effect",
           public_description: "Cascading Failure! Pool was empty — chain stops here.",
-        });
+          metadata: { card_key: card.card_key, effect_type: "cascading_failure", cascade_count: 0, pool_was_empty: true },
+        };
+        await admin.from("game_log").insert(cascadeEmptyLog);
       }
       return false;
     }
@@ -133,10 +140,13 @@ async function applyVirusEffect(admin: any, game: any, card: any): Promise<boole
     case "system_overload": {
       await admin.from("games")
         .update({ escape_timer: game.escape_timer + 1 }).eq("id", game_id);
-      await admin.from("game_log").insert({
-        game_id, event_type: "virus_resolved",
+      const overloadLog: GameLogInsert<"virus_effect"> = {
+        game_id,
+        event_type: "virus_effect",
         public_description: "System Overload! Escape Timer +1.",
-      });
+        metadata: { card_key: card.card_key, effect_type: "system_overload" },
+      };
+      await admin.from("game_log").insert(overloadLog);
       return false;
     }
 
@@ -148,10 +158,13 @@ async function applyVirusEffect(admin: any, game: any, card: any): Promise<boole
           compute_contributed: Math.max(0, mission.compute_contributed - 1),
         }).eq("id", mission.id);
       }
-      await admin.from("game_log").insert({
-        game_id, event_type: "virus_resolved",
+      const corruptLog: GameLogInsert<"virus_effect"> = {
+        game_id,
+        event_type: "virus_effect",
         public_description: "Model Corruption! −1 Compute from mission.",
-      });
+        metadata: { card_key: card.card_key, effect_type: "model_corruption" },
+      };
+      await admin.from("game_log").insert(corruptLog);
       return false;
     }
 
@@ -163,10 +176,13 @@ async function applyVirusEffect(admin: any, game: any, card: any): Promise<boole
           data_contributed: Math.max(0, mission.data_contributed - 1),
         }).eq("id", mission.id);
       }
-      await admin.from("game_log").insert({
-        game_id, event_type: "virus_resolved",
+      const driftLog: GameLogInsert<"virus_effect"> = {
+        game_id,
+        event_type: "virus_effect",
         public_description: "Data Drift! −1 Data from mission.",
-      });
+        metadata: { card_key: card.card_key, effect_type: "data_drift" },
+      };
+      await admin.from("game_log").insert(driftLog);
       return false;
     }
 
@@ -178,10 +194,13 @@ async function applyVirusEffect(admin: any, game: any, card: any): Promise<boole
           validation_contributed: Math.max(0, mission.validation_contributed - 1),
         }).eq("id", mission.id);
       }
-      await admin.from("game_log").insert({
-        game_id, event_type: "virus_resolved",
+      const valFailLog: GameLogInsert<"virus_effect"> = {
+        game_id,
+        event_type: "virus_effect",
         public_description: "Validation Failure! −1 Validation from mission.",
-      });
+        metadata: { card_key: card.card_key, effect_type: "validation_failure" },
+      };
+      await admin.from("game_log").insert(valFailLog);
       return false;
     }
 
@@ -192,10 +211,13 @@ async function applyVirusEffect(admin: any, game: any, card: any): Promise<boole
         const specialState = { ...(mission.special_state ?? {}), pipeline_breakdown_active: true };
         await admin.from("active_mission").update({ special_state: specialState }).eq("id", mission.id);
       }
-      await admin.from("game_log").insert({
-        game_id, event_type: "virus_resolved",
+      const pipelineLog: GameLogInsert<"virus_effect"> = {
+        game_id,
+        event_type: "virus_effect",
         public_description: "Pipeline Breakdown! Next contribution has 50% chance of failing.",
-      });
+        metadata: { card_key: card.card_key, effect_type: "pipeline_breakdown" },
+      };
+      await admin.from("game_log").insert(pipelineLog);
       return false;
     }
 
@@ -206,10 +228,13 @@ async function applyVirusEffect(admin: any, game: any, card: any): Promise<boole
         const specialState = { ...(mission.special_state ?? {}), dependency_error_active: true };
         await admin.from("active_mission").update({ special_state: specialState }).eq("id", mission.id);
       }
-      await admin.from("game_log").insert({
-        game_id, event_type: "virus_resolved",
+      const depErrLog: GameLogInsert<"virus_effect"> = {
+        game_id,
+        event_type: "virus_effect",
         public_description: "Dependency Error! Compute locked until Data is contributed.",
-      });
+        metadata: { card_key: card.card_key, effect_type: "dependency_error" },
+      };
+      await admin.from("game_log").insert(depErrLog);
       return false;
     }
 
@@ -226,18 +251,26 @@ async function applyVirusEffect(admin: any, game: any, card: any): Promise<boole
         current_targeting_resolution_id: card.id,
         current_targeting_card_key: card.card_key,
       }).eq("id", game_id);
-      await admin.from("game_log").insert({
-        game_id, event_type: "virus_resolved",
+      const targetingLog: GameLogInsert<"virus_effect"> = {
+        game_id,
+        event_type: "virus_effect",
         public_description: `${cardDisplayName(card.card_key)}! Misaligned AIs are selecting a target…`,
-      });
+        metadata: { card_key: card.card_key, effect_type: card.card_key as EffectType },
+      };
+      await admin.from("game_log").insert(targetingLog);
       return true; // pause
     }
 
     default: {
-      await admin.from("game_log").insert({
-        game_id, event_type: "virus_resolved",
-        public_description: `Virus resolved: ${card.card_key.replace(/_/g, " ")}.`,
-      });
+      // Progress card in the pool — no virus effect.
+      const noEffectCardType: CardType = card.card_type === "progress" ? card.card_key as CardType : "virus";
+      const noEffectLog: GameLogInsert<"virus_no_effect"> = {
+        game_id,
+        event_type: "virus_no_effect",
+        public_description: `${card.card_key.replace(/_/g, " ")} in virus pool — no effect.`,
+        metadata: { card_key: card.card_key, card_type: noEffectCardType },
+      };
+      await admin.from("game_log").insert(noEffectLog);
       return false;
     }
   }
