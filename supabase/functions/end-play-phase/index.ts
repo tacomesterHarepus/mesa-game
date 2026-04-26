@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { advanceTurnOrPhase, corsHeaders, drawCardsForPlayer, shuffle } from "../_shared/advanceTurnOrPhase.ts";
-import type { GameLogInsert } from "../_shared/gameLogTypes.ts";
+import type { GameLogInsert, MissionOutcome } from "../_shared/gameLogTypes.ts";
 
 const MISSION_REQUIREMENTS: Record<string, { compute?: number; data?: number; validation?: number }> = {
   data_cleanup: { data: 4, compute: 3 },
@@ -76,6 +76,7 @@ Deno.serve(async (req) => {
       .from("active_mission").select("*").eq("id", game.current_mission_id).maybeSingle();
 
     let missionResolved = false;
+    let missionOutcomeForTransition: MissionOutcome | undefined;
     let gameUpdates: Record<string, any> = { turn_play_count: 0 };
 
     if (mission) {
@@ -97,16 +98,19 @@ Deno.serve(async (req) => {
 
       if (missionComplete) {
         missionResolved = true;
+        missionOutcomeForTransition = "complete";
         const reward = MISSION_REWARDS[mission.mission_key] ?? 2;
         gameUpdates.core_progress = game.core_progress + reward;
         gameUpdates.current_mission_id = null;
         gameUpdates.pending_mission_options = [];
         await resetPlayersForNextMission(admin, game_id);
-        await admin.from("game_log").insert({
+        const missionCompleteLog: GameLogInsert<"mission_complete"> = {
           game_id,
           event_type: "mission_complete",
           public_description: `Mission complete! Core Progress +${reward}. (${gameUpdates.core_progress}/10)`,
-        });
+          metadata: { mission_key: mission.mission_key, reward, new_progress: gameUpdates.core_progress },
+        };
+        await admin.from("game_log").insert(missionCompleteLog);
       } else {
         // Check end of round 2
         const turnOrderIds: string[] = game.turn_order_ids ?? [];
@@ -115,16 +119,19 @@ Deno.serve(async (req) => {
 
         if (isLastPlayer && mission.round === 2) {
           missionResolved = true;
+          missionOutcomeForTransition = "failed";
           const penalty = MISSION_FAIL_PENALTIES[mission.mission_key] ?? 1;
           gameUpdates.escape_timer = game.escape_timer + penalty;
           gameUpdates.current_mission_id = null;
           gameUpdates.pending_mission_options = [];
           await resetPlayersForNextMission(admin, game_id);
-          await admin.from("game_log").insert({
+          const missionFailedLog: GameLogInsert<"mission_failed"> = {
             game_id,
             event_type: "mission_failed",
             public_description: `Mission failed! Escape Timer +${penalty}. (${gameUpdates.escape_timer}/8)`,
-          });
+            metadata: { mission_key: mission.mission_key, penalty, new_timer: gameUpdates.escape_timer },
+          };
+          await admin.from("game_log").insert(missionFailedLog);
         }
       }
     }
@@ -200,7 +207,7 @@ Deno.serve(async (req) => {
     // No viruses (or pool empty) — advance turn directly
     await admin.from("games").update(gameUpdates).eq("id", game_id);
     const updatedGame = { ...game, ...gameUpdates };
-    return await advanceTurnOrPhase(admin, updatedGame, callerPlayer, missionResolved);
+    return await advanceTurnOrPhase(admin, updatedGame, callerPlayer, missionResolved, missionOutcomeForTransition);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }), {

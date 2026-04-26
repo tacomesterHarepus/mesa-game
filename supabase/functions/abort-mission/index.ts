@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { advanceTurnOrPhase, corsHeaders } from "../_shared/advanceTurnOrPhase.ts";
+import type { GameLogInsert } from "../_shared/gameLogTypes.ts";
 
 const MISSION_FAIL_PENALTIES: Record<string, number> = {
   data_cleanup: 1, basic_model_training: 1,
@@ -51,11 +52,13 @@ Deno.serve(async (req) => {
     const newEscapeTimer = game.escape_timer + penalty;
 
     await resetPlayersForNextMission(admin, game_id);
-    await admin.from("game_log").insert({
+    const missionAbortedLog: GameLogInsert<"mission_aborted"> = {
       game_id,
       event_type: "mission_aborted",
       public_description: `Mission aborted by humans. Escape Timer +${penalty}. (${newEscapeTimer}/8)`,
-    });
+      metadata: { mission_key: mission.mission_key, penalty, new_timer: newEscapeTimer, aborted_by_player_id: callerPlayer.id },
+    };
+    await admin.from("game_log").insert(missionAbortedLog);
 
     const gameUpdates = {
       escape_timer: newEscapeTimer,
@@ -67,7 +70,7 @@ Deno.serve(async (req) => {
 
     const updatedGame = { ...game, ...gameUpdates };
     const currentTurnPlayer = { id: game.current_turn_player_id };
-    return await advanceTurnOrPhase(admin, updatedGame, currentTurnPlayer, true);
+    return await advanceTurnOrPhase(admin, updatedGame, currentTurnPlayer, true, "aborted");
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }), {

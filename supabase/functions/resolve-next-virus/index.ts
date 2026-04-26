@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { advanceTurnOrPhase, corsHeaders, shuffle } from "../_shared/advanceTurnOrPhase.ts";
-import type { GameLogInsert, CardType, EffectType } from "../_shared/gameLogTypes.ts";
+import type { GameLogInsert, CardType, EffectType, LogWinner } from "../_shared/gameLogTypes.ts";
 
 // Resolves one card from the virus_resolution_queue.
 // Called by the host (or any human in dev mode) from the VirusResolution UI.
@@ -74,10 +74,14 @@ Deno.serve(async (req) => {
     // Timer check: misaligned win is immediate, even mid-chain
     if ((updatedGame?.escape_timer ?? 0) >= 8) {
       await admin.from("games").update({ phase: "game_over", winner: "misaligned" }).eq("id", game_id);
-      await admin.from("game_log").insert({
-        game_id, event_type: "game_over",
+      const winner: LogWinner = "misaligned";
+      const gameOverLog: GameLogInsert<"game_over"> = {
+        game_id,
+        event_type: "game_over",
         public_description: "Escape Timer reached 8! Misaligned AIs win!",
-      });
+        metadata: { winner, final_progress: updatedGame?.core_progress ?? 0, final_timer: updatedGame?.escape_timer ?? 0, end_cause: "timer" },
+      };
+      await admin.from("game_log").insert(gameOverLog);
       return new Response(JSON.stringify({ success: true, game_over: true, winner: "misaligned" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

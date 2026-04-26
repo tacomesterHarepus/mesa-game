@@ -1,4 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
+import type { GameLogInsert, MissionOutcome } from "./gameLogTypes.ts";
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -96,19 +97,32 @@ export async function advanceTurnOrPhase(
   game: any,
   currentPlayer: any,
   missionResolved: boolean,
+  missionOutcome?: MissionOutcome,
 ): Promise<Response> {
   const game_id = game.id;
 
   if ((game.escape_timer ?? 0) >= 8) {
     await admin.from("games").update({ phase: "game_over", winner: "misaligned" }).eq("id", game_id);
-    await admin.from("game_log").insert({ game_id, event_type: "game_over", public_description: "Escape Timer reached 8! Misaligned AIs win!" });
+    const gameOverLog: GameLogInsert<"game_over"> = {
+      game_id,
+      event_type: "game_over",
+      public_description: "Escape Timer reached 8! Misaligned AIs win!",
+      metadata: { winner: "misaligned", final_progress: game.core_progress ?? 0, final_timer: game.escape_timer ?? 0, end_cause: "timer" },
+    };
+    await admin.from("game_log").insert(gameOverLog);
     return new Response(JSON.stringify({ success: true, game_over: true, winner: "misaligned" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
   if ((game.core_progress ?? 0) >= 10) {
     await admin.from("games").update({ phase: "game_over", winner: "humans" }).eq("id", game_id);
-    await admin.from("game_log").insert({ game_id, event_type: "game_over", public_description: "Core Progress reached 10! Humans win!" });
+    const gameOverLog: GameLogInsert<"game_over"> = {
+      game_id,
+      event_type: "game_over",
+      public_description: "Core Progress reached 10! Humans win!",
+      metadata: { winner: "humans", final_progress: game.core_progress ?? 0, final_timer: game.escape_timer ?? 0, end_cause: "progress" },
+    };
+    await admin.from("game_log").insert(gameOverLog);
     return new Response(JSON.stringify({ success: true, game_over: true, winner: "humans" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -120,7 +134,7 @@ export async function advanceTurnOrPhase(
     // in round 2 (mission failure). abort-mission (Phase 10) must pass the same contract.
     const { data: aiPlayers } = await admin
       .from("players")
-      .select("id, turn_order")
+      .select("id, turn_order, display_name")
       .eq("game_id", game_id)
       .neq("role", "human")
       .order("turn_order", { ascending: true });
@@ -142,6 +156,24 @@ export async function advanceTurnOrPhase(
       pending_mission_options: shuffle(allMissions).slice(0, 3),
       turn_order_ids: rotated,
     }).eq("id", game_id);
+
+    // Only log mission_transition when the caller knows the outcome (direct paths).
+    // Indirect path (resolve-next-virus after virus resolution) doesn't pass missionOutcome
+    // since mission_complete/mission_failed was already logged by end-play-phase.
+    if (missionOutcome !== undefined) {
+      const transitionLog: GameLogInsert<"mission_transition"> = {
+        game_id,
+        event_type: "mission_transition",
+        public_description: "Transitioning to next mission.",
+        metadata: {
+          next_first_player_id: rotated[0] ?? currentPlayer.id,
+          completing_player_id: currentPlayer.id,
+          mission_outcome: missionOutcome,
+        },
+      };
+      await admin.from("game_log").insert(transitionLog);
+    }
+
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -161,10 +193,13 @@ export async function advanceTurnOrPhase(
 
     if (nextPlayer.skip_next_turn) {
       await admin.from("players").update({ skip_next_turn: false }).eq("id", nextPlayerId);
-      await admin.from("game_log").insert({
-        game_id, event_type: "turn_skipped",
+      const turnSkippedLog: GameLogInsert<"turn_skipped"> = {
+        game_id,
+        event_type: "turn_skipped",
         public_description: `${nextPlayer.display_name}'s turn was skipped.`,
-      });
+        metadata: { actor_player_id: nextPlayerId, reason: "process_crash" },
+      };
+      await admin.from("game_log").insert(turnSkippedLog);
       nextIdx++;
       continue;
     }
@@ -172,10 +207,13 @@ export async function advanceTurnOrPhase(
     await admin.from("players").update({ has_discarded_this_turn: false }).eq("id", nextPlayerId);
     await drawCardsForPlayer(admin, game_id, nextPlayer);
     await admin.from("games").update({ current_turn_player_id: nextPlayerId, phase: "player_turn" }).eq("id", game_id);
-    await admin.from("game_log").insert({
-      game_id, event_type: "turn_start",
+    const turnStartLog: GameLogInsert<"turn_start"> = {
+      game_id,
+      event_type: "turn_start",
       public_description: `${nextPlayer.display_name}'s turn.`,
-    });
+      metadata: { actor_player_id: nextPlayerId, round: game.current_round ?? 1 },
+    };
+    await admin.from("game_log").insert(turnStartLog);
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -190,10 +228,13 @@ export async function advanceTurnOrPhase(
       if (fp && !fp.skip_next_turn) break;
       if (fp?.skip_next_turn) {
         await admin.from("players").update({ skip_next_turn: false }).eq("id", pid);
-        await admin.from("game_log").insert({
-          game_id, event_type: "turn_skipped",
+        const turnSkippedLog: GameLogInsert<"turn_skipped"> = {
+          game_id,
+          event_type: "turn_skipped",
           public_description: `${fp.display_name}'s turn was skipped.`,
-        });
+          metadata: { actor_player_id: pid, reason: "process_crash" },
+        };
+        await admin.from("game_log").insert(turnSkippedLog);
       }
       firstIdx++;
     }
@@ -210,10 +251,25 @@ export async function advanceTurnOrPhase(
       current_round: 2,
       phase: "player_turn",
     }).eq("id", game_id);
-    await admin.from("game_log").insert({
-      game_id, event_type: "round_start",
+
+    const roundStartLog: GameLogInsert<"round_start"> = {
+      game_id,
+      event_type: "round_start",
       public_description: "Round 2 begins.",
-    });
+      metadata: { round: 2, first_player_id: round2FirstPlayer },
+    };
+    await admin.from("game_log").insert(roundStartLog);
+
+    if (r2Player) {
+      const turnStartLog: GameLogInsert<"turn_start"> = {
+        game_id,
+        event_type: "turn_start",
+        public_description: `${r2Player.display_name}'s turn — Round 2.`,
+        metadata: { actor_player_id: round2FirstPlayer, round: 2 },
+      };
+      await admin.from("game_log").insert(turnStartLog);
+    }
+
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
