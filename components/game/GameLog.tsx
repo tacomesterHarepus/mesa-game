@@ -7,6 +7,7 @@ interface LogEntry {
   event_type: string;
   public_description: string;
   created_at: string;
+  metadata: Record<string, unknown>;
 }
 
 interface Props {
