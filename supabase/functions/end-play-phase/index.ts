@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { advanceTurnOrPhase, corsHeaders, drawCardsForPlayer, shuffle } from "../_shared/advanceTurnOrPhase.ts";
+import type { GameLogInsert } from "../_shared/gameLogTypes.ts";
 
 const MISSION_REQUIREMENTS: Record<string, { compute?: number; data?: number; validation?: number }> = {
   data_cleanup: { data: 4, compute: 3 },
@@ -150,6 +151,14 @@ Deno.serve(async (req) => {
       await admin.from("pending_viruses").delete().eq("game_id", game_id);
     }
 
+    const virusesPlacedLog: GameLogInsert<"viruses_placed"> = {
+      game_id,
+      event_type: "viruses_placed",
+      public_description: `${callerPlayer.display_name} shuffled ${pending?.length ?? 0} card${(pending?.length ?? 0) !== 1 ? "s" : ""} into the virus pool.`,
+      metadata: { actor_player_id: callerPlayer.id, count: pending?.length ?? 0 },
+    };
+    await admin.from("game_log").insert(virusesPlacedLog);
+
     // ── 3. Compute viruses to resolve ─────────────────────────────────────────
     const cardsPlayedThisTurn = game.turn_play_count;
     const numViruses = virusCount(callerPlayer.cpu, cardsPlayedThisTurn);
@@ -170,11 +179,15 @@ Deno.serve(async (req) => {
           }))
         );
         await admin.from("virus_pool").delete().in("id", pool.map((c: any) => c.id));
-        await admin.from("game_log").insert({
+        const { count: poolSizeAfter } = await admin.from("virus_pool")
+          .select("id", { count: "exact", head: true }).eq("game_id", game_id);
+        const queueStartLog: GameLogInsert<"virus_queue_start"> = {
           game_id,
           event_type: "virus_queue_start",
           public_description: `${callerPlayer.display_name} generated ${pool.length} virus${pool.length > 1 ? "es" : ""}.`,
-        });
+          metadata: { actor_player_id: callerPlayer.id, virus_count: pool.length, pool_size_after: poolSizeAfter ?? 0 },
+        };
+        await admin.from("game_log").insert(queueStartLog);
         gameUpdates.phase = "virus_resolution";
         await admin.from("games").update(gameUpdates).eq("id", game_id);
         return new Response(JSON.stringify({ success: true }), {
