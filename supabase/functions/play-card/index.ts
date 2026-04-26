@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { GameLogInsert, CardType, MissionProgress } from "../_shared/gameLogTypes.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -132,10 +133,25 @@ Deno.serve(async (req) => {
     if (failed) {
       specialState.pipeline_breakdown_active = false;
       await admin.from("active_mission").update({ special_state: specialState }).eq("id", mission.id);
-      await admin.from("game_log").insert({
-        game_id, event_type: "card_played",
+      const failedMissionProgress: MissionProgress = {
+        compute: mission.compute_contributed,
+        data: mission.data_contributed,
+        validation: mission.validation_contributed,
+      };
+      const failedCardLog: GameLogInsert<"card_played"> = {
+        game_id,
+        event_type: "card_played",
         public_description: `${callerPlayer.display_name}'s ${cardKey.replace(/_/g, " ")} contribution failed! (Pipeline Breakdown)`,
-      });
+        metadata: {
+          actor_player_id: callerPlayer.id,
+          card_key: cardKey,
+          card_type: cardKey as CardType,
+          failed: true,
+          mission_progress: failedMissionProgress,
+          failure_reason: "pipeline_breakdown",
+        },
+      };
+      await admin.from("game_log").insert(failedCardLog);
       return new Response(
         JSON.stringify({ success: true, failed: true, mission_complete: false }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -166,13 +182,27 @@ Deno.serve(async (req) => {
     await admin.from("games")
       .update({ turn_play_count: game.turn_play_count + 1 }).eq("id", game_id);
 
-    await admin.from("game_log").insert({
-      game_id, event_type: "card_played",
-      public_description: `${callerPlayer.display_name} contributed ${cardKey.replace(/_/g, " ")}.`,
-    });
-
     // ── Check mission completion ──────────────────────────────────────────────
     const updatedMission = { ...mission, ...countUpdates };
+
+    const successMissionProgress: MissionProgress = {
+      compute: updatedMission.compute_contributed ?? 0,
+      data: updatedMission.data_contributed ?? 0,
+      validation: updatedMission.validation_contributed ?? 0,
+    };
+    const cardPlayedLog: GameLogInsert<"card_played"> = {
+      game_id,
+      event_type: "card_played",
+      public_description: `${callerPlayer.display_name} contributed ${cardKey.replace(/_/g, " ")}.`,
+      metadata: {
+        actor_player_id: callerPlayer.id,
+        card_key: cardKey,
+        card_type: cardKey as CardType,
+        failed: false,
+        mission_progress: successMissionProgress,
+      },
+    };
+    await admin.from("game_log").insert(cardPlayedLog);
     const reqs = MISSION_REQUIREMENTS[mission.mission_key] ?? {};
     const requirementsMet =
       (updatedMission.compute_contributed ?? 0) >= (reqs.compute ?? 0) &&

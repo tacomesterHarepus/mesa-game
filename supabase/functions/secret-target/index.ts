@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { GameLogInsert, TargetingEffect } from "../_shared/gameLogTypes.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -135,11 +136,17 @@ Deno.serve(async (req) => {
       current_targeting_card_key: null,
     }).eq("id", game_id);
 
-    await admin.from("game_log").insert({
+    const targetingLog: GameLogInsert<"targeting_resolved"> = {
       game_id,
       event_type: "targeting_resolved",
       public_description: effectLog,
-    });
+      metadata: {
+        card_key: cardKey,
+        target_player_id: winnerId ?? "",
+        effect: cardKey as TargetingEffect,
+      },
+    };
+    await admin.from("game_log").insert(targetingLog);
 
     return new Response(JSON.stringify({ success: true, resolved: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

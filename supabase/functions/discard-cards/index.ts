@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, drawCardsForPlayer } from "../_shared/advanceTurnOrPhase.ts";
+import type { GameLogInsert } from "../_shared/gameLogTypes.ts";
 
 // Active AI discards 0–3 cards from hand before playing (DISCARD → DRAW step).
 // Each discarded card is removed from hands and its deck_cards row is marked 'discarded'.
@@ -69,13 +70,15 @@ Deno.serve(async (req) => {
     await admin.from("players").update({ has_discarded_this_turn: true }).eq("id", callerPlayer.id);
 
     const n = card_ids.length;
-    await admin.from("game_log").insert({
+    const discardLog: GameLogInsert<"discard"> = {
       game_id,
       event_type: "discard",
       public_description: n === 0
         ? `${callerPlayer.display_name} skipped discard.`
         : `${callerPlayer.display_name} discarded ${n} card${n !== 1 ? "s" : ""}.`,
-    });
+      metadata: { actor_player_id: callerPlayer.id, count: n },
+    };
+    await admin.from("game_log").insert(discardLog);
 
     return new Response(JSON.stringify({ success: true, cards_discarded: n }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
