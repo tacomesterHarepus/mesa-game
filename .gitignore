@@ -37,4 +37,5 @@ next-env.d.ts
 
 # claude
 .claude-status
+.claude-session-summary
 .claude/scheduled_tasks.lock
