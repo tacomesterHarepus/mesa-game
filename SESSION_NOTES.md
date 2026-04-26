@@ -1,7 +1,7 @@
 # Session Notes
 
 ## Current Phase
-**Phase 11 — Game Log** (next up)
+**Phase 12 — Chat system** (next up)
 
 Recent completed work:
 - **Phase 7.5** — Virus placement UI + bug fixes. All items done. See `HISTORY.md` for full details.
@@ -34,11 +34,11 @@ Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2
 | Discard step | ✓ | Migration 012, discard-cards v1, play-card v6 strict mode, PlayerTurn discard UI. 6 commits be74806–df76279. |
 | Discard bug fix | ✓ | UI server-sync bidirectional (PlayerTurn.tsx); end-play-phase pool-empty path calls advanceTurnOrPhase. DIAGNOSIS_2026-04-26.md appendix 2. end-play-phase deployed v10. |
 | 10. Human controls | ✓ | abort-mission v1 deployed; Abort Mission button in PlayerTurn; 3 E2E tests in abort-mission.spec.ts. |
-| 11. Game log | **DONE** | Migration 013 (metadata jsonb), gameLogTypes.ts, 7-commit instrumentation. All edge functions emit typed metadata. E2E test game-log.spec.ts covers 12 guaranteed + 3 conditional event types. |
+| 11. Game log | **DONE** | Migration 013 (metadata jsonb), gameLogTypes.ts, 7-commit instrumentation. All edge functions emit typed metadata. E2E test game-log.spec.ts covers 16 guaranteed + 1 conditional event types + CPU≥2 ordering test. **mission_transition gap closed (Approach A):** migration 014 adds `pending_mission_outcome` to games; end-play-phase v13 writes it on virus path; resolve-next-virus v8 reads and passes it to advanceTurnOrPhase; cleared atomically in same update. **Session B UI rework:** 5 commits 7e06a3b–2c584f3 — LogEntry type widened (metadata: Record<string,unknown>), bold styling on mission_complete/failed/aborted/game_over, card_played running totals (n/m) via mission key scan, scroll preservation (40px threshold), E2E game-log-ui.spec.ts (3 tests). |
 | 12. Chat system | pending | |
 | 13. UI polish | pending | |
 
-**Test suite: ~65/75 passing (est.), 13 skip, 0 genuine fail** (+15 game-log tests. mission-rules.spec.ts has a pre-existing flaky timeout on test 28 in full-suite runs — passes in isolation.)
+**Test suite: ~69/79 passing (est.), 13 skip, 0 genuine fail** (+3 game-log-ui UI tests. mission-rules.spec.ts has a pre-existing flaky timeout on test 28 in full-suite runs — passes in isolation. game-log.spec.ts cold-start flake on test 1 clears on re-run.)
 
 ---
 
@@ -55,8 +55,8 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 | allocate-resources | v7 | Draws cards + resets has_discarded_this_turn for first player |
 | discard-cards | v2 | Phase 11: typed `discard` log with metadata |
 | place-virus | v1 | Moves card from hands → pending_viruses |
-| end-play-phase | v12 | Phase 11: typed mission_complete/failed logs + missionOutcome param to advanceTurnOrPhase |
-| resolve-next-virus | v7 | Phase 11: typed virus_effect/virus_no_effect/game_over logs |
+| end-play-phase | v13 | Approach A: writes pending_mission_outcome to games on virus path when mission resolved |
+| resolve-next-virus | v8 | Approach A: reads pending_mission_outcome, passes to advanceTurnOrPhase at queue-empty |
 | secret-target | v2 | Phase 11: typed targeting_resolved log |
 | play-card | v7 | Phase 11: typed card_played log with mission_progress snapshot |
 | abort-mission | v2 | Phase 11: typed mission_aborted log; passes "aborted" to advanceTurnOrPhase |

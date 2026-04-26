@@ -18,6 +18,10 @@ Ideas and polish items that aren't blocking current phases. Add freely; prioriti
 
 ---
 
+- **GameLog initial load capped at 100 rows** — `app/game/[gameId]/page.tsx` fetches game_log with `.limit(100)`. Long games (3+ missions with virus chains) can easily generate 150+ events. Earliest entries drop off silently — there is no pagination, infinite-scroll, or "load more" control. Options: (a) raise the limit (200–300) as a short-term fix; (b) lazy-load older entries when the user scrolls to the top of the log container; (c) split the log into per-mission pages. The Realtime subscription is not affected (it appends new rows indefinitely). *(Added Phase 11 Session B, 2026-04-27)*
+
+---
+
 ## Game Balance
 
 *(empty)*
