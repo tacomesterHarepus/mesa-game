@@ -622,13 +622,14 @@ mesa/
 | 4. Game state machine | **DONE** | Main game screen, phase routing, polling fallback, 5 edge functions |
 | 5. Card data layer | **DONE** | cards.ts, missions.ts, deck.ts, virusRules.ts, missionRules.ts, phaseTransitions.ts |
 | 6. Mission flow | **DONE** | play-card, end-play-phase edge functions + PlayerTurn UI; simplified (no virus resolution yet) |
-| 7. Virus system | **NEXT UP** | |
-| 8. Secret actions | pending | |
-| 9. Mission special rules | pending | |
-| 10. Human controls | pending | |
-| 11. Game log | pending | |
-| 12. Chat system | pending | |
-| 13. UI polish | pending | |
+| 7. Virus system | **DONE** | |
+| 8. Secret actions | **DONE** | |
+| 9. Mission special rules | **DONE** | |
+| 10. Human controls | **DONE** | |
+| 11. Game log | **DONE** | |
+| 12. Chat system | deferred to BACKLOG | |
+| 13. UI polish | deferred to BACKLOG | |
+| Board redesign | **NEXT UP** | |
 | 14. Playwright tests | pending | Written alongside each feature, not after |
 | 15. Email (Resend) | pending | |
 
