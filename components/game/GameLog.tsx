@@ -52,7 +52,7 @@ export function GameLog({ entries }: Props) {
   return (
     <div>
       <h3 className="label-caps mb-2">Log</h3>
-      <div ref={containerRef} className="space-y-1 max-h-48 overflow-y-auto pr-1">
+      <div ref={containerRef} data-testid="game-log-container" className="space-y-1 max-h-48 overflow-y-auto pr-1">
         {entries.map((entry, idx) => {
           const total = getRunningTotal(entry, missionKeyAtIndex[idx]);
           return (
