@@ -26,7 +26,10 @@ export function GameLog({ entries }: Props) {
       <h3 className="label-caps mb-2">Log</h3>
       <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
         {entries.map((entry) => (
-          <div key={entry.id} className="text-xs font-mono text-faint leading-relaxed">
+          <div
+            key={entry.id}
+            className={`text-xs font-mono leading-relaxed ${isBoldEvent(entry.event_type) ? "text-foreground font-bold" : "text-faint"}`}
+          >
             <span className="text-muted">{formatTime(entry.created_at)}</span>{" "}
             {entry.public_description}
           </div>
@@ -38,6 +41,17 @@ export function GameLog({ entries }: Props) {
       </div>
     </div>
   );
+}
+
+const BOLD_EVENT_TYPES = new Set([
+  "mission_complete",
+  "mission_failed",
+  "mission_aborted",
+  "game_over",
+]);
+
+function isBoldEvent(eventType: string): boolean {
+  return BOLD_EVENT_TYPES.has(eventType);
 }
 
 function formatTime(ts: string): string {
