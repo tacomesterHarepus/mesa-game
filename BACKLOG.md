@@ -42,4 +42,6 @@ Ideas and polish items that aren't blocking current phases. Add freely; prioriti
 
 ## Future Features
 
+- **End game early** — Host or unanimous-player vote to terminate an in-progress game without a winner. Should set `games.winner = 'aborted'` (new enum value) or similar, transition to `game_over`, and handle the end screen gracefully (role reveal and stats may be suppressed or shown as-is). Useful for: abandoned games that started by mistake, dev testing cleanup, players who need to quit before completion. Open questions: who can trigger it (host-only vs. unanimous vote), what the end screen shows, whether the game counts toward stats. *(Added 2026-04-26)*
+
 - **Captain role for humans** — Consider restricting human actions (resource adjustment, allocation, mission abort) to a single "captain" human rather than any human. Needs design decisions: captain selection (random/voted/rotating), mid-game reassignment, scope (which actions are captain-only vs. all-humans). Rationale: clearer decision-making, reduced coordination friction, more social-deduction-game feel. Defer until after first multi-human playtest confirms coordination is actually a problem. *(Reported: design review, not yet tested)*
