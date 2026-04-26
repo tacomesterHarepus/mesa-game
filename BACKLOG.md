@@ -14,6 +14,8 @@ Ideas and polish items that aren't blocking current phases. Add freely; prioriti
 
 - **VirusResolution should auto-resolve without user clicks** — The VirusResolution UI requires a manual "Resolve Virus" button click per card. Per spec: "Cards equal to viruses generated are revealed and resolved one at a time from the top of the pool." The intended UX is automatic sequential resolution with brief delays between cards (for log/drama), not a manual click-to-advance flow. Each card should be revealed and its effect applied automatically; only the final state (next phase) requires acknowledgement. *(Reported: Phase 2 playtest 2026-04-25)*
 
+- **Abort Mission timing window** — The "Abort Mission" button is only visible between AI turns in round 2, but the next AI's turn begins immediately when the previous one ends. The window is too short for deliberation in practice. Options to consider: (a) add a brief frozen/paused state between AI turns in round 2 where the abort button is active and the next turn cannot start; (b) require at least one human to explicitly confirm "no abort" before the next AI turn proceeds; (c) widen the window to all of round 2, not just between turns, so humans can abort at any point mid-turn. Each option has trade-offs around game pacing and how AI turns are gated server-side. *(Added 2026-04-26)*
+
 ---
 
 ## Game Balance
