@@ -196,6 +196,9 @@ Deno.serve(async (req) => {
         };
         await admin.from("game_log").insert(queueStartLog);
         gameUpdates.phase = "virus_resolution";
+        if (missionOutcomeForTransition !== undefined) {
+          gameUpdates.pending_mission_outcome = missionOutcomeForTransition;
+        }
         await admin.from("games").update(gameUpdates).eq("id", game_id);
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },

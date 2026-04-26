@@ -151,15 +151,14 @@ export async function advanceTurnOrPhase(
       "multi_model_ensemble", "synchronized_training", "genome_simulation",
       "global_research_network", "experimental_vaccine_model",
     ];
+    // Clear pending_mission_outcome atomically with the phase transition (Approach A).
     await admin.from("games").update({
       phase: "resource_adjustment",
       pending_mission_options: shuffle(allMissions).slice(0, 3),
       turn_order_ids: rotated,
+      pending_mission_outcome: null,
     }).eq("id", game_id);
 
-    // Only log mission_transition when the caller knows the outcome (direct paths).
-    // Indirect path (resolve-next-virus after virus resolution) doesn't pass missionOutcome
-    // since mission_complete/mission_failed was already logged by end-play-phase.
     if (missionOutcome !== undefined) {
       const transitionLog: GameLogInsert<"mission_transition"> = {
         game_id,
