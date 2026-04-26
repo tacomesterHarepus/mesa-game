@@ -1,7 +1,7 @@
 # Session Notes
 
 ## Current Phase
-**Phase 10 — Human Controls** (next up)
+**Phase 11 — Game Log** (next up)
 
 Recent completed work:
 - **Phase 7.5** — Virus placement UI + bug fixes. All items done. See `HISTORY.md` for full details.
@@ -33,34 +33,12 @@ Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2
 | Post-10.5 bugs | ✓ | Bug 3 c760b46, Bug 2 8edfe02, Bug 1 d2089a2. Regression tests in multi-mission.spec.ts. select-mission deployed as v4. |
 | Discard step | ✓ | Migration 012, discard-cards v1, play-card v6 strict mode, PlayerTurn discard UI. 6 commits be74806–df76279. |
 | Discard bug fix | ✓ | UI server-sync bidirectional (PlayerTurn.tsx); end-play-phase pool-empty path calls advanceTurnOrPhase. DIAGNOSIS_2026-04-26.md appendix 2. end-play-phase deployed v10. |
-| 10. Human controls | **NEXT** | abort-mission edge function + UI button |
-| 11. Game log | pending | |
+| 10. Human controls | ✓ | abort-mission v1 deployed; Abort Mission button in PlayerTurn; 3 E2E tests in abort-mission.spec.ts. |
+| 11. Game log | **NEXT** | |
 | 12. Chat system | pending | |
 | 13. UI polish | pending | |
 
-**Test suite: 47/57 passing, 13 skip, 0 genuine fail** (+1 discard test 4: turn advance resets has_discarded for next player. mission-rules.spec.ts has a pre-existing flaky timeout on test 28 in full-suite runs — passes in isolation.)
-
----
-
-## Phase 10 Plan — Human Controls
-
-Most human control points are already implemented (resource adjustment, mission selection, card reveal, resource allocation). The one missing piece:
-
-**`abort-mission` edge function:**
-- Validates: `phase = player_turn` AND `round = 2` AND caller is human
-- Applies fail penalty: `escape_timer += mission.fail_penalty`; sets `current_mission_id = null`
-- Transitions to `resource_adjustment`
-
-**UI in `PlayerTurn.tsx`:**
-- When `currentPlayer.role === 'human'` and `round === 2`, show "Abort Mission" button
-- Not shown in round 1; not shown during virus resolution
-
-**Test:** abort-mission fires correctly, advances to resource_adjustment
-
-**Key constraints:**
-- Abort only valid in round 2, only between turns (phase=player_turn)
-- Normal fail penalty applies (same as end-of-round-2 failure)
-- After abort: same flow as mission failure → resource_adjustment
+**Test suite: 50/60 passing, 13 skip, 0 genuine fail** (+3 abort-mission tests. mission-rules.spec.ts has a pre-existing flaky timeout on test 28 in full-suite runs — passes in isolation.)
 
 ---
 
@@ -81,6 +59,7 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 | resolve-next-virus | v5 | Picks up _shared reset for has_discarded_this_turn |
 | secret-target | v1 | Vote mode + force-resolve mode |
 | play-card | v6 | All 10 mission special rules + strict discard-before-play check |
+| abort-mission | v1 | Round 2 human abort; applies fail penalty; calls advanceTurnOrPhase |
 
 ## Dev Mode
 
