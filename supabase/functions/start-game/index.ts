@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { GameLogInsert } from "../_shared/gameLogTypes.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -135,11 +136,13 @@ Deno.serve(async (req) => {
       })
       .eq("id", game_id);
 
-    await admin.from("game_log").insert({
+    const gameStartedLog: GameLogInsert<"game_started"> = {
       game_id,
       event_type: "game_started",
       public_description: `Game started with ${count} players.`,
-    });
+      metadata: { player_count: count },
+    };
+    await admin.from("game_log").insert(gameStartedLog);
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

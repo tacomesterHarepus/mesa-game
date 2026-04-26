@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { GameLogInsert, CardType } from "../_shared/gameLogTypes.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -56,11 +57,14 @@ Deno.serve(async (req) => {
       revealed_card_key: card_key,
     }).eq("id", callerPlayer.id);
 
-    await admin.from("game_log").insert({
+    const metadataCardType: CardType = handCard.card_type === "progress" ? card_key as CardType : "virus";
+    const cardRevealedLog: GameLogInsert<"card_revealed"> = {
       game_id,
       event_type: "card_revealed",
       public_description: `${callerPlayer.display_name} revealed: ${card_key.replace(/_/g, " ")}.`,
-    });
+      metadata: { actor_player_id: callerPlayer.id, card_key, card_type: metadataCardType },
+    };
+    await admin.from("game_log").insert(cardRevealedLog);
 
     // Check if all AIs have revealed
     const { data: aiPlayers } = await admin
@@ -74,11 +78,13 @@ Deno.serve(async (req) => {
     if (allRevealed) {
       await admin.from("games").update({ phase: "resource_allocation" }).eq("id", game_id);
 
-      await admin.from("game_log").insert({
+      const revealDoneLog: GameLogInsert<"reveal_done"> = {
         game_id,
-        event_type: "phase_change",
+        event_type: "reveal_done",
         public_description: "All AIs revealed cards. Allocating resources.",
-      });
+        metadata: {},
+      };
+      await admin.from("game_log").insert(revealDoneLog);
     }
 
     return new Response(JSON.stringify({ success: true, all_revealed: allRevealed }), {

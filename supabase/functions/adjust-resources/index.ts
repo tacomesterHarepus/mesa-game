@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { GameLogInsert } from "../_shared/gameLogTypes.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -79,11 +80,13 @@ Deno.serve(async (req) => {
         pending_mission_options: options,
       }).eq("id", game_id);
 
-      await admin.from("game_log").insert({
+      const adjustmentLog: GameLogInsert<"adjustment_done"> = {
         game_id,
-        event_type: "phase_change",
+        event_type: "adjustment_done",
         public_description: "Resource adjustment complete. Selecting mission.",
-      });
+        metadata: {},
+      };
+      await admin.from("game_log").insert(adjustmentLog);
     }
 
     return new Response(JSON.stringify({ success: true }), {

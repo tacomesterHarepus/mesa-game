@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { drawCardsForPlayer } from "../_shared/advanceTurnOrPhase.ts";
+import type { GameLogInsert } from "../_shared/gameLogTypes.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -91,11 +92,16 @@ Deno.serve(async (req) => {
       pending_mission_options: [],
     }).eq("id", game_id);
 
-    await admin.from("game_log").insert({
+    const missionSelectedLog: GameLogInsert<"mission_selected"> = {
       game_id,
       event_type: "mission_selected",
       public_description: `Mission selected: ${mission_key.replace(/_/g, " ")}.`,
-    });
+      metadata: {
+        mission_key,
+        mission_options: [mission_key, ...game.pending_mission_options.filter((k: string) => k !== mission_key)] as [string, string, string],
+      },
+    };
+    await admin.from("game_log").insert(missionSelectedLog);
 
     return new Response(JSON.stringify({ success: true, mission_id: mission.id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

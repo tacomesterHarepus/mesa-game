@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { drawCardsForPlayer } from "../_shared/advanceTurnOrPhase.ts";
+import type { GameLogInsert, AllocationEntry } from "../_shared/gameLogTypes.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -75,6 +76,7 @@ Deno.serve(async (req) => {
     if (totalRam > pool.ram) throw new Error(`RAM allocation ${totalRam} exceeds pool ${pool.ram}`);
 
     // Apply allocations (only add, respect max limits)
+    const appliedAllocations: AllocationEntry[] = [];
     for (const alloc of allocations as any[]) {
       const { player_id, cpu_delta, ram_delta } = alloc;
       const { data: target } = await admin.from("players").select("*").eq("id", player_id).single();
@@ -86,6 +88,11 @@ Deno.serve(async (req) => {
       if (ram_delta && ram_delta > 0) updates.ram = Math.min(7, target.ram + ram_delta);
       if (Object.keys(updates).length > 0) {
         await admin.from("players").update(updates).eq("id", player_id);
+        appliedAllocations.push({
+          player_id,
+          cpu_added: updates.cpu !== undefined ? updates.cpu - target.cpu : 0,
+          ram_added: updates.ram !== undefined ? updates.ram - target.ram : 0,
+        });
       }
     }
 
@@ -101,17 +108,32 @@ Deno.serve(async (req) => {
     // for players 2+ (when advancing to the next turn). The first player would
     // otherwise start with their start-game hand, which may be smaller than their
     // post-allocation RAM if the human just bumped it.
+    let firstPlayerName = "";
     if (firstPlayerId) {
       await admin.from("players").update({ has_discarded_this_turn: false }).eq("id", firstPlayerId);
       const { data: firstPlayer } = await admin.from("players").select("*").eq("id", firstPlayerId).single();
-      if (firstPlayer) await drawCardsForPlayer(admin, game_id, firstPlayer);
+      if (firstPlayer) {
+        firstPlayerName = firstPlayer.display_name;
+        await drawCardsForPlayer(admin, game_id, firstPlayer);
+      }
     }
 
-    await admin.from("game_log").insert({
+    const allocationLog: GameLogInsert<"allocation_done"> = {
       game_id,
-      event_type: "phase_change",
+      event_type: "allocation_done",
       public_description: "Resources allocated. Mission begins!",
-    });
+      metadata: { allocations: appliedAllocations },
+    };
+    await admin.from("game_log").insert(allocationLog);
+    if (firstPlayerId && firstPlayerName) {
+      const turnStartLog: GameLogInsert<"turn_start"> = {
+        game_id,
+        event_type: "turn_start",
+        public_description: `${firstPlayerName}'s turn — Round 1.`,
+        metadata: { actor_player_id: firstPlayerId, round: 1 },
+      };
+      await admin.from("game_log").insert(turnStartLog);
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
