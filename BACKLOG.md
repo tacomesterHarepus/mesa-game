@@ -32,6 +32,8 @@ Items to revisit after the final board-redesign phase task (game_over) ships.
 
 - **Mockup re-render — RAM track** — `mockup_resource_phases_human.html` (and any other mockup showing AI chip RAM tracks) needs re-rendering with 7-square RAM (currently shows 5). The spec was corrected as part of the RAM track width fix (2026-04-27). *(Added 2026-04-27)*
 
+- **Multi-click stack selection** — Stacked cards in the AI's hand (PlayerTurn, CardReveal, ResourcePhase wherever applicable) should support multi-select via repeated clicks. Click 1 selects 1, click 2 selects 2, up to min(stack count, applicable cap). Cap depends on action: Play and Stage for Pool gated by remaining CPU this turn; Discard gated by stack count only. Selected count shown in the SELECTED ×N tag (already exists for ×1). On confirm, all selected copies are played/staged/discarded together. Applies to: Play Card, Stage for Pool, Discard. *(Added 2026-04-27)*
+
 ---
 
 ## Game Balance
