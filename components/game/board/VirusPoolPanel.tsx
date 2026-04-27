@@ -1,4 +1,16 @@
-export function VirusPoolPanel() {
+interface Props {
+  poolCount: number;
+  pendingPullCount?: number;
+  phase: string;
+}
+
+export function VirusPoolPanel({ poolCount, pendingPullCount, phase }: Props) {
+  const cardLabel = poolCount === 1 ? "CARD" : "CARDS";
+  const headerText =
+    phase === "virus_pull" && pendingPullCount !== undefined && pendingPullCount > 0
+      ? `VIRUS POOL · ${poolCount} ${cardLabel} · ${pendingPullCount} TO DRAW`
+      : `VIRUS POOL · ${poolCount} ${cardLabel}`;
+
   return (
     <div
       style={{
@@ -31,7 +43,7 @@ export function VirusPoolPanel() {
             letterSpacing: 2,
           }}
         >
-          VIRUS POOL · 4 CARDS
+          {headerText}
         </span>
       </div>
 
@@ -44,7 +56,7 @@ export function VirusPoolPanel() {
           padding: "24px 28px",
         }}
       >
-        {/* 4 stacked face-down virus cards */}
+        {/* 4 stacked face-down virus cards (visual decoration) */}
         <div style={{ position: "relative", width: 58, height: 72 }}>
           {[3, 2, 1, 0].map((offset) => (
             <div
@@ -74,7 +86,7 @@ export function VirusPoolPanel() {
               marginBottom: 6,
             }}
           >
-            ×4
+            ×{poolCount}
           </div>
           <div
             style={{

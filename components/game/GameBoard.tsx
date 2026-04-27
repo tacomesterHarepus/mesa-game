@@ -64,6 +64,7 @@ export function GameBoard({
   );
   const [mission, setMission] = useState<ActiveMission | null>(initialMission);
   const [log, setLog] = useState<LogEntry[]>(initialLog);
+  const [poolCount, setPoolCount] = useState(4);
   const [missionSelected, setMissionSelected] = useState<string | null>(null);
   const [resPendingCpu, setResPendingCpu] = useState<Record<string, number>>({});
   const [resPendingRam, setResPendingRam] = useState<Record<string, number>>({});
@@ -87,15 +88,17 @@ export function GameBoard({
       if (g) setGame((prev) => ({ ...prev, ...(g as unknown as Partial<Game>) }));
 
       const missionId = g?.current_mission_id ?? null;
-      const [{ data: p }, { data: m }] = await Promise.all([
+      const [{ data: p }, { data: m }, poolResult] = await Promise.all([
         supabase.from("players").select("*").eq("game_id", gameId),
         missionId
           ? supabase.from("active_mission").select("*").eq("id", missionId).maybeSingle()
           : Promise.resolve({ data: null }),
+        supabase.from("virus_pool").select("id", { count: "exact", head: true }).eq("game_id", gameId),
       ]);
       if (p && p.length > 0) setPlayers(p);
       // m is null when there is no active mission (lobby, resource_adjustment, etc.) — that is valid
       if (m !== undefined) setMission(m);
+      if (poolResult.count !== null) setPoolCount(poolResult.count);
 
       // game_log poll backup: Realtime INSERT can be missed silently; poll catches stragglers.
       // Fetches the 50 most-recent rows and appends any not yet in state. gameId is referenced
@@ -191,6 +194,16 @@ export function GameBoard({
           (payload) => {
             setLog((prev) => [...prev, payload.new as LogEntry]);
           }
+        )
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "virus_pool", filter: `game_id=eq.${gameId}` },
+          () => { setPoolCount((prev) => prev + 1); }
+        )
+        .on(
+          "postgres_changes",
+          { event: "DELETE", schema: "public", table: "virus_pool", filter: `game_id=eq.${gameId}` },
+          () => { setPoolCount((prev) => Math.max(0, prev - 1)); }
         );
 
       // Hand updates — subscribe to whichever player's hand is active.
@@ -575,7 +588,11 @@ export function GameBoard({
         ) : (
           <>
             <MissionPanel mission={mission} />
-            <VirusPoolPanel />
+            <VirusPoolPanel
+              poolCount={poolCount}
+              pendingPullCount={game.pending_pull_count ?? 0}
+              phase={game.phase}
+            />
           </>
         )}
 
