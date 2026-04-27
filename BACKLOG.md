@@ -34,6 +34,8 @@ Items to revisit after the final board-redesign phase task (game_over) ships.
 
 - **Multi-click stack selection** — Stacked cards in the AI's hand (PlayerTurn, CardReveal, ResourcePhase wherever applicable) should support multi-select via repeated clicks. Click 1 selects 1, click 2 selects 2, up to min(stack count, applicable cap). Cap depends on action: Play and Stage for Pool gated by remaining CPU this turn; Discard gated by stack count only. Selected count shown in the SELECTED ×N tag (already exists for ×1). On confirm, all selected copies are played/staged/discarded together. Applies to: Play Card, Stage for Pool, Discard. *(Added 2026-04-27)*
 
+- **Card animations** — All card transitions in/out of the action region and chip surfaces should animate rather than snap. Specifically: card played (hand → mission contribution slot or chip area), card staged for pool (hand → staging zone), card pulled (pool → virus card overlay during virus_resolution), card discarded (hand → off-screen / discard pile, including discards triggered as consequence of other discard actions). Out of scope for v0.1 functional milestone; bundle with the layout density pass post-redesign. *(Added 2026-04-27)*
+
 ---
 
 ## Game Balance
