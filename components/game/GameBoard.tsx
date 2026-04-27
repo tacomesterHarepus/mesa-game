@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { ResourceAdjustment } from "./phases/ResourceAdjustment";
+import { ResourcePhase } from "./phases/ResourcePhase";
 import { MissionSelection } from "./phases/MissionSelection";
 import { CardReveal } from "./phases/CardReveal";
-import { ResourceAllocation } from "./phases/ResourceAllocation";
 import { PlayerTurn } from "./phases/PlayerTurn";
 import { VirusResolution } from "./phases/VirusResolution";
 import { SecretTargeting } from "./phases/SecretTargeting";
@@ -17,9 +16,10 @@ import { HumanTerminals } from "./board/HumanTerminals";
 import { MissionPanel } from "./board/MissionPanel";
 import { MissionCandidatesPanel } from "./board/MissionCandidatesPanel";
 import { VirusPoolPanel } from "./board/VirusPoolPanel";
-import { CentralBoard } from "./board/CentralBoard";
+import { CentralBoard, type ResourceChipConfig } from "./board/CentralBoard";
 import { ActionRegion } from "./board/ActionRegion";
 import { RightPanel } from "./board/RightPanel";
+import { MISSION_MAP } from "@/lib/game/missions";
 import type { Game } from "@/types/game";
 import type { Database } from "@/types/supabase";
 
@@ -27,6 +27,11 @@ type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
 type ActiveMission = Database["public"]["Tables"]["active_mission"]["Row"];
 type LogEntry = Database["public"]["Tables"]["game_log"]["Row"];
 type HandCard = Database["public"]["Tables"]["hands"]["Row"];
+
+const CPU_MIN = 1;
+const CPU_MAX = 4;
+const RAM_MIN = 3;
+const RAM_MAX = 7;
 
 interface Props {
   initialGame: Game;
@@ -59,6 +64,8 @@ export function GameBoard({
   const [mission, setMission] = useState<ActiveMission | null>(initialMission);
   const [log, setLog] = useState<LogEntry[]>(initialLog);
   const [missionSelected, setMissionSelected] = useState<string | null>(null);
+  const [resPendingCpu, setResPendingCpu] = useState<Record<string, number>>({});
+  const [resPendingRam, setResPendingRam] = useState<Record<string, number>>({});
 
   const gameId = game.id;
 
@@ -234,9 +241,17 @@ export function GameBoard({
       });
   }, [devMode, activeDevPlayer?.id]);
 
-  // Reset mission candidate selection when leaving mission_selection phase
+  // Reset phase-local state when leaving their respective phases
   useEffect(() => {
     if (game.phase !== "mission_selection") setMissionSelected(null);
+  }, [game.phase]);
+
+  useEffect(() => {
+    const isResPhase = game.phase === "resource_adjustment" || game.phase === "resource_allocation";
+    if (!isResPhase) {
+      setResPendingCpu({});
+      setResPendingRam({});
+    }
   }, [game.phase]);
 
   const isHost = game.host_user_id === userId;
@@ -267,15 +282,114 @@ export function GameBoard({
   const humanPlayers = sortedPlayers.filter((p) => p.role === "human");
   const aiPlayers = sortedPlayers.filter((p) => p.role !== "human");
 
+  // ── Resource phase chip config ────────────────────────────────────────────
+  // Compute per-player ResourceChipConfig when in a resource phase.
+  // State (resPendingCpu / resPendingRam) is lifted here so both CentralBoard
+  // (visual) and ResourcePhase (Confirm payload) read from a single source.
+
+  const isResPhase =
+    game.phase === "resource_adjustment" || game.phase === "resource_allocation";
+  const resMode = game.phase === "resource_allocation" ? "allocation" : "adjustment";
+  const isViewerHuman = effectiveCurrentPlayer?.role === "human";
+
+  // Pool sizes — only meaningful in allocation mode
+  const missionDef =
+    isResPhase && resMode === "allocation" && mission
+      ? (MISSION_MAP[mission.mission_key] ?? null)
+      : null;
+  const cpuPool = missionDef?.allocation.cpu ?? 0;
+  const ramPool = missionDef?.allocation.ram ?? 0;
+  const totalResCpu = Object.values(resPendingCpu).reduce((a, b) => a + b, 0);
+  const totalResRam = Object.values(resPendingRam).reduce((a, b) => a + b, 0);
+
+  // Build per-player chip configs (rendered in CentralBoard)
+  const resourceChips: Record<string, ResourceChipConfig> | undefined = isResPhase
+    ? Object.fromEntries(
+        aiPlayers.map((player) => {
+          const pendCpu = resPendingCpu[player.id] ?? 0;
+          const pendRam = resPendingRam[player.id] ?? 0;
+
+          // Adjustment: [-] = remove more (delta +1), [+] = undo removal (delta -1)
+          // Allocation: [+] = allocate more (delta +1), [-] = undo allocation (delta -1)
+          const applyCpu = (delta: number) => {
+            const next = pendCpu + delta;
+            if (next < 0) return;
+            if (resMode === "adjustment" && player.cpu - next < CPU_MIN) return;
+            if (resMode === "allocation") {
+              if (player.cpu + next > CPU_MAX) return;
+              if (totalResCpu - pendCpu + next > cpuPool) return;
+            }
+            setResPendingCpu((prev) => ({ ...prev, [player.id]: next }));
+          };
+          const applyRam = (delta: number) => {
+            const next = pendRam + delta;
+            if (next < 0) return;
+            if (resMode === "adjustment" && player.ram - next < RAM_MIN) return;
+            if (resMode === "allocation") {
+              if (player.ram + next > RAM_MAX) return;
+              if (totalResRam - pendRam + next > ramPool) return;
+            }
+            setResPendingRam((prev) => ({ ...prev, [player.id]: next }));
+          };
+
+          const cfg: ResourceChipConfig = {
+            mode: resMode,
+            pendingCpu: pendCpu,
+            pendingRam: pendRam,
+            cpuMinus: isViewerHuman
+              ? {
+                  enabled:
+                    resMode === "adjustment"
+                      ? player.cpu - pendCpu > CPU_MIN
+                      : pendCpu > 0,
+                  onClick: () => applyCpu(resMode === "adjustment" ? +1 : -1),
+                }
+              : null,
+            cpuPlus: isViewerHuman
+              ? {
+                  enabled:
+                    resMode === "adjustment"
+                      ? pendCpu > 0
+                      : totalResCpu < cpuPool && player.cpu + pendCpu < CPU_MAX,
+                  onClick: () => applyCpu(resMode === "adjustment" ? -1 : +1),
+                }
+              : null,
+            ramMinus: isViewerHuman
+              ? {
+                  enabled:
+                    resMode === "adjustment"
+                      ? player.ram - pendRam > RAM_MIN
+                      : pendRam > 0,
+                  onClick: () => applyRam(resMode === "adjustment" ? +1 : -1),
+                }
+              : null,
+            ramPlus: isViewerHuman
+              ? {
+                  enabled:
+                    resMode === "adjustment"
+                      ? pendRam > 0
+                      : totalResRam < ramPool && player.ram + pendRam < RAM_MAX,
+                  onClick: () => applyRam(resMode === "adjustment" ? -1 : +1),
+                }
+              : null,
+          };
+          return [player.id, cfg];
+        })
+      )
+    : undefined;
+
   function renderPhase() {
     switch (game.phase) {
       case "resource_adjustment":
         return (
-          <ResourceAdjustment
+          <ResourcePhase
+            mode="adjustment"
             gameId={gameId}
-            players={sortedPlayers}
-            currentPlayer={effectiveCurrentPlayer}
+            aiPlayers={aiPlayers as unknown as import("@/types/game").Player[]}
+            currentPlayer={effectiveCurrentPlayer as import("@/types/game").Player | null}
             overridePlayerId={overridePlayerId}
+            pendingCpu={resPendingCpu}
+            pendingRam={resPendingRam}
           />
         );
       case "mission_selection":
@@ -299,12 +413,15 @@ export function GameBoard({
         );
       case "resource_allocation":
         return (
-          <ResourceAllocation
+          <ResourcePhase
+            mode="allocation"
             gameId={gameId}
-            players={sortedPlayers}
-            currentPlayer={effectiveCurrentPlayer}
-            missionKey={mission?.mission_key ?? ""}
+            aiPlayers={aiPlayers as unknown as import("@/types/game").Player[]}
+            currentPlayer={effectiveCurrentPlayer as import("@/types/game").Player | null}
             overridePlayerId={overridePlayerId}
+            missionKey={mission?.mission_key ?? ""}
+            pendingCpu={resPendingCpu}
+            pendingRam={resPendingRam}
           />
         );
       case "player_turn":
@@ -419,8 +536,12 @@ export function GameBoard({
         <CentralBoard
           aiPlayers={aiPlayers}
           coreProgress={game.core_progress}
-          currentTurnPlayerId={game.current_turn_player_id ?? undefined}
+          // Suppress active-chip styling during resource phases (no AI is "active" §7.3)
+          currentTurnPlayerId={
+            isResPhase ? undefined : (game.current_turn_player_id ?? undefined)
+          }
           turnOrderIds={game.turn_order_ids ?? []}
+          resourceChips={resourceChips}
         />
 
         <ActionRegion
@@ -430,6 +551,9 @@ export function GameBoard({
               !!effectiveCurrentPlayer &&
               effectiveCurrentPlayer.id === game.current_turn_player_id) ||
             (game.phase === "mission_selection" &&
+              effectiveCurrentPlayer?.role === "human") ||
+            ((game.phase === "resource_adjustment" ||
+              game.phase === "resource_allocation") &&
               effectiveCurrentPlayer?.role === "human")
           }
           currentTurnPlayerName={currentTurnPlayer?.display_name ?? undefined}
