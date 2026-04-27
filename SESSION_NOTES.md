@@ -4,6 +4,7 @@
 **Board redesign — card_reveal DONE. Mobile workflow loop set up. Next: (TBD from UX_DESIGN.md.)**
 
 Recent completed work:
+- **RAM track fix + BACKLOG additions** — CentralBoard: 5→7 squares, ramFilled cap raised to 7, track start shifted to x=110 (ends at 158, within 160-wide body). UX_DESIGN §5.2 + §10.1 updated. BACKLOG: new "UI/UX polish (post-redesign)" section with 3 entries (allocation visibility, layout density, mockup re-render). Canary suite 8/8 pass (mission-rules pre-existing flake unchanged). Build clean.
 - **Mobile workflow iteration 2** — MOBILE_TEST.md task log + current state updated. Testing 5-line NTFY cap.
 - **Mobile workflow setup** — MOBILE_TEST.md created. CLAUDE.md "Task completion ritual" updated by user (LATEST_TASK.md + NTFY ping added to ritual). NTFY topic: ntfy.sh/mesa-claude-lind-7k2x7.
 - **Board redesign — card_reveal phase task** — CentralBoard: RevealChipConfig + RevealSlotGroup renders revealed card icon/name/owner on chip slots (progress cards in color, virus cards in red). CardReveal.tsx: full visual redesign — RevealCardStack (110×120px cards, shadow offset, count badge, SELECTED tag), stacked hand grouped by card_key, Reveal Card button with useRef fix for stale closure. GameBoard: revealSlots prop wired, currentPlayer + hand + overridePlayerId threaded to CardReveal. ActionRegion: "REVEAL ONE CARD" / "AIs REVEALING CARDS" headers. E2E: card-reveal.spec.ts unskipped; mission-flow.spec.ts test 6 timing fixed (waitFor not isVisible + per-reveal confirmation wait). `next build` clean, both spec files 100% pass.

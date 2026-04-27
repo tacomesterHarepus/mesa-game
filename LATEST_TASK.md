@@ -1,27 +1,25 @@
 # Latest Task
 
-**Task:** Mobile workflow iteration 2 — NTFY 5-line cap test
+**Task:** RAM track fix + BACKLOG additions
 **Date:** 2026-04-27
 **Status:** DONE
 
 ## What shipped
 
-- `MOBILE_TEST.md` — current state updated; task log entry appended (2026-04-27 17:13).
-- `SESSION_NOTES.md` — iteration 2 noted.
+- `CentralBoard.tsx` — RAM track widened from 5 to 7 squares (ramFilled cap 5→7, start x 115→110, loop `[0..4]`→`[0..6]`). Fits within 160px chip body (ends at x=158).
+- `UX_DESIGN.md` — §5.2 updated (7 squares, absolute-display note); §10.1 mockup re-render list updated.
+- `BACKLOG.md` — new "UI / UX Polish (post-redesign)" section: allocation visibility, layout density pass, mockup re-render.
 
 ## Commits
 
-- `d6739e5` Docs: MOBILE_TEST.md iteration 2 — NTFY 5-line cap test
+- `6c01753` Fix: RAM track widened from 5 to 7 squares to cover full 3–7 range
+- `66c3d52` Backlog: add UI/UX polish (post-redesign) section with 3 entries
 - (docs commit follows)
-
-## Files changed
-
-- `MOBILE_TEST.md`, `SESSION_NOTES.md`, `LATEST_TASK.md` — docs only.
 
 ## Test status
 
-No code changed. Build and tests unaffected.
+Build clean. Canary suite 8/8 pass (abort-mission 3, error-handling 1, multi-mission 3, turn-order 1). mission-rules pre-existing flaky timeout unchanged.
 
 ## Suggested next step
 
-Confirm NTFY ping arrived on phone within the 5-line cap. If loop feels good, retire MOBILE_TEST.md or run iteration 3 with a real board-redesign task prompt.
+Next board-redesign phase task per UX_DESIGN.md ordering — check §ordering section for what follows card_reveal. Likely virus_resolution or resource_adjustment visual pass.
