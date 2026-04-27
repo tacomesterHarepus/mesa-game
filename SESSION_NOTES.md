@@ -1,9 +1,10 @@
 # Session Notes
 
 ## Current Phase
-**Board redesign — card_reveal DONE. Mobile workflow loop set up. Next: (TBD from UX_DESIGN.md.)**
+**Board redesign — virus_pull phase DONE. Next: virus_resolution visual pass (per UX_DESIGN ordering).**
 
 Recent completed work:
+- **Board redesign — virus_pull phase** — Migration 015 (pending_pull_count int default 0). end-play-phase v14: numViruses>0 + pool non-empty now sets phase=virus_pull + pending_pull_count (logs virus_pull_initiated); pool-empty fallthrough unchanged. pull-viruses v1: reads pending_pull_count, pulls top N from pool into queue, logs virus_queue_start, sets phase=virus_resolution. VirusPull.tsx: active AI sees amber Pull button; observers see waiting message. ActionRegion + GameBoard wired. virus-system.spec.ts endCurrentPlayerTurn updated to chain pull-viruses. Canary suite 8/8 pass. Build clean.
 - **RAM track fix + BACKLOG additions** — CentralBoard: 5→7 squares, ramFilled cap raised to 7, track start shifted to x=110 (ends at 158, within 160-wide body). UX_DESIGN §5.2 + §10.1 updated. BACKLOG: new "UI/UX polish (post-redesign)" section with 3 entries (allocation visibility, layout density, mockup re-render). Canary suite 8/8 pass (mission-rules pre-existing flake unchanged). Build clean.
 - **Mobile workflow iteration 2** — MOBILE_TEST.md task log + current state updated. Testing 5-line NTFY cap.
 - **Mobile workflow setup** — MOBILE_TEST.md created. CLAUDE.md "Task completion ritual" updated by user (LATEST_TASK.md + NTFY ping added to ritual). NTFY topic: ntfy.sh/mesa-claude-lind-7k2x7.
@@ -50,6 +51,7 @@ Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2
 | Board redesign — mission_selection | **DONE** | MissionCandidatesPanel (left column y=180–565, 3 stacked candidates), GameBoard conditional render (MissionPanel+VirusPool hidden during phase), ActionRegion "SELECT MISSION" header, MissionSelection lifted-state rework. 2 commits 21efe1e–4b8ae6c. build clean. mission-flow:143 + multi-mission all pass. |
 | Board redesign — resource_adjustment + resource_allocation | **DONE** | Unified ResourcePhase.tsx, CentralBoard chip buttons (SVGChipButton, [-]/[+]), pending-state visual (solid/dashed), lifted state in GameBoard, active chip suppression. Old ResourceAdjustment.tsx + ResourceAllocation.tsx deleted. build clean. multi-mission 3/3 pass. |
 | Board redesign — card_reveal | **DONE** | RevealSlotGroup in CentralBoard, CardReveal visual redesign (RevealCardStack + useRef fix), GameBoard wiring, ActionRegion headers. card-reveal.spec.ts unskipped. mission-flow.spec.ts test 6 timing fixed. build clean. 8/8 pass. |
+| Board redesign — virus_pull | **DONE** | Migration 015, end-play-phase v14, pull-viruses v1, VirusPull.tsx, ActionRegion + GameBoard wired. virus-system.spec.ts endCurrentPlayerTurn chains pull-viruses. build clean. 8/8 canary pass. |
 
 **Test suite: ~71/80 passing (est.), 12 skip, 0 genuine fail** (card-reveal.spec.ts unskipped: +1 test. mission-flow.spec.ts test 6 fixed. mission-rules.spec.ts has a pre-existing flaky timeout on test 28 in full-suite runs — passes in isolation. game-log.spec.ts cold-start flake on test 1 clears on re-run.)
 
@@ -68,7 +70,8 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 | allocate-resources | v7 | Draws cards + resets has_discarded_this_turn for first player |
 | discard-cards | v2 | Phase 11: typed `discard` log with metadata |
 | place-virus | v1 | Moves card from hands → pending_viruses |
-| end-play-phase | v13 | Approach A: writes pending_mission_outcome to games on virus path when mission resolved |
+| end-play-phase | v14 | virus_pull phase: sets phase=virus_pull + pending_pull_count; pool-empty fallthrough unchanged |
+| pull-viruses | v1 | Pulls pending_pull_count cards from pool into queue; logs virus_queue_start; sets phase=virus_resolution |
 | resolve-next-virus | v8 | Approach A: reads pending_mission_outcome, passes to advanceTurnOrPhase at queue-empty |
 | secret-target | v2 | Phase 11: typed targeting_resolved log |
 | play-card | v7 | Phase 11: typed card_played log with mission_progress snapshot |
