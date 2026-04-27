@@ -9,7 +9,11 @@ interface Props {
 
 export function ActionRegion({ children, phase, isActivePlayer, currentTurnPlayerName }: Props) {
   const isActionPhase =
-    phase === "player_turn" || phase === "between_turns" || phase === "mission_selection";
+    phase === "player_turn" ||
+    phase === "between_turns" ||
+    phase === "mission_selection" ||
+    phase === "resource_adjustment" ||
+    phase === "resource_allocation";
   const showAmber = isActionPhase && isActivePlayer;
 
   const border = showAmber ? "2px solid #d4a017" : "1px solid #3a3a3a";
@@ -20,6 +24,14 @@ export function ActionRegion({ children, phase, isActivePlayer, currentTurnPlaye
       ? isActivePlayer
         ? "▸ YOUR ACTION REQUIRED · SELECT MISSION"
         : "// HUMANS CHOOSING MISSION"
+      : phase === "resource_adjustment"
+      ? isActivePlayer
+        ? "▸ YOUR ACTION REQUIRED · ADJUST RESOURCES"
+        : "// HUMANS ADJUSTING RESOURCES"
+      : phase === "resource_allocation"
+      ? isActivePlayer
+        ? "▸ YOUR ACTION REQUIRED · ALLOCATE RESOURCES"
+        : "// HUMANS ALLOCATING RESOURCES"
       : showAmber
       ? "▸ YOUR ACTION REQUIRED · YOUR TURN"
       : isActionPhase && currentTurnPlayerName
