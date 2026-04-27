@@ -28,6 +28,13 @@ export interface VirusResolvingCard {
   cascaded_from?: string | null;
 }
 
+export interface TargetingChipConfig {
+  state: "selectable" | "nominated" | "watching";
+  isSelf: boolean;
+  isFellow: boolean;
+  onNominate?: () => void;
+}
+
 interface Props {
   aiPlayers: PlayerRow[]; // sorted by turn_order 0–3; slot A=index 0 (TL), B=1 (TR), C=2 (BR), D=3 (BL)
   coreProgress: number;
@@ -35,6 +42,7 @@ interface Props {
   turnOrderIds?: string[];
   resourceChips?: Record<string, ResourceChipConfig>; // keyed by player.id; set during resource phases
   revealSlots?: Record<string, RevealChipConfig>;     // keyed by player.id; set during card_reveal
+  targetingChips?: Record<string, TargetingChipConfig>; // keyed by player.id; set during secret_targeting
   dimCore?: boolean;
   virusResolvingCard?: VirusResolvingCard | null;
 }
@@ -164,6 +172,7 @@ function AIChipGroup({
   missionSeatNum,
   resourceChip,
   revealSlot,
+  targetingChip,
   slotSide = "left",
 }: {
   slotLabel: string;
@@ -175,6 +184,7 @@ function AIChipGroup({
   missionSeatNum: number | null;
   resourceChip?: ResourceChipConfig;
   revealSlot?: RevealChipConfig;
+  targetingChip?: TargetingChipConfig;
   slotSide?: "left" | "right";
 }) {
   const cpuFilled = Math.min(player?.cpu ?? 1, 4);
@@ -243,8 +253,14 @@ function AIChipGroup({
     (resourceChip.cpuMinus || resourceChip.cpuPlus || resourceChip.ramMinus || resourceChip.ramPlus)
   );
 
+  const isTargetSelectable = targetingChip?.state === "selectable" && !targetingChip.isSelf;
+  const isTargetNominated = targetingChip?.state === "nominated";
+
   return (
-    <g>
+    <g
+      onClick={isTargetSelectable ? targetingChip?.onNominate : undefined}
+      style={{ cursor: isTargetSelectable ? "pointer" : "default" }}
+    >
       {/* Outer amber active border — 5px outside chip, per §5.4 */}
       {isActive && (
         <rect
@@ -260,16 +276,56 @@ function AIChipGroup({
         />
       )}
 
-      {/* Contribution counters — all zeros for scaffolding */}
+      {/* Targeting rings — rendered outside chip body like the active ring */}
+      {isTargetSelectable && (
+        <rect
+          x={chipX - 5}
+          y={chipY - 5}
+          width={170}
+          height={100}
+          fill="none"
+          stroke="#d4a017"
+          strokeWidth={1.5}
+          strokeDasharray="4 3"
+          rx={4}
+          opacity={0.7}
+        />
+      )}
+      {isTargetNominated && (
+        <rect
+          x={chipX - 5}
+          y={chipY - 5}
+          width={170}
+          height={100}
+          fill="none"
+          stroke="#a32d2d"
+          strokeWidth={2}
+          rx={4}
+        />
+      )}
+
+      {/* Contribution counters OR targeting label */}
       <g transform={`translate(${chipX}, ${counterY})`}>
-        <text x="14" y="14" fontFamily="sans-serif" fontSize="11" fill="#9cb4d4" textAnchor="middle">⚙</text>
-        <text x="26" y="14" fontFamily="monospace" fontSize="11" fill={counterText}>0</text>
-        <text x="44" y="13" fontFamily="monospace" fontSize="9" fill={dotSep}>·</text>
-        <text x="68" y="14" fontFamily="sans-serif" fontSize="11" fill="#5dcaa5" textAnchor="middle">▣</text>
-        <text x="80" y="14" fontFamily="monospace" fontSize="11" fill={counterText}>0</text>
-        <text x="98" y="13" fontFamily="monospace" fontSize="9" fill={dotSep}>·</text>
-        <text x="122" y="14" fontFamily="sans-serif" fontSize="11" fill="#caa55d" textAnchor="middle">◆</text>
-        <text x="134" y="14" fontFamily="monospace" fontSize="11" fill={counterText}>0</text>
+        {isTargetNominated ? (
+          <text x="80" y="14" fontFamily="monospace" fontSize="8" fill="#a32d2d" textAnchor="middle" letterSpacing="1">
+            {"▸ NOMINATED"}
+          </text>
+        ) : isTargetSelectable ? (
+          <text x="80" y="14" fontFamily="monospace" fontSize="7" fill="#d4a017" textAnchor="middle" letterSpacing="1">
+            CLICK TO NOMINATE
+          </text>
+        ) : (
+          <>
+            <text x="14" y="14" fontFamily="sans-serif" fontSize="11" fill="#9cb4d4" textAnchor="middle">⚙</text>
+            <text x="26" y="14" fontFamily="monospace" fontSize="11" fill={counterText}>0</text>
+            <text x="44" y="13" fontFamily="monospace" fontSize="9" fill={dotSep}>·</text>
+            <text x="68" y="14" fontFamily="sans-serif" fontSize="11" fill="#5dcaa5" textAnchor="middle">▣</text>
+            <text x="80" y="14" fontFamily="monospace" fontSize="11" fill={counterText}>0</text>
+            <text x="98" y="13" fontFamily="monospace" fontSize="9" fill={dotSep}>·</text>
+            <text x="122" y="14" fontFamily="sans-serif" fontSize="11" fill="#caa55d" textAnchor="middle">◆</text>
+            <text x="134" y="14" fontFamily="monospace" fontSize="11" fill={counterText}>0</text>
+          </>
+        )}
       </g>
 
       {/* Chip body group — local origin at chip top-left */}
@@ -311,6 +367,13 @@ function AIChipGroup({
         {isActive && (
           <text x="155" y="23" fontFamily="monospace" fontSize="9" fill="#d4a017" textAnchor="end">
             ▸ ACTIVE
+          </text>
+        )}
+
+        {/* MIS badge — shown during targeting for misaligned fellow chips */}
+        {targetingChip?.isFellow && !isActive && (
+          <text x="155" y="23" fontFamily="monospace" fontSize="8" fill="#a32d2d" textAnchor="end" letterSpacing="1">
+            MIS
           </text>
         )}
 
@@ -627,6 +690,7 @@ export function CentralBoard({
   turnOrderIds = [],
   resourceChips,
   revealSlots,
+  targetingChips,
   dimCore,
   virusResolvingCard,
 }: Props) {
@@ -729,6 +793,7 @@ export function CentralBoard({
             missionSeatNum={missionSeatNum}
             resourceChip={player ? resourceChips?.[player.id] : undefined}
             revealSlot={player ? revealSlots?.[player.id] : undefined}
+            targetingChip={player ? targetingChips?.[player.id] : undefined}
             slotSide={SLOT_SIDES[i]}
           />
         );

@@ -15,7 +15,8 @@ export function ActionRegion({ children, phase, isActivePlayer, currentTurnPlaye
     phase === "mission_selection" ||
     phase === "resource_adjustment" ||
     phase === "resource_allocation" ||
-    phase === "card_reveal";
+    phase === "card_reveal" ||
+    phase === "secret_targeting";
   const showAmber = isActionPhase && isActivePlayer;
 
   const border = showAmber ? "2px solid #d4a017" : "1px solid #3a3a3a";
@@ -44,13 +45,20 @@ export function ActionRegion({ children, phase, isActivePlayer, currentTurnPlaye
         : `// WAITING — ${currentTurnPlayerName ?? "ACTIVE AI"} PULLING`
       : phase === "virus_resolution"
       ? "// AUTO-RESOLVING · NO ACTION NEEDED"
+      : phase === "secret_targeting"
+      ? isActivePlayer
+        ? "▸ YOUR ACTION REQUIRED · NOMINATE A TARGET"
+        : "// MISALIGNED AIs ARE TARGETING…"
       : showAmber
       ? "▸ YOUR ACTION REQUIRED · YOUR TURN"
       : isActionPhase && currentTurnPlayerName
       ? `// ${currentTurnPlayerName}'s TURN`
       : null;
 
-  const headerColor = showAmber ? "#d4a017" : phase === "virus_resolution" ? "#a32d2d" : "#555";
+  const headerColor =
+    showAmber ? "#d4a017" :
+    (phase === "virus_resolution" || phase === "secret_targeting") ? "#a32d2d" :
+    "#555";
 
   return (
     <div
