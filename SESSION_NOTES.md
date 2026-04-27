@@ -1,9 +1,10 @@
 # Session Notes
 
 ## Current Phase
-**game_log poll backup + scroll fix DONE. Next: virus_resolution visual pass (per UX_DESIGN ordering).**
+**VirusPoolPanel live count DONE. Next: virus_resolution visual pass (per UX_DESIGN ordering).**
 
 Recent completed work:
+- **VirusPoolPanel live count** — VirusPoolPanel now accepts poolCount/pendingPullCount/phase props. Header dynamic (N CARDS, + M TO DRAW during virus_pull). GameBoard poll extended with virus_pool count query; Realtime INSERT/DELETE subscriptions for live updates. Build clean. Canary pass (isolated).
 - **game_log Realtime miss — poll backup + scroll fix** — GameBoard 3s poll now appends last 50 game_log rows (id-dedup, append-only safe). RightPanel scroll fix: wasAtBottomRef via scroll listener (pre-render) replaces post-render distFromBottom check — fixes batch-addition auto-scroll. game-log-ui 3/3 pass, canary 8/8. Build clean.
 - **Board redesign — virus_pull phase** — Migration 015 (pending_pull_count int default 0). end-play-phase v14: numViruses>0 + pool non-empty now sets phase=virus_pull + pending_pull_count (logs virus_pull_initiated); pool-empty fallthrough unchanged. pull-viruses v1: reads pending_pull_count, pulls top N from pool into queue, logs virus_queue_start, sets phase=virus_resolution. VirusPull.tsx: active AI sees amber Pull button; observers see waiting message. ActionRegion + GameBoard wired. virus-system.spec.ts endCurrentPlayerTurn updated to chain pull-viruses. Canary suite 8/8 pass. Build clean.
 - **RAM track fix + BACKLOG additions** — CentralBoard: 5→7 squares, ramFilled cap raised to 7, track start shifted to x=110 (ends at 158, within 160-wide body). UX_DESIGN §5.2 + §10.1 updated. BACKLOG: new "UI/UX polish (post-redesign)" section with 3 entries (allocation visibility, layout density, mockup re-render). Canary suite 8/8 pass (mission-rules pre-existing flake unchanged). Build clean.

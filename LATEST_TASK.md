@@ -1,22 +1,22 @@
 # Latest Task
 
-**Task:** game_log Realtime miss — poll backup + scroll fix
+**Task:** VirusPoolPanel live count
 **Date:** 2026-04-27
 **Status:** DONE
 
 ## What shipped
 
-- `components/game/GameBoard.tsx` — Extended 3s poll to fetch last 50 `game_log` rows and append any not yet in state (id-dedup via `Set`). `gameId` referenced only in the fetch query (not inside `setLog` callback) to avoid stale-closure risk on game switch. Comment added noting `game_log` is append-only so dedup is safe.
-- `components/game/board/RightPanel.tsx` — Replaced `mountedRef` + post-render `distFromBottom` check with `wasAtBottomRef` tracked via scroll event listener. Fixes auto-scroll for batch additions (poll catch-up): old approach measured distance *after* content grew, giving a falsely large gap. New approach captures "was at bottom?" before the render fires.
+- `components/game/board/VirusPoolPanel.tsx` — now accepts `{ poolCount, pendingPullCount, phase }` props. Header renders `"VIRUS POOL · N CARD(S)"` dynamically; during `virus_pull` appends `"· M TO DRAW"` from `pendingPullCount`. Count label `×N` uses live `poolCount`.
+- `components/game/GameBoard.tsx` — virus_pool count added to the 3s poll (`head: true` count query, no full rows). Realtime channel now subscribes to `virus_pool` INSERT and DELETE for live increment/decrement; poll corrects any drift within 3s. `VirusPoolPanel` receives `poolCount`, `game.pending_pull_count`, and `game.phase`.
 
 ## Commits
 
-- `2367e18` game_log poll backup + scroll fix
+- `8acaf29` VirusPoolPanel live count: poll + Realtime
 
 ## Test status
 
-Build clean. game-log-ui 3/3 pass (1 skipped per phase discipline). Canary 8/8 pass (abort-mission 3, error-handling 1, multi-mission 3, turn-order 1). abort-mission test 2 had a one-off timing flake in the full-suite run — cleared on isolated re-run, pre-existing pattern.
+Build clean. Canary suite 20/21 pass — only failure was `abort-mission:164` Chromium worker crash (`0xC0000409`) in the combined run; isolated run 3/3 pass (pre-existing Windows Chromium flake). `mission-rules` 10/10 pass (1 pre-existing flaky test skipped).
 
 ## Suggested next step
 
-Per UX_DESIGN.md ordering, `virus_resolution` visual pass is next. The existing `VirusResolution.tsx` still uses the old non-redesigned layout — it needs the same visual treatment as the other phase components (styled within the 1064×200 ActionRegion). Check UX_DESIGN §7.x for the spec.
+Per UX_DESIGN.md ordering, `virus_resolution` visual pass is next. The existing `VirusResolution.tsx` still uses the old non-redesigned layout — it needs the same treatment as the other phase components (styled within the 1064×200 ActionRegion). Check UX_DESIGN §7.x for the spec.
