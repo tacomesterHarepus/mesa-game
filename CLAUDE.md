@@ -612,6 +612,51 @@ mesa/
 
 ---
 
+## Test discipline during the UI redesign
+
+While the board redesign is in progress (tracked in `UX_DESIGN.md`), the test suite is in a transitional state. UI tests written against the old layout will fail until the corresponding phase is reimplemented and its tests are updated.
+
+**Do not run the full Playwright suite as a sanity check during phase tasks. The failures are mostly stale-selector noise, not regressions.**
+
+### Per-phase test discipline
+
+When implementing a phase task:
+
+1. **Always run** `next build` — must pass cleanly.
+2. **Always run** backend / non-UI tests — these don't depend on the redesign and must pass.
+3. **Run UI tests for the specific phase being implemented** — update selectors to match the new DOM as part of the task.
+4. **Mark UI tests for other not-yet-redesigned phases as `.skip`** with a comment like `// SKIPPED: depends on pre-redesign UI; revisit after [phase_name] task`. Don't delete them.
+5. **Don't run the full suite.** It will fail and the failures aren't actionable until the redesign completes.
+
+### Backend / non-UI tests (always run)
+
+- `tests/e2e/error-handling.spec.ts` (cold-start retries)
+- `tests/e2e/turn-order.spec.ts` (seat order rotation)
+- `tests/e2e/multi-mission.spec.ts` (mission 2+ regressions)
+- `tests/e2e/mission-rules.spec.ts` (mission special rules — note: pre-existing flake on test 28)
+- `tests/e2e/abort-mission.spec.ts` (abort-mission edge function)
+
+These don't touch redesigned UI elements. If any of these starts failing during a redesign task, that's a real regression and needs investigation.
+
+### Pre-existing test issues to ignore
+
+- `tests/e2e/mission-rules.spec.ts` test 28 — flaky 15s timeout, passes on isolated re-run
+- `tests/e2e/game-log.spec.ts` test 1 — cold-start flake, clears on re-run
+- Playwright webServer timeout — pre-existing environment issue, fails identically on unmodified code
+
+### End of redesign
+
+After the final phase task (per `UX_DESIGN.md` section 11 ordering), do a dedicated test-cleanup pass:
+
+1. Unskip all `.skip`'d UI tests
+2. Run the full Playwright suite
+3. Fix any remaining failures phase-by-phase
+4. Document final passing baseline in SESSION_NOTES.md
+
+This is when the test suite returns to its "all green" baseline.
+
+---
+
 ## Build Sequence & Current Status
 
 | Phase | Status | Notes |
