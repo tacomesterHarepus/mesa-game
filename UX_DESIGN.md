@@ -157,7 +157,7 @@ Same on bottom edge.
 
 CPU track: 4 squares of `10×10`, gap 1px. Filled = `#5dcaa5` with `#3a5a4a` border. Empty = no fill, `#3a5a4a` border only.
 
-RAM track: 5 squares of `6×10`, gap 1px. Same fill rules.
+RAM track: 7 squares of `6×10`, gap 1px. Same fill rules. Like CPU, this is an absolute display: square i represents RAM value i+1, so all 7 squares represent real values in the 1–7 range (RAM min 1 implied, max 7).
 
 **Pending changes** during resource_adjustment / virus targeting:
 - Pending removal: filled square becomes outlined-red dashed (`stroke="#a32d2d" stroke-width="1.5" stroke-dasharray="2 1"`)
@@ -611,6 +611,10 @@ The virus pool location was decided late in the session (move from right side to
 - `mesa_board_redesign_v14_card_reveal_ai.html` (card_reveal AI view — pool was at x=1100, needs moving to x=32)
 
 When re-rendering, also: ensure the right side `x=1050-1090` is **empty negative space**, not filled with anything.
+
+Additionally, the following mockups show 5-square RAM tracks and need updating to 7 squares (RAM range is 3–7, not 3–5):
+
+- `mockup_resource_phases_human.html` — shows chip cluster during resource phases; RAM track widened from 5 to 7 squares (start x=110, stride 7)
 
 ### 10.2 Cascade pattern adjustments
 

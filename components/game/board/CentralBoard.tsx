@@ -170,7 +170,7 @@ function AIChipGroup({
   slotSide?: "left" | "right";
 }) {
   const cpuFilled = Math.min(player?.cpu ?? 1, 4);
-  const ramFilled = Math.min(player?.ram ?? 4, 5);
+  const ramFilled = Math.min(player?.ram ?? 4, 7);
   const seatNum = missionSeatNum !== null ? String(missionSeatNum) : "?";
   const name = player?.display_name ?? "—";
 
@@ -339,13 +339,13 @@ function AIChipGroup({
           RAM
         </text>
 
-        {/* RAM track — 5 squares of 6×10, stride 7 */}
-        {([0, 1, 2, 3, 4] as const).map((i) => {
+        {/* RAM track — 7 squares of 6×10, stride 7, start x=110 (ends at 158, within 160-wide body) */}
+        {([0, 1, 2, 3, 4, 5, 6] as const).map((i) => {
           const sq = ramSquareProps(i);
           return (
             <rect
               key={i}
-              x={115 + i * 7}
+              x={110 + i * 7}
               y={61}
               width="6"
               height="10"
