@@ -152,11 +152,11 @@ async function advanceToPlayerTurnWithCpu2(page: Page, gameId: string): Promise<
   await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
 }
 
-// Calls end-play-phase for the current turn player via REST, bypassing any virus-staging
-// UI requirements. Returns true if the call succeeded, false if not in player_turn phase.
+// Calls end-play-phase for the current turn player via REST, then chains pull-viruses
+// if the phase transitions to virus_pull. Returns true if end-play-phase succeeded.
 // Using REST (not UI button click) because CPU=2 players require staging a card before
 // the End Turn button enables — REST skips that requirement and lets end-play-phase
-// compute virus counts server-side, which is what triggers virus_resolution.
+// compute virus counts server-side, which is what triggers the virus flow.
 async function endCurrentPlayerTurn(gameId: string, token: string): Promise<boolean> {
   const gameResp = await fetch(
     `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=current_turn_player_id,phase`,
@@ -170,7 +170,24 @@ async function endCurrentPlayerTurn(gameId: string, token: string): Promise<bool
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ game_id: gameId, override_player_id: gameRow.current_turn_player_id }),
   });
-  return resp.status === 200;
+  if (resp.status !== 200) return false;
+
+  // Chain through virus_pull if end-play-phase set that intermediate phase.
+  await new Promise((r) => setTimeout(r, 300));
+  const phaseResp = await fetch(
+    `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=phase,current_turn_player_id`,
+    { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+  );
+  const [phaseRow] = (await phaseResp.json()) as Array<{ phase: string; current_turn_player_id: string }>;
+  if (phaseRow?.phase === "virus_pull" && phaseRow?.current_turn_player_id) {
+    await fetch(`${SUPABASE_URL}/functions/v1/pull-viruses`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ game_id: gameId, override_player_id: phaseRow.current_turn_player_id }),
+    });
+  }
+
+  return true;
 }
 
 // ── Shared setup ──────────────────────────────────────────────────────────────
