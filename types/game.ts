@@ -5,6 +5,7 @@ export type Phase =
   | 'card_reveal'
   | 'resource_allocation'
   | 'player_turn'
+  | 'virus_pull'
   | 'virus_resolution'
   | 'secret_targeting'
   | 'between_turns'
@@ -25,6 +26,7 @@ export interface Game {
   escape_timer: number
   current_mission_id: string | null
   pending_mission_options: string[]
+  pending_pull_count: number
   targeting_deadline: string | null
   current_targeting_resolution_id: string | null
   current_targeting_card_key: string | null

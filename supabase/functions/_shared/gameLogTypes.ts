@@ -55,6 +55,7 @@ export interface GameLogMetadataMap {
     failure_reason?: string;
   };
   viruses_placed: { actor_player_id: string; count: number };
+  virus_pull_initiated: { actor_player_id: string; virus_count: number; pool_size_before: number };
   virus_queue_start: { actor_player_id: string; virus_count: number; pool_size_after: number };
   virus_effect: {
     card_key: string;

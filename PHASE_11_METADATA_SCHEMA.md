@@ -194,8 +194,23 @@ Logged by `end-play-phase` after pending viruses are shuffled into the pool.
 
 ---
 
+### virus_pull_initiated
+Logged by `end-play-phase` when viruses are generated and the pool is non-empty, transitioning to `virus_pull` phase.
+
+```ts
+{ actor_player_id: string; virus_count: number; pool_size_before: number }
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `actor_player_id` | `string` | The AI whose turn triggered virus generation |
+| `virus_count` | `number` | Number of cards that will be pulled from the pool |
+| `pool_size_before` | `number` | Pool size before any cards are drawn |
+
+---
+
 ### virus_queue_start
-Logged by `end-play-phase` when at least 1 virus card is generated and the resolution queue is seeded.
+Logged by `pull-viruses` after the active AI pulls cards from the pool into the resolution queue.
 
 ```ts
 { actor_player_id: string; virus_count: number; pool_size_after: number }
