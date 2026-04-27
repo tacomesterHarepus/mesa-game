@@ -702,7 +702,14 @@ export function GameBoard({
           {renderPhase()}
         </ActionRegion>
 
-        <RightPanel log={log} />
+        <RightPanel
+          log={log}
+          gameId={gameId}
+          currentPlayer={effectiveCurrentPlayer}
+          allPlayers={sortedPlayers}
+          phase={game.phase}
+          currentTurnPlayerId={game.current_turn_player_id ?? null}
+        />
       </div>
     </div>
   );

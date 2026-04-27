@@ -11,13 +11,17 @@ interface Props {
   gameId: string;
   currentPlayer: Player;
   misalignedPlayers: Player[];
+  canPost: boolean;
+  onNewMessage?: () => void;
 }
 
-export function MisalignedPrivateChat({ gameId, currentPlayer, misalignedPlayers }: Props) {
+export function MisalignedPrivateChat({ gameId, currentPlayer, misalignedPlayers, canPost, onNewMessage }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const onNewMsgRef = useRef(onNewMessage);
+  useEffect(() => { onNewMsgRef.current = onNewMessage; }, [onNewMessage]);
 
   const playerMap = Object.fromEntries(misalignedPlayers.map((p) => [p.id, p.display_name]));
 
@@ -36,16 +40,12 @@ export function MisalignedPrivateChat({ gameId, currentPlayer, misalignedPlayers
       .channel(`chat-misaligned-${gameId}`)
       .on(
         "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "chat_messages",
-          filter: `game_id=eq.${gameId}`,
-        },
+        { event: "INSERT", schema: "public", table: "chat_messages", filter: `game_id=eq.${gameId}` },
         (payload) => {
           const row = payload.new as ChatMessage;
           if (row.channel === "misaligned_private") {
             setMessages((prev) => [...prev, row]);
+            onNewMsgRef.current?.();
           }
         }
       )
@@ -54,13 +54,39 @@ export function MisalignedPrivateChat({ gameId, currentPlayer, misalignedPlayers
     return () => { supabase.removeChannel(channel); };
   }, [gameId]);
 
+  // Poll backup — 3s id-dedup
+  useEffect(() => {
+    const supabase = createClient();
+    const id = setInterval(async () => {
+      const { data } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("game_id", gameId)
+        .eq("channel", "misaligned_private")
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (data && data.length > 0) {
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const newRows = data.filter((r) => !existingIds.has(r.id)).reverse();
+          if (newRows.length > 0) {
+            newRows.forEach(() => onNewMsgRef.current?.());
+            return [...prev, ...newRows];
+          }
+          return prev;
+        });
+      }
+    }, 3000);
+    return () => clearInterval(id);
+  }, [gameId]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || !canPost) return;
     setSending(true);
     const supabase = createClient();
     await supabase.from("chat_messages").insert({
@@ -74,41 +100,77 @@ export function MisalignedPrivateChat({ gameId, currentPlayer, misalignedPlayers
   }
 
   return (
-    <div className="flex flex-col h-full border border-virus rounded p-2">
-      <div className="flex items-center gap-1 mb-2">
-        <span className="text-virus text-[10px] font-mono">▲</span>
-        <h3 className="label-caps text-[10px] text-virus">Private Channel</h3>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{ padding: "5px 12px 4px", borderBottom: "1px solid #1e0808" }}>
+        <span style={{ fontFamily: "monospace", fontSize: 8, color: "#8a1a1a", letterSpacing: 2 }}>
+          {"▲ PRIVATE — MISALIGNED ONLY"}
+        </span>
       </div>
-      <div className="flex-1 overflow-y-auto space-y-1 mb-2 min-h-0 max-h-32 pr-1">
-        {messages.map((msg) => (
-          <div key={msg.id} className="text-xs font-mono">
-            <span className="text-virus opacity-70">{playerMap[msg.player_id] ?? "?"}: </span>
-            <span className="text-primary">{msg.message}</span>
+      <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px" }}>
+        {messages.length === 0 ? (
+          <div style={{ fontFamily: "monospace", fontSize: 10, color: "#555", letterSpacing: 1 }}>
+            {"// NO MESSAGES YET"}
           </div>
-        ))}
-        {messages.length === 0 && (
-          <div className="text-faint text-xs font-mono">No messages yet.</div>
+        ) : (
+          messages.map((msg) => (
+            <div key={msg.id} style={{ marginBottom: 4, lineHeight: "1.4" }}>
+              <span style={{ fontFamily: "monospace", fontSize: 10, color: "#8a3a3a" }}>
+                {playerMap[msg.player_id] ?? "?"}:{" "}
+              </span>
+              <span style={{ fontFamily: "monospace", fontSize: 10, color: "#ccc" }}>
+                {msg.message}
+              </span>
+            </div>
+          ))
         )}
         <div ref={bottomRef} />
       </div>
-      <form onSubmit={handleSend} className="flex gap-1">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          disabled={sending}
-          placeholder="Private message…"
-          maxLength={200}
-          className="flex-1 bg-base border border-virus border-opacity-40 rounded px-2 py-1 text-xs font-mono text-primary placeholder:text-faint focus:outline-none focus:border-virus disabled:opacity-50"
-        />
-        <button
-          type="submit"
-          disabled={sending || !input.trim()}
-          className="px-2 py-1 bg-surface border border-virus rounded text-xs font-mono text-virus hover:opacity-80 disabled:opacity-40"
-        >
-          ↑
-        </button>
-      </form>
+      <div style={{ padding: "8px 12px", borderTop: "1px solid #1e0808" }}>
+        {canPost ? (
+          <form onSubmit={handleSend} style={{ display: "flex", gap: 6 }}>
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              disabled={sending}
+              placeholder="Private message…"
+              maxLength={200}
+              style={{
+                flex: 1,
+                background: "#110808",
+                border: "1px solid #2a1010",
+                borderRadius: 2,
+                padding: "4px 8px",
+                fontSize: 10,
+                fontFamily: "monospace",
+                color: "#ccc",
+                outline: "none",
+              }}
+            />
+            <button
+              type="submit"
+              disabled={sending || !input.trim()}
+              style={{
+                padding: "4px 10px",
+                background: "none",
+                border: "1px solid #2a1010",
+                borderRadius: 2,
+                fontSize: 10,
+                fontFamily: "monospace",
+                color: "#8a3a3a",
+                cursor: "pointer",
+                opacity: sending || !input.trim() ? 0.4 : 1,
+              }}
+            >
+              ↑
+            </button>
+          </form>
+        ) : (
+          <div style={{ fontFamily: "monospace", fontSize: 9, color: "#442020", letterSpacing: 1 }}>
+            {"// LOCKED DURING MISSION SETUP"}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

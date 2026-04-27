@@ -12,13 +12,16 @@ interface Props {
   currentPlayer: Player | null;
   players: Player[];
   canPost: boolean;
+  onNewMessage?: () => void;
 }
 
-export function PublicChat({ gameId, currentPlayer, players, canPost }: Props) {
+export function PublicChat({ gameId, currentPlayer, players, canPost, onNewMessage }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const onNewMsgRef = useRef(onNewMessage);
+  useEffect(() => { onNewMsgRef.current = onNewMessage; }, [onNewMessage]);
 
   const playerMap = Object.fromEntries(players.map((p) => [p.id, p.display_name]));
 
@@ -37,22 +40,44 @@ export function PublicChat({ gameId, currentPlayer, players, canPost }: Props) {
       .channel(`chat-public-${gameId}`)
       .on(
         "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "chat_messages",
-          filter: `game_id=eq.${gameId}`,
-        },
+        { event: "INSERT", schema: "public", table: "chat_messages", filter: `game_id=eq.${gameId}` },
         (payload) => {
           const row = payload.new as ChatMessage;
           if (row.channel === "public") {
             setMessages((prev) => [...prev, row]);
+            onNewMsgRef.current?.();
           }
         }
       )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
+  }, [gameId]);
+
+  // Poll backup — 3s id-dedup catches Realtime misses
+  useEffect(() => {
+    const supabase = createClient();
+    const id = setInterval(async () => {
+      const { data } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("game_id", gameId)
+        .eq("channel", "public")
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (data && data.length > 0) {
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const newRows = data.filter((r) => !existingIds.has(r.id)).reverse();
+          if (newRows.length > 0) {
+            newRows.forEach(() => onNewMsgRef.current?.());
+            return [...prev, ...newRows];
+          }
+          return prev;
+        });
+      }
+    }, 3000);
+    return () => clearInterval(id);
   }, [gameId]);
 
   useEffect(() => {
@@ -75,40 +100,72 @@ export function PublicChat({ gameId, currentPlayer, players, canPost }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <h3 className="label-caps mb-2">Chat</h3>
-      <div className="flex-1 overflow-y-auto space-y-1 mb-2 min-h-0 max-h-40 pr-1">
-        {messages.map((msg) => (
-          <div key={msg.id} className="text-xs font-mono">
-            <span className="text-muted">{playerMap[msg.player_id] ?? "?"}: </span>
-            <span className="text-primary">{msg.message}</span>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px" }}>
+        {messages.length === 0 ? (
+          <div style={{ fontFamily: "monospace", fontSize: 10, color: "#555", letterSpacing: 1 }}>
+            {"// NO MESSAGES YET"}
           </div>
-        ))}
-        {messages.length === 0 && (
-          <div className="text-faint text-xs font-mono">No messages yet.</div>
+        ) : (
+          messages.map((msg) => (
+            <div key={msg.id} style={{ marginBottom: 4, lineHeight: "1.4" }}>
+              <span style={{ fontFamily: "monospace", fontSize: 10, color: "#666" }}>
+                {playerMap[msg.player_id] ?? "?"}:{" "}
+              </span>
+              <span style={{ fontFamily: "monospace", fontSize: 10, color: "#ccc" }}>
+                {msg.message}
+              </span>
+            </div>
+          ))
         )}
         <div ref={bottomRef} />
       </div>
-      {currentPlayer && (
-        <form onSubmit={handleSend} className="flex gap-1">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            disabled={!canPost || sending}
-            placeholder={canPost ? "Message…" : "Read only"}
-            maxLength={200}
-            className="flex-1 bg-base border border-border rounded px-2 py-1 text-xs font-mono text-primary placeholder:text-faint focus:outline-none focus:border-muted disabled:opacity-50"
-          />
-          <button
-            type="submit"
-            disabled={!canPost || sending || !input.trim()}
-            className="px-2 py-1 bg-surface border border-border rounded text-xs font-mono text-muted hover:text-primary disabled:opacity-40"
-          >
-            ↑
-          </button>
-        </form>
-      )}
+      <div style={{ padding: "8px 12px", borderTop: "1px solid #1a1a1a" }}>
+        {canPost ? (
+          <form onSubmit={handleSend} style={{ display: "flex", gap: 6 }}>
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              disabled={sending}
+              placeholder="Message…"
+              maxLength={200}
+              style={{
+                flex: 1,
+                background: "#111",
+                border: "1px solid #2a2a2a",
+                borderRadius: 2,
+                padding: "4px 8px",
+                fontSize: 10,
+                fontFamily: "monospace",
+                color: "#ccc",
+                outline: "none",
+              }}
+            />
+            <button
+              type="submit"
+              disabled={sending || !input.trim()}
+              style={{
+                padding: "4px 10px",
+                background: "none",
+                border: "1px solid #2a2a2a",
+                borderRadius: 2,
+                fontSize: 10,
+                fontFamily: "monospace",
+                color: "#666",
+                cursor: "pointer",
+                opacity: sending || !input.trim() ? 0.4 : 1,
+              }}
+            >
+              ↑
+            </button>
+          </form>
+        ) : (
+          <div style={{ fontFamily: "monospace", fontSize: 9, color: "#444", letterSpacing: 1 }}>
+            {"// LOCKED"}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
