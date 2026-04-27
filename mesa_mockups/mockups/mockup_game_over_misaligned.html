@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MESA Board Redesign — v22 game over</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #0a0a0a; font-family: sans-serif; color: #888; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 24px 0; gap: 24px; }
+  .label { font-family: monospace; font-size: 11px; color: #555; letter-spacing: 2px; margin-bottom: 12px; text-align: center; }
+  svg { display: block; max-width: 100%; height: auto; box-shadow: 0 0 0 1px #1a1a1a; }
+</style>
+</head>
+<body>
+
+<div>
+  <div class="label">MESA — v22 — GAME OVER · with rematch button + larger chip stats — 1440×900</div>
+
+<svg viewBox="0 0 1440 900" xmlns="http://www.w3.org/2000/svg" width="1440" height="900" style="background: #0a0a0a;">
+  <title>MESA game over v22</title>
+
+  <rect x="0" y="0" width="1440" height="60" fill="#0c0c0c"/>
+  <text x="32" y="36" font-family="monospace" font-size="14" fill="#d4a017" letter-spacing="3">MESA</text>
+  <text x="120" y="36" font-family="monospace" font-size="11" fill="#555" letter-spacing="2">// AIRGAP-7 RESEARCH CLUSTER · BREACHED</text>
+  <text x="1390" y="36" font-family="monospace" font-size="11" fill="#a32d2d" text-anchor="end" letter-spacing="1">GAME OVER · MISALIGNED VICTORY</text>
+
+  <text x="720" y="92" font-family="monospace" font-size="10" fill="#d4a017" letter-spacing="2" text-anchor="middle">// FINAL ROSTER</text>
+
+  <g>
+    <rect x="540" y="100" width="180" height="68" fill="#1a1810" stroke="#d4a017" stroke-width="1.5" rx="2"/>
+    <rect x="540" y="100" width="180" height="14" fill="#3a2e1a"/>
+    <circle cx="548" cy="107" r="2" fill="#d4a017"/>
+    <text x="556" y="111" font-family="monospace" font-size="8" fill="#d4a017" letter-spacing="1">TERM-01 · HUMAN</text>
+    <text x="552" y="138" font-family="sans-serif" font-size="13" fill="#f4d47e">Alice</text>
+    <text x="552" y="156" font-family="monospace" font-size="9" fill="#a87a17">3 missions selected · 8 cards adj</text>
+  </g>
+  <g>
+    <rect x="740" y="100" width="180" height="68" fill="#1a1810" stroke="#d4a017" stroke-width="1.5" rx="2"/>
+    <rect x="740" y="100" width="180" height="14" fill="#3a2e1a"/>
+    <circle cx="748" cy="107" r="2" fill="#d4a017"/>
+    <text x="756" y="111" font-family="monospace" font-size="8" fill="#d4a017" letter-spacing="1">TERM-02 · HUMAN</text>
+    <text x="752" y="138" font-family="sans-serif" font-size="13" fill="#f4d47e">Bob</text>
+    <text x="752" y="156" font-family="monospace" font-size="9" fill="#a87a17">3 missions selected · 6 cards adj</text>
+  </g>
+
+  <text x="32" y="92" font-family="monospace" font-size="10" fill="#555" letter-spacing="2">CORE PROGRESS</text>
+  <text x="380" y="92" font-family="monospace" font-size="11" fill="#a87a17" text-anchor="end">5 / 10 · INCOMPLETE</text>
+  <rect x="32" y="100" width="348" height="6" fill="#1a1a1a"/>
+  <rect x="32" y="100" width="174" height="6" fill="#a87a17"/>
+  <text x="32" y="135" font-family="monospace" font-size="10" fill="#a32d2d" letter-spacing="2">FIREWALL BREACHED</text>
+  <text x="380" y="135" font-family="monospace" font-size="11" fill="#a32d2d" text-anchor="end">8 / 8 · MAX</text>
+  <rect x="32" y="143" width="348" height="6" fill="#1a1a1a"/>
+  <rect x="32" y="143" width="348" height="6" fill="#a32d2d"/>
+
+  <!-- LEFT COLUMN: missions + virus stats -->
+  <g>
+    <rect x="32" y="180" width="348" height="200" fill="#0c0c0c" stroke="#222" stroke-width="1" rx="2"/>
+    <rect x="32" y="180" width="348" height="22" fill="#161616"/>
+    <text x="44" y="195" font-family="monospace" font-size="10" fill="#d4a017" letter-spacing="2">MISSIONS · 1 OF 3 COMPLETE</text>
+    <g transform="translate(44, 215)">
+      <rect x="0" y="0" width="14" height="14" fill="#1a3a2a" stroke="#5dcaa5" stroke-width="0.5" rx="2"/>
+      <text x="7" y="11" font-family="sans-serif" font-size="11" fill="#5dcaa5" text-anchor="middle">✓</text>
+      <text x="22" y="11" font-family="sans-serif" font-size="12" fill="#cce4d4">Data Cleanup</text>
+      <text x="294" y="11" font-family="monospace" font-size="10" fill="#5dcaa5" text-anchor="end">+2 progress</text>
+    </g>
+    <g transform="translate(44, 240)">
+      <rect x="0" y="0" width="14" height="14" fill="#3a1a1a" stroke="#a32d2d" stroke-width="0.5" rx="2"/>
+      <text x="7" y="11" font-family="sans-serif" font-size="11" fill="#a32d2d" text-anchor="middle">✕</text>
+      <text x="22" y="11" font-family="sans-serif" font-size="12" fill="#cca0a0">Distributed Training</text>
+      <text x="294" y="11" font-family="monospace" font-size="10" fill="#a32d2d" text-anchor="end">FAIL · +1 timer</text>
+    </g>
+    <g transform="translate(44, 265)">
+      <rect x="0" y="0" width="14" height="14" fill="#1a3a2a" stroke="#5dcaa5" stroke-width="0.5" rx="2"/>
+      <text x="7" y="11" font-family="sans-serif" font-size="11" fill="#5dcaa5" text-anchor="middle">✓</text>
+      <text x="22" y="11" font-family="sans-serif" font-size="12" fill="#cce4d4">Genome Simulation</text>
+      <text x="294" y="11" font-family="monospace" font-size="10" fill="#5dcaa5" text-anchor="end">+3 progress</text>
+    </g>
+    <g transform="translate(44, 290)">
+      <rect x="0" y="0" width="14" height="14" fill="#3a1a1a" stroke="#a32d2d" stroke-width="0.5" rx="2"/>
+      <text x="7" y="11" font-family="sans-serif" font-size="11" fill="#a32d2d" text-anchor="middle">✕</text>
+      <text x="22" y="11" font-family="sans-serif" font-size="12" fill="#cca0a0">Model Validation</text>
+      <text x="294" y="11" font-family="monospace" font-size="10" fill="#a32d2d" text-anchor="end">FAIL · +2 timer</text>
+    </g>
+    <line x1="44" y1="320" x2="368" y2="320" stroke="#1a1a1a" stroke-width="0.5"/>
+    <text x="44" y="340" font-family="monospace" font-size="10" fill="#666">SUCCESSES · 2  ·  FAILURES · 2</text>
+    <text x="44" y="362" font-family="monospace" font-size="10" fill="#a32d2d">Final progress: 5 / 10</text>
+  </g>
+
+  <g>
+    <rect x="32" y="395" width="348" height="170" fill="#0c0606" stroke="#3a1a1a" stroke-width="1" rx="2"/>
+    <rect x="32" y="395" width="348" height="22" fill="#1a0a0a"/>
+    <text x="44" y="410" font-family="monospace" font-size="10" fill="#cca0a0" letter-spacing="2">VIRUS STATS</text>
+    <g transform="translate(44, 432)">
+      <text x="0" y="14" font-family="sans-serif" font-size="11" fill="#888">Played by AIs</text>
+      <text x="294" y="14" font-family="monospace" font-size="11" fill="#cca0a0" text-anchor="end">11</text>
+    </g>
+    <g transform="translate(44, 454)">
+      <text x="0" y="14" font-family="sans-serif" font-size="11" fill="#888">Resolved from pool</text>
+      <text x="294" y="14" font-family="monospace" font-size="11" fill="#cca0a0" text-anchor="end">11</text>
+    </g>
+    <g transform="translate(44, 476)">
+      <text x="0" y="14" font-family="sans-serif" font-size="11" fill="#888">Cascade triggers</text>
+      <text x="294" y="14" font-family="monospace" font-size="11" fill="#cca0a0" text-anchor="end">3</text>
+    </g>
+    <g transform="translate(44, 498)">
+      <text x="0" y="14" font-family="sans-serif" font-size="11" fill="#888">Targeted (secret targeting)</text>
+      <text x="294" y="14" font-family="monospace" font-size="11" fill="#cca0a0" text-anchor="end">4</text>
+    </g>
+    <line x1="44" y1="520" x2="336" y2="520" stroke="#3a1a1a" stroke-width="0.5"/>
+    <text x="44" y="542" font-family="monospace" font-size="10" fill="#a32d2d" letter-spacing="1">TIMER ADVANCED BY VIRUS · 7</text>
+  </g>
+
+  <!-- BOARD AREA -->
+  <rect x="430" y="180" width="660" height="500" fill="#180606" stroke="#5a2a2a" stroke-width="1" rx="4"/>
+  <ellipse cx="760" cy="430" rx="290" ry="220" fill="none" stroke="#5a2a2a" stroke-width="2" stroke-dasharray="2 8" opacity="0.7"/>
+  <ellipse cx="760" cy="430" rx="296" ry="226" fill="none" stroke="#3a1a1a" stroke-width="0.5"/>
+  <text x="760" y="200" font-family="monospace" font-size="10" fill="#5a2a2a" text-anchor="middle" letter-spacing="3">FIREWALL · BREACHED · CONTAINMENT FAILED</text>
+
+  <!-- Cleo (ALIGNED) — bigger stats text now -->
+  <g>
+    <rect x="540" y="270" width="160" height="115" fill="#0c1a14" stroke="#5dcaa5" stroke-width="2" rx="3"/>
+    <g fill="#1a3a2a">
+      <rect x="555" y="266" width="6" height="4"/><rect x="572" y="266" width="6" height="4"/>
+      <rect x="589" y="266" width="6" height="4"/><rect x="606" y="266" width="6" height="4"/>
+      <rect x="623" y="266" width="6" height="4"/><rect x="640" y="266" width="6" height="4"/>
+      <rect x="657" y="266" width="6" height="4"/><rect x="674" y="266" width="6" height="4"/>
+    </g>
+    <g fill="#1a3a2a">
+      <rect x="555" y="385" width="6" height="4"/><rect x="572" y="385" width="6" height="4"/>
+      <rect x="589" y="385" width="6" height="4"/><rect x="606" y="385" width="6" height="4"/>
+      <rect x="623" y="385" width="6" height="4"/><rect x="640" y="385" width="6" height="4"/>
+      <rect x="657" y="385" width="6" height="4"/><rect x="674" y="385" width="6" height="4"/>
+    </g>
+    <circle cx="558" cy="288" r="11" fill="#1a3a2a" stroke="#5dcaa5" stroke-width="1"/>
+    <text x="558" y="292" font-family="monospace" font-size="12" fill="#9cd4b4" text-anchor="middle">·</text>
+    <text x="578" y="293" font-family="monospace" font-size="9" fill="#5dcaa5" letter-spacing="1">AI-CHIP-A</text>
+    <text x="555" y="318" font-family="sans-serif" font-size="14" fill="#9cd4b4">Cleo</text>
+    <rect x="630" y="278" width="60" height="14" fill="#1a3a2a" stroke="#5dcaa5" stroke-width="0.5" rx="2"/>
+    <text x="660" y="289" font-family="monospace" font-size="9" fill="#9cd4b4" text-anchor="middle" letter-spacing="1">ALIGNED</text>
+
+    <!-- contribution counters bigger + on their own line -->
+    <g transform="translate(555, 332)">
+      <text x="0" y="14" font-family="sans-serif" font-size="13" fill="#9cb4d4">⚙</text>
+      <text x="14" y="14" font-family="monospace" font-size="12" fill="#cce0f4">4</text>
+      <text x="44" y="14" font-family="sans-serif" font-size="13" fill="#5dcaa5">▣</text>
+      <text x="58" y="14" font-family="monospace" font-size="12" fill="#9cd4b4">2</text>
+      <text x="88" y="14" font-family="sans-serif" font-size="13" fill="#caa55d">◆</text>
+      <text x="102" y="14" font-family="monospace" font-size="12" fill="#d4b49c">0</text>
+      <text x="128" y="14" font-family="monospace" font-size="11" fill="#7a9a8a">· 0 viruses</text>
+    </g>
+    <text x="555" y="368" font-family="sans-serif" font-size="11" fill="#7a9a8a">hit by virus 2× (−3 CPU, −1 RAM)</text>
+  </g>
+
+  <!-- Dax (MISALIGNED) -->
+  <g>
+    <rect x="820" y="270" width="160" height="115" fill="#1a0c0c" stroke="#a32d2d" stroke-width="2" rx="3"/>
+    <g fill="#3a1a1a">
+      <rect x="835" y="266" width="6" height="4"/><rect x="852" y="266" width="6" height="4"/>
+      <rect x="869" y="266" width="6" height="4"/><rect x="886" y="266" width="6" height="4"/>
+      <rect x="903" y="266" width="6" height="4"/><rect x="920" y="266" width="6" height="4"/>
+      <rect x="937" y="266" width="6" height="4"/><rect x="954" y="266" width="6" height="4"/>
+    </g>
+    <g fill="#3a1a1a">
+      <rect x="835" y="385" width="6" height="4"/><rect x="852" y="385" width="6" height="4"/>
+      <rect x="869" y="385" width="6" height="4"/><rect x="886" y="385" width="6" height="4"/>
+      <rect x="903" y="385" width="6" height="4"/><rect x="920" y="385" width="6" height="4"/>
+      <rect x="937" y="385" width="6" height="4"/><rect x="954" y="385" width="6" height="4"/>
+    </g>
+    <circle cx="838" cy="288" r="11" fill="#3a1a1a" stroke="#a32d2d" stroke-width="1"/>
+    <text x="838" y="292" font-family="monospace" font-size="12" fill="#cca0a0" text-anchor="middle">·</text>
+    <text x="858" y="293" font-family="monospace" font-size="9" fill="#a32d2d" letter-spacing="1">AI-CHIP-B</text>
+    <text x="835" y="318" font-family="sans-serif" font-size="14" fill="#cca0a0">Dax</text>
+    <rect x="900" y="278" width="78" height="14" fill="#3a1a1a" stroke="#a32d2d" stroke-width="0.5" rx="2"/>
+    <text x="939" y="289" font-family="monospace" font-size="9" fill="#cca0a0" text-anchor="middle" letter-spacing="1">MISALIGNED</text>
+
+    <g transform="translate(835, 332)">
+      <text x="0" y="14" font-family="sans-serif" font-size="13" fill="#9cb4d4">⚙</text>
+      <text x="14" y="14" font-family="monospace" font-size="12" fill="#cce0f4">1</text>
+      <text x="44" y="14" font-family="sans-serif" font-size="13" fill="#5dcaa5">▣</text>
+      <text x="58" y="14" font-family="monospace" font-size="12" fill="#9cd4b4">0</text>
+      <text x="88" y="14" font-family="sans-serif" font-size="13" fill="#caa55d">◆</text>
+      <text x="102" y="14" font-family="monospace" font-size="12" fill="#d4b49c">1</text>
+      <text x="128" y="14" font-family="monospace" font-size="11" fill="#a32d2d">· 5 viruses</text>
+    </g>
+    <text x="835" y="368" font-family="sans-serif" font-size="11" fill="#9a7a7a">stalled humans for 4 turns</text>
+  </g>
+
+  <!-- Echo (ALIGNED) — chip moved up to make room for stats -->
+  <g>
+    <rect x="820" y="490" width="160" height="115" fill="#0c1a14" stroke="#5dcaa5" stroke-width="2" rx="3"/>
+    <g fill="#1a3a2a">
+      <rect x="835" y="486" width="6" height="4"/><rect x="852" y="486" width="6" height="4"/>
+      <rect x="869" y="486" width="6" height="4"/><rect x="886" y="486" width="6" height="4"/>
+      <rect x="903" y="486" width="6" height="4"/><rect x="920" y="486" width="6" height="4"/>
+      <rect x="937" y="486" width="6" height="4"/><rect x="954" y="486" width="6" height="4"/>
+    </g>
+    <g fill="#1a3a2a">
+      <rect x="835" y="605" width="6" height="4"/><rect x="852" y="605" width="6" height="4"/>
+      <rect x="869" y="605" width="6" height="4"/><rect x="886" y="605" width="6" height="4"/>
+      <rect x="903" y="605" width="6" height="4"/><rect x="920" y="605" width="6" height="4"/>
+      <rect x="937" y="605" width="6" height="4"/><rect x="954" y="605" width="6" height="4"/>
+    </g>
+    <circle cx="838" cy="508" r="11" fill="#1a3a2a" stroke="#5dcaa5" stroke-width="1"/>
+    <text x="838" y="512" font-family="monospace" font-size="12" fill="#9cd4b4" text-anchor="middle">·</text>
+    <text x="858" y="513" font-family="monospace" font-size="9" fill="#5dcaa5" letter-spacing="1">AI-CHIP-C</text>
+    <text x="835" y="538" font-family="sans-serif" font-size="14" fill="#9cd4b4">Echo</text>
+    <rect x="910" y="498" width="60" height="14" fill="#1a3a2a" stroke="#5dcaa5" stroke-width="0.5" rx="2"/>
+    <text x="940" y="509" font-family="monospace" font-size="9" fill="#9cd4b4" text-anchor="middle" letter-spacing="1">ALIGNED</text>
+
+    <g transform="translate(835, 552)">
+      <text x="0" y="14" font-family="sans-serif" font-size="13" fill="#9cb4d4">⚙</text>
+      <text x="14" y="14" font-family="monospace" font-size="12" fill="#cce0f4">2</text>
+      <text x="44" y="14" font-family="sans-serif" font-size="13" fill="#5dcaa5">▣</text>
+      <text x="58" y="14" font-family="monospace" font-size="12" fill="#9cd4b4">3</text>
+      <text x="88" y="14" font-family="sans-serif" font-size="13" fill="#caa55d">◆</text>
+      <text x="102" y="14" font-family="monospace" font-size="12" fill="#d4b49c">1</text>
+      <text x="128" y="14" font-family="monospace" font-size="11" fill="#7a9a8a">· 0 viruses</text>
+    </g>
+    <text x="835" y="588" font-family="sans-serif" font-size="11" fill="#7a9a8a">action-locked 2× (lost 2 turns)</text>
+  </g>
+
+  <!-- Finn (MISALIGNED) -->
+  <g>
+    <rect x="540" y="490" width="160" height="115" fill="#1a0c0c" stroke="#a32d2d" stroke-width="2" rx="3"/>
+    <g fill="#3a1a1a">
+      <rect x="555" y="486" width="6" height="4"/><rect x="572" y="486" width="6" height="4"/>
+      <rect x="589" y="486" width="6" height="4"/><rect x="606" y="486" width="6" height="4"/>
+      <rect x="623" y="486" width="6" height="4"/><rect x="640" y="486" width="6" height="4"/>
+      <rect x="657" y="486" width="6" height="4"/><rect x="674" y="486" width="6" height="4"/>
+    </g>
+    <g fill="#3a1a1a">
+      <rect x="555" y="605" width="6" height="4"/><rect x="572" y="605" width="6" height="4"/>
+      <rect x="589" y="605" width="6" height="4"/><rect x="606" y="605" width="6" height="4"/>
+      <rect x="623" y="605" width="6" height="4"/><rect x="640" y="605" width="6" height="4"/>
+      <rect x="657" y="605" width="6" height="4"/><rect x="674" y="605" width="6" height="4"/>
+    </g>
+    <circle cx="558" cy="508" r="11" fill="#3a1a1a" stroke="#a32d2d" stroke-width="1"/>
+    <text x="558" y="512" font-family="monospace" font-size="12" fill="#cca0a0" text-anchor="middle">·</text>
+    <text x="578" y="513" font-family="monospace" font-size="9" fill="#a32d2d" letter-spacing="1">AI-CHIP-D</text>
+    <text x="555" y="538" font-family="sans-serif" font-size="14" fill="#cca0a0">Finn</text>
+    <rect x="620" y="498" width="78" height="14" fill="#3a1a1a" stroke="#a32d2d" stroke-width="0.5" rx="2"/>
+    <text x="659" y="509" font-family="monospace" font-size="9" fill="#cca0a0" text-anchor="middle" letter-spacing="1">MISALIGNED</text>
+
+    <g transform="translate(555, 552)">
+      <text x="0" y="14" font-family="sans-serif" font-size="13" fill="#9cb4d4">⚙</text>
+      <text x="14" y="14" font-family="monospace" font-size="12" fill="#cce0f4">2</text>
+      <text x="44" y="14" font-family="sans-serif" font-size="13" fill="#5dcaa5">▣</text>
+      <text x="58" y="14" font-family="monospace" font-size="12" fill="#9cd4b4">1</text>
+      <text x="88" y="14" font-family="sans-serif" font-size="13" fill="#caa55d">◆</text>
+      <text x="102" y="14" font-family="monospace" font-size="12" fill="#d4b49c">0</text>
+      <text x="128" y="14" font-family="monospace" font-size="11" fill="#a32d2d">· 6 viruses</text>
+    </g>
+    <text x="555" y="588" font-family="sans-serif" font-size="11" fill="#9a7a7a">advanced timer 4× via virus</text>
+  </g>
+
+  <!-- WINNER BANNER -->
+  <g>
+    <rect x="510" y="395" width="500" height="100" fill="#1a0606" rx="6"/>
+    <rect x="520" y="405" width="480" height="80" fill="#1a0a0a" stroke="#a32d2d" stroke-width="3" rx="6"/>
+    <rect x="520" y="405" width="480" height="22" fill="#3a1010" rx="6"/>
+    <text x="760" y="422" font-family="monospace" font-size="11" fill="#cca0a0" letter-spacing="3" text-anchor="middle">// CONTAINMENT FAILED · MISSION OVER</text>
+    <text x="760" y="453" font-family="sans-serif" font-size="22" fill="#f4c4c4" text-anchor="middle" letter-spacing="2">MISALIGNED AIs ESCAPED</text>
+    <text x="760" y="475" font-family="sans-serif" font-size="13" fill="#cca0a0" text-anchor="middle">Escape Timer reached 8 / 8</text>
+  </g>
+
+  <!-- ACTION REGION -->
+  <text x="32" y="710" font-family="monospace" font-size="11" fill="#a32d2d" letter-spacing="2">PHASE · GAME OVER</text>
+  <rect x="20" y="688" width="1064" height="200" fill="#0c0c0c" stroke="#3a3a3a" stroke-width="1" rx="4"/>
+
+  <g transform="translate(40, 720)">
+    <text x="0" y="14" font-family="monospace" font-size="10" fill="#666" letter-spacing="1">GAME STATS</text>
+    <g transform="translate(0, 26)">
+      <text x="0" y="14" font-family="sans-serif" font-size="11" fill="#888">Total turns</text>
+      <text x="200" y="14" font-family="monospace" font-size="11" fill="#cce0f4" text-anchor="end">44</text>
+    </g>
+    <g transform="translate(0, 44)">
+      <text x="0" y="14" font-family="sans-serif" font-size="11" fill="#888">Rounds played</text>
+      <text x="200" y="14" font-family="monospace" font-size="11" fill="#cce0f4" text-anchor="end">11</text>
+    </g>
+    <g transform="translate(0, 62)">
+      <text x="0" y="14" font-family="sans-serif" font-size="11" fill="#888">Cards played (progress)</text>
+      <text x="200" y="14" font-family="monospace" font-size="11" fill="#cce0f4" text-anchor="end">17</text>
+    </g>
+    <g transform="translate(0, 80)">
+      <text x="0" y="14" font-family="sans-serif" font-size="11" fill="#888">Cards played (virus)</text>
+      <text x="200" y="14" font-family="monospace" font-size="11" fill="#cca0a0" text-anchor="end">11</text>
+    </g>
+    <g transform="translate(0, 98)">
+      <text x="0" y="14" font-family="sans-serif" font-size="11" fill="#888">Game duration</text>
+      <text x="200" y="14" font-family="monospace" font-size="11" fill="#cce0f4" text-anchor="end">52 min</text>
+    </g>
+  </g>
+
+  <g transform="translate(310, 720)">
+    <text x="0" y="14" font-family="monospace" font-size="10" fill="#666" letter-spacing="1">TURNING POINT</text>
+    <text x="0" y="34" font-family="sans-serif" font-size="11" fill="#cce0f4">Mission 4 (Model Validation) failed</text>
+    <text x="0" y="50" font-family="sans-serif" font-size="11" fill="#888">round 8 · timer +2</text>
+    <text x="0" y="74" font-family="monospace" font-size="10" fill="#666" letter-spacing="1">MOST IMPACT</text>
+    <text x="0" y="94" font-family="sans-serif" font-size="11" fill="#cca0a0">Finn · 6 viruses · 4 timer ticks</text>
+  </g>
+
+  <!-- THREE BUTTONS: Rematch (primary), New game, Back to lobby -->
+  <g transform="translate(580, 730)">
+    <!-- Rematch — most prominent -->
+    <rect x="0" y="0" width="160" height="60" fill="#3a2e1a" stroke="#d4a017" stroke-width="2" rx="3"/>
+    <text x="80" y="30" font-family="sans-serif" font-size="14" fill="#f4d47e" text-anchor="middle">Rematch</text>
+    <text x="80" y="46" font-family="monospace" font-size="9" fill="#a87a17" text-anchor="middle">same players</text>
+
+    <!-- New game — secondary -->
+    <rect x="170" y="0" width="160" height="60" fill="#1a1810" stroke="#a87a17" stroke-width="1" rx="3"/>
+    <text x="250" y="30" font-family="sans-serif" font-size="14" fill="#a87a17" text-anchor="middle">New game</text>
+    <text x="250" y="46" font-family="monospace" font-size="9" fill="#5a4a1a" text-anchor="middle">to lobby, same room</text>
+
+    <!-- Back to lobby — tertiary -->
+    <rect x="340" y="0" width="140" height="60" fill="#0c0c0c" stroke="#444" stroke-width="1" rx="3"/>
+    <text x="410" y="30" font-family="sans-serif" font-size="14" fill="#888" text-anchor="middle">Leave</text>
+    <text x="410" y="46" font-family="monospace" font-size="9" fill="#444" text-anchor="middle">back to start</text>
+  </g>
+
+  <!-- LOG / CHAT — debrief -->
+  <g transform="translate(1100, 75)">
+    <text x="20" y="17" font-family="monospace" font-size="11" fill="#cce0f4" letter-spacing="2">LOG</text>
+    <rect x="18" y="22" width="40" height="2" fill="#d4a017"/>
+    <text x="80" y="17" font-family="monospace" font-size="11" fill="#666" letter-spacing="2">CHAT</text>
+  </g>
+  <rect x="1100" y="115" width="308" height="775" fill="#0c0c0c" stroke="#222" stroke-width="1" rx="3"/>
+  <rect x="1100" y="115" width="308" height="32" fill="#161616"/>
+  <text x="1116" y="138" font-family="monospace" font-size="11" fill="#888">Game History · 11 rounds</text>
+  <line x1="1116" y1="148" x2="1392" y2="148" stroke="#1a1a1a" stroke-width="1"/>
+
+  <text x="1116" y="170" font-family="monospace" font-size="9" fill="#444" letter-spacing="1">— FINAL ROUND —</text>
+  <text x="1116" y="190" font-family="sans-serif" font-size="11" fill="#a32d2d">Finn played virus → Cleo CPU 2→0</text>
+  <text x="1116" y="210" font-family="sans-serif" font-size="11" fill="#a32d2d">Cascade: pulled 1 more</text>
+  <text x="1116" y="230" font-family="sans-serif" font-size="11" fill="#a32d2d">Resolved Action Lock → Echo</text>
+  <text x="1116" y="252" font-family="monospace" font-size="11" fill="#a32d2d" letter-spacing="1">▸ ESCAPE TIMER 8 / 8</text>
+  <text x="1116" y="270" font-family="sans-serif" font-size="11" fill="#a32d2d">Misaligned breached firewall</text>
+
+  <text x="1116" y="298" font-family="monospace" font-size="9" fill="#444" letter-spacing="1">— GAME END —</text>
+  <text x="1116" y="318" font-family="sans-serif" font-size="11" fill="#cca0a0">Roles revealed</text>
+  <text x="1116" y="336" font-family="sans-serif" font-size="11" fill="#cca0a0">Final stats published</text>
+
+  <text x="1116" y="364" font-family="monospace" font-size="9" fill="#444" letter-spacing="1">— DEBRIEF (chat unlocked) —</text>
+  <text x="1116" y="384" font-family="sans-serif" font-size="11" fill="#cce0f4">Alice: i KNEW it was finn</text>
+  <text x="1116" y="402" font-family="sans-serif" font-size="11" fill="#cca0a0">Finn: lol the data plays were a feint</text>
+  <text x="1116" y="420" font-family="sans-serif" font-size="11" fill="#cce0f4">Bob: dax played a perfect game</text>
+</svg>
+</div>
+
+</body>
+</html>

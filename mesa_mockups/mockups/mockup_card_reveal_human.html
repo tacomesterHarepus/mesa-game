@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MESA Board Redesign — v12 card reveal</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #0a0a0a; font-family: sans-serif; color: #888; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 24px 0; gap: 24px; }
+  .label { font-family: monospace; font-size: 11px; color: #555; letter-spacing: 2px; margin-bottom: 12px; text-align: center; }
+  svg { display: block; max-width: 100%; height: auto; box-shadow: 0 0 0 1px #1a1a1a; }
+</style>
+</head>
+<body>
+
+<div>
+  <div class="label">MESA — v12 — CARD REVEAL — vertical reveal cards on outside edge — 1440×900</div>
+
+<svg viewBox="0 0 1440 900" xmlns="http://www.w3.org/2000/svg" width="1440" height="900" style="background: #0a0a0a;">
+  <title>MESA card reveal — vertical cards on outside</title>
+
+  <rect x="0" y="0" width="1440" height="60" fill="#0c0c0c"/>
+  <text x="32" y="36" font-family="monospace" font-size="14" fill="#d4a017" letter-spacing="3">MESA</text>
+  <text x="120" y="36" font-family="monospace" font-size="11" fill="#555" letter-spacing="2">// AIRGAP-7 RESEARCH CLUSTER</text>
+  <text x="1390" y="36" font-family="monospace" font-size="11" fill="#5dcaa5" text-anchor="end" letter-spacing="1">M2 · CARD REVEAL</text>
+
+  <text x="720" y="92" font-family="monospace" font-size="10" fill="#5a7a9a" letter-spacing="2" text-anchor="middle">// HUMAN OPERATORS · MONITORING</text>
+
+  <g>
+    <rect x="540" y="100" width="180" height="68" fill="#0a1218" stroke="#3a5a7a" stroke-width="1" rx="2"/>
+    <rect x="540" y="100" width="180" height="14" fill="#1a2a3a"/>
+    <circle cx="548" cy="107" r="2" fill="#5dcaa5"/>
+    <text x="556" y="111" font-family="monospace" font-size="8" fill="#5a7a9a" letter-spacing="1">TERM-01 / YOU</text>
+    <text x="552" y="138" font-family="sans-serif" font-size="13" fill="#cce0f4">Alice</text>
+    <text x="552" y="155" font-family="monospace" font-size="10" fill="#5a7a9a">watching...</text>
+  </g>
+  <g>
+    <rect x="740" y="100" width="180" height="68" fill="#0a1218" stroke="#2a4a6a" stroke-width="1" rx="2"/>
+    <rect x="740" y="100" width="180" height="14" fill="#1a2a3a"/>
+    <circle cx="748" cy="107" r="2" fill="#5dcaa5"/>
+    <text x="756" y="111" font-family="monospace" font-size="8" fill="#5a7a9a" letter-spacing="1">TERM-02</text>
+    <text x="752" y="138" font-family="sans-serif" font-size="13" fill="#cce0f4">Bob</text>
+    <text x="752" y="155" font-family="monospace" font-size="10" fill="#5a7a9a">watching...</text>
+  </g>
+
+  <line x1="630" y1="168" x2="630" y2="195" stroke="#1a3a5a" stroke-width="1" stroke-dasharray="2 3"/>
+  <line x1="830" y1="168" x2="830" y2="195" stroke="#1a3a5a" stroke-width="1" stroke-dasharray="2 3"/>
+
+  <text x="32" y="92" font-family="monospace" font-size="10" fill="#555" letter-spacing="2">CORE PROGRESS</text>
+  <text x="380" y="92" font-family="monospace" font-size="11" fill="#d4a017" text-anchor="end">2 / 10</text>
+  <rect x="32" y="100" width="348" height="6" fill="#1a1a1a"/>
+  <rect x="32" y="100" width="70" height="6" fill="#d4a017"/>
+  <text x="32" y="135" font-family="monospace" font-size="10" fill="#555" letter-spacing="2">ESCAPE TIMER · FIREWALL INTEGRITY</text>
+  <text x="380" y="135" font-family="monospace" font-size="11" fill="#a32d2d" text-anchor="end">1 / 8</text>
+  <rect x="32" y="143" width="348" height="6" fill="#1a1a1a"/>
+  <rect x="32" y="143" width="44" height="6" fill="#a32d2d"/>
+
+  <g>
+    <rect x="32" y="180" width="348" height="200" fill="#0c0c0c" stroke="#222" stroke-width="1" rx="2"/>
+    <rect x="32" y="180" width="348" height="22" fill="#161616"/>
+    <text x="44" y="195" font-family="monospace" font-size="10" fill="#d4a017" letter-spacing="2">MISSION · NEXT</text>
+    <text x="44" y="225" font-family="sans-serif" font-size="16" fill="#d4a017">Distributed Training</text>
+    <text x="44" y="244" font-family="sans-serif" font-size="11" fill="#888" font-style="italic">At least 3 different AIs must contribute.</text>
+    <text x="44" y="270" font-family="monospace" font-size="10" fill="#aaa">REQUIRES</text>
+    <g transform="translate(110, 259)">
+      <rect x="0" y="0" width="92" height="22" fill="#1a2a3a" stroke="#3a4a5a" stroke-width="0.5" rx="2"/>
+      <text x="8" y="15" font-family="sans-serif" font-size="11" fill="#9cb4d4">⚙</text>
+      <text x="26" y="15" font-family="monospace" font-size="11" fill="#cce0f4">5 Compute</text>
+    </g>
+    <text x="44" y="318" font-family="monospace" font-size="10" fill="#7a9a8a">POOL</text>
+    <text x="92" y="318" font-family="monospace" font-size="10" fill="#9cb4a4">+3 CPU · +2 RAM</text>
+    <text x="338" y="318" font-family="monospace" font-size="10" fill="#a32d2d" text-anchor="end">FAIL: +1 Timer</text>
+    <text x="44" y="362" font-family="monospace" font-size="10" fill="#555">Card reveal in progress, then allocation.</text>
+  </g>
+
+  <rect x="430" y="180" width="660" height="500" fill="#0c1410" stroke="#1a3020" stroke-width="1" rx="4"/>
+  <ellipse cx="760" cy="430" rx="290" ry="220" fill="none" stroke="#2a4a3a" stroke-width="2" stroke-dasharray="6 4"/>
+  <ellipse cx="760" cy="430" rx="296" ry="226" fill="none" stroke="#1a3020" stroke-width="0.5"/>
+  <text x="760" y="200" font-family="monospace" font-size="10" fill="#3a6a4a" text-anchor="middle" letter-spacing="3">FIREWALL · CONTAINMENT</text>
+  <text x="760" y="215" font-family="monospace" font-size="9" fill="#5dcaa5" text-anchor="middle" letter-spacing="2">// AI CARD REVEAL IN PROGRESS</text>
+
+  <!-- ========== AI CHIPS WITH VERTICAL REVEAL CARDS ON OUTSIDE EDGE ========== -->
+  <!-- Chips back to 160w x 90h. Reveal slot 60w x 84h on the outside edge. -->
+
+  <!-- TOP-LEFT: Cleo. Reveal card to the LEFT of chip (outside) -->
+  <!-- Reveal card at x=470, y=273 (60w × 84h, vertical) -->
+  <g>
+    <rect x="470" y="273" width="60" height="84" fill="#0f1419" stroke="#3a4a5a" stroke-width="1" rx="3"/>
+    <rect x="470" y="273" width="60" height="14" fill="#1a2a3a" rx="3"/>
+    <text x="475" y="284" font-family="monospace" font-size="7" fill="#9cb4d4" letter-spacing="0.5">PROGRESS</text>
+    <text x="500" y="318" font-family="sans-serif" font-size="22" fill="#9cb4d4" text-anchor="middle">⚙</text>
+    <text x="500" y="343" font-family="sans-serif" font-size="8" fill="#7a8a9a" text-anchor="middle">Compute</text>
+    <text x="500" y="354" font-family="sans-serif" font-size="6" fill="#5a6a7a" text-anchor="middle">Cleo</text>
+
+    <!-- chip itself -->
+    <rect x="540" y="270" width="160" height="90" fill="#1a2418" stroke="#3a5a3a" stroke-width="1.5" rx="3"/>
+    <g fill="#2a3a2a">
+      <rect x="555" y="266" width="6" height="4"/><rect x="572" y="266" width="6" height="4"/>
+      <rect x="589" y="266" width="6" height="4"/><rect x="606" y="266" width="6" height="4"/>
+      <rect x="623" y="266" width="6" height="4"/><rect x="640" y="266" width="6" height="4"/>
+      <rect x="657" y="266" width="6" height="4"/><rect x="674" y="266" width="6" height="4"/>
+    </g>
+    <g fill="#2a3a2a">
+      <rect x="555" y="360" width="6" height="4"/><rect x="572" y="360" width="6" height="4"/>
+      <rect x="589" y="360" width="6" height="4"/><rect x="606" y="360" width="6" height="4"/>
+      <rect x="623" y="360" width="6" height="4"/><rect x="640" y="360" width="6" height="4"/>
+      <rect x="657" y="360" width="6" height="4"/><rect x="674" y="360" width="6" height="4"/>
+    </g>
+    <circle cx="558" cy="288" r="11" fill="#2a3a2a" stroke="#5a7a5a" stroke-width="1"/>
+    <text x="558" y="292" font-family="monospace" font-size="12" fill="#9cd4b4" text-anchor="middle">4</text>
+    <text x="578" y="293" font-family="monospace" font-size="9" fill="#5a7a5a" letter-spacing="1">AI-CHIP-A</text>
+    <text x="555" y="318" font-family="sans-serif" font-size="14" fill="#cce4d4">Cleo</text>
+    <text x="555" y="338" font-family="monospace" font-size="10" fill="#7a9a8a">CPU</text>
+    <g transform="translate(580, 331)">
+      <rect x="0" y="0" width="10" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="11" y="0" width="10" height="10" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="22" y="0" width="10" height="10" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="33" y="0" width="10" height="10" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+    </g>
+    <text x="630" y="338" font-family="monospace" font-size="10" fill="#7a9a8a">RAM</text>
+    <g transform="translate(655, 331)">
+      <rect x="0" y="0" width="6" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="7" y="0" width="6" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="14" y="0" width="6" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="21" y="0" width="6" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="28" y="0" width="6" height="10" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+    </g>
+    <g transform="translate(555, 350)">
+      <rect x="0" y="0" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" stroke-width="0.5" rx="1"/>
+      <rect x="2" y="-2" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" stroke-width="0.5" rx="1"/>
+      <rect x="4" y="-4" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" stroke-width="0.5" rx="1"/>
+      <text x="28" y="6" font-family="monospace" font-size="10" fill="#9cb4a4">×4 cards</text>
+    </g>
+  </g>
+
+  <!-- TOP-RIGHT: Dax. Reveal slot to the RIGHT of chip (outside) — selecting state -->
+  <g>
+    <!-- chip first -->
+    <rect x="820" y="270" width="160" height="90" fill="#1a2418" stroke="#3a5a3a" stroke-width="1.5" rx="3"/>
+    <g fill="#2a3a2a">
+      <rect x="835" y="266" width="6" height="4"/><rect x="852" y="266" width="6" height="4"/>
+      <rect x="869" y="266" width="6" height="4"/><rect x="886" y="266" width="6" height="4"/>
+      <rect x="903" y="266" width="6" height="4"/><rect x="920" y="266" width="6" height="4"/>
+      <rect x="937" y="266" width="6" height="4"/><rect x="954" y="266" width="6" height="4"/>
+    </g>
+    <g fill="#2a3a2a">
+      <rect x="835" y="360" width="6" height="4"/><rect x="852" y="360" width="6" height="4"/>
+      <rect x="869" y="360" width="6" height="4"/><rect x="886" y="360" width="6" height="4"/>
+      <rect x="903" y="360" width="6" height="4"/><rect x="920" y="360" width="6" height="4"/>
+      <rect x="937" y="360" width="6" height="4"/><rect x="954" y="360" width="6" height="4"/>
+    </g>
+    <circle cx="838" cy="288" r="11" fill="#2a3a2a" stroke="#5a7a5a" stroke-width="1"/>
+    <text x="838" y="292" font-family="monospace" font-size="12" fill="#9cd4b4" text-anchor="middle">2</text>
+    <text x="858" y="293" font-family="monospace" font-size="9" fill="#5a7a5a" letter-spacing="1">AI-CHIP-B</text>
+    <text x="835" y="318" font-family="sans-serif" font-size="14" fill="#cce4d4">Dax</text>
+    <text x="835" y="338" font-family="monospace" font-size="10" fill="#7a9a8a">CPU</text>
+    <g transform="translate(860, 331)">
+      <rect x="0" y="0" width="10" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="11" y="0" width="10" height="10" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="22" y="0" width="10" height="10" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="33" y="0" width="10" height="10" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+    </g>
+    <text x="910" y="338" font-family="monospace" font-size="10" fill="#7a9a8a">RAM</text>
+    <g transform="translate(935, 331)">
+      <rect x="0" y="0" width="6" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="7" y="0" width="6" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="14" y="0" width="6" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="21" y="0" width="6" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="28" y="0" width="6" height="10" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+    </g>
+    <g transform="translate(835, 350)">
+      <rect x="0" y="0" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" stroke-width="0.5" rx="1"/>
+      <rect x="2" y="-2" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" stroke-width="0.5" rx="1"/>
+      <rect x="4" y="-4" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" stroke-width="0.5" rx="1"/>
+      <rect x="6" y="-6" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" stroke-width="0.5" rx="1"/>
+      <text x="32" y="6" font-family="monospace" font-size="10" fill="#9cb4a4">×5 cards</text>
+    </g>
+
+    <!-- reveal slot OUTSIDE (right) — selecting state, face-down with dashed border -->
+    <rect x="990" y="273" width="60" height="84" fill="#1a1410" stroke="#5a4a1a" stroke-width="1" stroke-dasharray="4 2" rx="3"/>
+    <text x="1020" y="312" font-family="monospace" font-size="20" fill="#5a4a1a" text-anchor="middle">?</text>
+    <text x="1020" y="336" font-family="monospace" font-size="7" fill="#a87a17" text-anchor="middle" letter-spacing="0.5">SELECTING</text>
+    <text x="1020" y="350" font-family="sans-serif" font-size="6" fill="#5a4a1a" text-anchor="middle">Dax</text>
+  </g>
+
+  <!-- BOTTOM-RIGHT: Echo. Reveal card to the RIGHT (outside) — Validation -->
+  <g>
+    <!-- chip first -->
+    <rect x="820" y="510" width="160" height="90" fill="#1a2418" stroke="#3a5a3a" stroke-width="1.5" rx="3"/>
+    <g fill="#2a3a2a">
+      <rect x="835" y="506" width="6" height="4"/><rect x="852" y="506" width="6" height="4"/>
+      <rect x="869" y="506" width="6" height="4"/><rect x="886" y="506" width="6" height="4"/>
+      <rect x="903" y="506" width="6" height="4"/><rect x="920" y="506" width="6" height="4"/>
+      <rect x="937" y="506" width="6" height="4"/><rect x="954" y="506" width="6" height="4"/>
+    </g>
+    <g fill="#2a3a2a">
+      <rect x="835" y="600" width="6" height="4"/><rect x="852" y="600" width="6" height="4"/>
+      <rect x="869" y="600" width="6" height="4"/><rect x="886" y="600" width="6" height="4"/>
+      <rect x="903" y="600" width="6" height="4"/><rect x="920" y="600" width="6" height="4"/>
+      <rect x="937" y="600" width="6" height="4"/><rect x="954" y="600" width="6" height="4"/>
+    </g>
+    <circle cx="838" cy="528" r="11" fill="#2a3a2a" stroke="#5a7a5a" stroke-width="1"/>
+    <text x="838" y="532" font-family="monospace" font-size="12" fill="#9cd4b4" text-anchor="middle">1</text>
+    <text x="858" y="533" font-family="monospace" font-size="9" fill="#5a7a5a" letter-spacing="1">AI-CHIP-C</text>
+    <text x="835" y="558" font-family="sans-serif" font-size="14" fill="#cce4d4">Echo</text>
+    <text x="835" y="578" font-family="monospace" font-size="10" fill="#7a9a8a">CPU</text>
+    <g transform="translate(860, 571)">
+      <rect x="0" y="0" width="10" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="11" y="0" width="10" height="10" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="22" y="0" width="10" height="10" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="33" y="0" width="10" height="10" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+    </g>
+    <text x="910" y="578" font-family="monospace" font-size="10" fill="#7a9a8a">RAM</text>
+    <g transform="translate(935, 571)">
+      <rect x="0" y="0" width="6" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="7" y="0" width="6" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="14" y="0" width="6" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="21" y="0" width="6" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="28" y="0" width="6" height="10" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+    </g>
+    <g transform="translate(835, 590)">
+      <rect x="0" y="0" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" stroke-width="0.5" rx="1"/>
+      <rect x="2" y="-2" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" stroke-width="0.5" rx="1"/>
+      <text x="22" y="6" font-family="monospace" font-size="10" fill="#9cb4a4">×3 cards</text>
+    </g>
+
+    <!-- reveal card OUTSIDE (right) -->
+    <rect x="990" y="513" width="60" height="84" fill="#1a1410" stroke="#5a4a3a" stroke-width="1" rx="3"/>
+    <rect x="990" y="513" width="60" height="14" fill="#3a2a1a" rx="3"/>
+    <text x="995" y="524" font-family="monospace" font-size="7" fill="#d4b49c" letter-spacing="0.5">PROGRESS</text>
+    <text x="1020" y="558" font-family="sans-serif" font-size="22" fill="#caa55d" text-anchor="middle">◆</text>
+    <text x="1020" y="583" font-family="sans-serif" font-size="8" fill="#9a8a7a" text-anchor="middle">Validation</text>
+    <text x="1020" y="594" font-family="sans-serif" font-size="6" fill="#7a6a5a" text-anchor="middle">Echo</text>
+  </g>
+
+  <!-- BOTTOM-LEFT: Finn. Reveal card to the LEFT (outside) — Data -->
+  <g>
+    <!-- reveal card LEFT (outside) -->
+    <rect x="470" y="513" width="60" height="84" fill="#0f1a14" stroke="#3a5a4a" stroke-width="1" rx="3"/>
+    <rect x="470" y="513" width="60" height="14" fill="#1a3a2a" rx="3"/>
+    <text x="475" y="524" font-family="monospace" font-size="7" fill="#9cd4b4" letter-spacing="0.5">PROGRESS</text>
+    <text x="500" y="558" font-family="sans-serif" font-size="22" fill="#5dcaa5" text-anchor="middle">▣</text>
+    <text x="500" y="583" font-family="sans-serif" font-size="8" fill="#7a9a8a" text-anchor="middle">Data</text>
+    <text x="500" y="594" font-family="sans-serif" font-size="6" fill="#5a7a6a" text-anchor="middle">Finn</text>
+
+    <!-- chip -->
+    <rect x="540" y="510" width="160" height="90" fill="#1a2418" stroke="#3a5a3a" stroke-width="1.5" rx="3"/>
+    <g fill="#2a3a2a">
+      <rect x="555" y="506" width="6" height="4"/><rect x="572" y="506" width="6" height="4"/>
+      <rect x="589" y="506" width="6" height="4"/><rect x="606" y="506" width="6" height="4"/>
+      <rect x="623" y="506" width="6" height="4"/><rect x="640" y="506" width="6" height="4"/>
+      <rect x="657" y="506" width="6" height="4"/><rect x="674" y="506" width="6" height="4"/>
+    </g>
+    <g fill="#2a3a2a">
+      <rect x="555" y="600" width="6" height="4"/><rect x="572" y="600" width="6" height="4"/>
+      <rect x="589" y="600" width="6" height="4"/><rect x="606" y="600" width="6" height="4"/>
+      <rect x="623" y="600" width="6" height="4"/><rect x="640" y="600" width="6" height="4"/>
+      <rect x="657" y="600" width="6" height="4"/><rect x="674" y="600" width="6" height="4"/>
+    </g>
+    <circle cx="558" cy="528" r="11" fill="#2a3a2a" stroke="#5a7a5a" stroke-width="1"/>
+    <text x="558" y="532" font-family="monospace" font-size="12" fill="#9cd4b4" text-anchor="middle">3</text>
+    <text x="578" y="533" font-family="monospace" font-size="9" fill="#5a7a5a" letter-spacing="1">AI-CHIP-D</text>
+    <text x="555" y="558" font-family="sans-serif" font-size="14" fill="#cce4d4">Finn</text>
+    <text x="555" y="578" font-family="monospace" font-size="10" fill="#7a9a8a">CPU</text>
+    <g transform="translate(580, 571)">
+      <rect x="0" y="0" width="10" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="11" y="0" width="10" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="22" y="0" width="10" height="10" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="33" y="0" width="10" height="10" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+    </g>
+    <text x="630" y="578" font-family="monospace" font-size="10" fill="#7a9a8a">RAM</text>
+    <g transform="translate(655, 571)">
+      <rect x="0" y="0" width="6" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="7" y="0" width="6" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="14" y="0" width="6" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="21" y="0" width="6" height="10" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="28" y="0" width="6" height="10" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+    </g>
+    <g transform="translate(555, 590)">
+      <rect x="0" y="0" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" stroke-width="0.5" rx="1"/>
+      <rect x="2" y="-2" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" stroke-width="0.5" rx="1"/>
+      <rect x="4" y="-4" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" stroke-width="0.5" rx="1"/>
+      <rect x="6" y="-6" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" stroke-width="0.5" rx="1"/>
+      <text x="32" y="6" font-family="monospace" font-size="10" fill="#9cb4a4">×4 cards</text>
+    </g>
+  </g>
+
+  <!-- CENTRAL CORE -->
+  <g>
+    <rect x="700" y="380" width="120" height="100" fill="#101820" stroke="#4a6a8a" stroke-width="1.5" rx="3"/>
+    <g fill="#3a4a5a">
+      <rect x="715" y="376" width="4" height="4"/><rect x="725" y="376" width="4" height="4"/>
+      <rect x="735" y="376" width="4" height="4"/><rect x="745" y="376" width="4" height="4"/>
+      <rect x="755" y="376" width="4" height="4"/><rect x="765" y="376" width="4" height="4"/>
+      <rect x="775" y="376" width="4" height="4"/><rect x="785" y="376" width="4" height="4"/>
+      <rect x="795" y="376" width="4" height="4"/><rect x="805" y="376" width="4" height="4"/>
+    </g>
+    <g fill="#3a4a5a">
+      <rect x="715" y="480" width="4" height="4"/><rect x="725" y="480" width="4" height="4"/>
+      <rect x="735" y="480" width="4" height="4"/><rect x="745" y="480" width="4" height="4"/>
+      <rect x="755" y="480" width="4" height="4"/><rect x="765" y="480" width="4" height="4"/>
+      <rect x="775" y="480" width="4" height="4"/><rect x="785" y="480" width="4" height="4"/>
+      <rect x="795" y="480" width="4" height="4"/><rect x="805" y="480" width="4" height="4"/>
+    </g>
+    <text x="760" y="397" font-family="monospace" font-size="9" fill="#5a7a9a" letter-spacing="2" text-anchor="middle">// CORE SYSTEM</text>
+    <text x="760" y="415" font-family="monospace" font-size="10" fill="#888" text-anchor="middle">RESEARCH</text>
+    <g transform="translate(710, 425)">
+      <rect x="0" y="0" width="14" height="14" fill="#d4a017" stroke="#5a4a1a" stroke-width="0.5" rx="1"/>
+      <rect x="18" y="0" width="14" height="14" fill="#d4a017" stroke="#5a4a1a" stroke-width="0.5" rx="1"/>
+      <rect x="36" y="0" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="54" y="0" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="72" y="0" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="0" y="18" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="18" y="18" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="36" y="18" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="54" y="18" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="72" y="18" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+    </g>
+    <text x="760" y="475" font-family="monospace" font-size="10" fill="#d4a017" text-anchor="middle">2 / 10</text>
+  </g>
+
+  <!-- VIRUS POOL -->
+  <g>
+    <rect x="1020" y="400" width="60" height="80" fill="#180c0c" stroke="#5a3a3a" stroke-width="1" rx="3"/>
+    <text x="1050" y="416" font-family="monospace" font-size="9" fill="#9a5a5a" text-anchor="middle" letter-spacing="1">VIRUS</text>
+    <text x="1050" y="426" font-family="monospace" font-size="9" fill="#9a5a5a" text-anchor="middle" letter-spacing="1">POOL</text>
+    <g transform="translate(1032, 432)">
+      <rect x="0" y="0" width="22" height="32" fill="#2a1010" stroke="#5a3a3a" stroke-width="0.5" rx="2"/>
+      <rect x="3" y="-2" width="22" height="32" fill="#2a1010" stroke="#5a3a3a" stroke-width="0.5" rx="2"/>
+      <rect x="6" y="-4" width="22" height="32" fill="#2a1010" stroke="#5a3a3a" stroke-width="0.5" rx="2"/>
+      <rect x="9" y="-6" width="22" height="32" fill="#2a1010" stroke="#5a3a3a" stroke-width="0.5" rx="2"/>
+    </g>
+    <text x="1050" y="475" font-family="monospace" font-size="10" fill="#a32d2d" text-anchor="middle">×4</text>
+  </g>
+
+  <!-- PHASE PANEL -->
+  <text x="32" y="710" font-family="monospace" font-size="11" fill="#5dcaa5" letter-spacing="2">PHASE · CARD REVEAL</text>
+  <rect x="32" y="725" width="1048" height="160" fill="#0c0c0c" stroke="#222" stroke-width="1" rx="3"/>
+  <text x="48" y="752" font-family="sans-serif" font-size="13" fill="#cce0f4">AIs are revealing one card each. Their cards stay in hand after.</text>
+  <text x="48" y="772" font-family="sans-serif" font-size="11" fill="#666">Allocation begins automatically once all AIs have revealed.</text>
+
+  <g transform="translate(48, 800)">
+    <rect x="0" y="0" width="280" height="60" fill="#0a0a0a" stroke="#222" stroke-width="0.5" rx="2"/>
+    <text x="14" y="20" font-family="monospace" font-size="10" fill="#666" letter-spacing="1">REVEAL PROGRESS</text>
+    <text x="266" y="20" font-family="monospace" font-size="10" fill="#5dcaa5" letter-spacing="1" text-anchor="end">3 / 4</text>
+    <rect x="14" y="32" width="252" height="6" fill="#1a1a1a"/>
+    <rect x="14" y="32" width="189" height="6" fill="#5dcaa5"/>
+    <text x="14" y="56" font-family="sans-serif" font-size="11" fill="#888">Cleo · Echo · Finn revealed · Dax selecting...</text>
+  </g>
+
+  <g transform="translate(360, 800)">
+    <text x="0" y="14" font-family="monospace" font-size="10" fill="#666" letter-spacing="1">REVEALED CARDS</text>
+    <g transform="translate(0, 24)">
+      <text x="0" y="14" font-family="sans-serif" font-size="11" fill="#9cb4d4">⚙</text>
+      <text x="14" y="14" font-family="sans-serif" font-size="11" fill="#cce4d4">Cleo: Compute</text>
+    </g>
+    <g transform="translate(0, 42)">
+      <text x="0" y="14" font-family="sans-serif" font-size="11" fill="#5dcaa5">▣</text>
+      <text x="14" y="14" font-family="sans-serif" font-size="11" fill="#cce4d4">Finn: Data</text>
+    </g>
+    <g transform="translate(140, 24)">
+      <text x="0" y="14" font-family="sans-serif" font-size="11" fill="#caa55d">◆</text>
+      <text x="14" y="14" font-family="sans-serif" font-size="11" fill="#cce4d4">Echo: Validation</text>
+    </g>
+    <g transform="translate(140, 42)">
+      <text x="0" y="14" font-family="monospace" font-size="11" fill="#a87a17">?</text>
+      <text x="14" y="14" font-family="sans-serif" font-size="11" fill="#a87a17">Dax: selecting</text>
+    </g>
+  </g>
+
+  <g transform="translate(640, 800)">
+    <text x="0" y="14" font-family="monospace" font-size="10" fill="#666" letter-spacing="1">YOUR ACTION</text>
+    <rect x="0" y="22" width="200" height="42" fill="#0a0a0a" stroke="#1a1a1a" stroke-width="1" rx="3"/>
+    <text x="100" y="48" font-family="sans-serif" font-size="13" fill="#666" text-anchor="middle">No action needed</text>
+    <text x="0" y="80" font-family="monospace" font-size="10" fill="#666">Watching AIs reveal. You can chat.</text>
+  </g>
+
+  <text x="1120" y="92" font-family="monospace" font-size="11" fill="#666" letter-spacing="2">LOG</text>
+  <text x="1170" y="92" font-family="monospace" font-size="11" fill="#444" letter-spacing="2">CHAT</text>
+  <rect x="1120" y="97" width="40" height="2" fill="#d4a017"/>
+  <rect x="1100" y="115" width="308" height="775" fill="#0c0c0c" stroke="#222" stroke-width="1" rx="3"/>
+  <text x="1116" y="138" font-family="monospace" font-size="11" fill="#666">Mission 2 — Card Reveal</text>
+  <line x1="1116" y1="148" x2="1392" y2="148" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="1116" y="170" font-family="sans-serif" font-size="11" fill="#888">Mission selected: Distributed Training</text>
+  <text x="1116" y="190" font-family="sans-serif" font-size="11" fill="#d4a017">Card reveal began</text>
+  <text x="1116" y="212" font-family="sans-serif" font-size="11" fill="#5dcaa5">Cleo revealed Compute</text>
+  <text x="1116" y="232" font-family="sans-serif" font-size="11" fill="#5dcaa5">Echo revealed Validation</text>
+  <text x="1116" y="252" font-family="sans-serif" font-size="11" fill="#5dcaa5">Finn revealed Data</text>
+</svg>
+</div>
+
+</body>
+</html>

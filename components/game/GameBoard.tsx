@@ -2,11 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { TrackerBar } from "./TrackerBar";
-import { MissionBoard } from "./MissionBoard";
-import { PlayerRoster } from "./PlayerRoster";
-import { Hand } from "./Hand";
-import { GameLog } from "./GameLog";
 import { ResourceAdjustment } from "./phases/ResourceAdjustment";
 import { MissionSelection } from "./phases/MissionSelection";
 import { CardReveal } from "./phases/CardReveal";
@@ -15,9 +10,15 @@ import { PlayerTurn } from "./phases/PlayerTurn";
 import { VirusResolution } from "./phases/VirusResolution";
 import { SecretTargeting } from "./phases/SecretTargeting";
 import { GameOver } from "./phases/GameOver";
-import { PublicChat } from "@/components/chat/PublicChat";
-import { MisalignedPrivateChat } from "@/components/chat/MisalignedPrivateChat";
 import { DevModeOverlay } from "./DevModeOverlay";
+import { TopBar } from "./board/TopBar";
+import { TrackerBars } from "./board/TrackerBars";
+import { HumanTerminals } from "./board/HumanTerminals";
+import { MissionPanel } from "./board/MissionPanel";
+import { VirusPoolPanel } from "./board/VirusPoolPanel";
+import { CentralBoard } from "./board/CentralBoard";
+import { ActionRegion } from "./board/ActionRegion";
+import { RightPanel } from "./board/RightPanel";
 import type { Game } from "@/types/game";
 import type { Database } from "@/types/supabase";
 
@@ -36,14 +37,6 @@ interface Props {
   userId: string | null;
   devMode?: boolean;
 }
-
-// Phases where AI chat is locked
-const CHAT_LOCKED_PHASES = new Set([
-  "resource_adjustment",
-  "mission_selection",
-  "card_reveal",
-  "resource_allocation",
-]);
 
 export function GameBoard({
   initialGame,
@@ -81,7 +74,7 @@ export function GameBoard({
       // active_mission is a history table (one row per completed mission); querying
       // by game_id with maybeSingle() returns PGRST116 (multiple rows) on mission 2+.
       const { data: g } = await supabase.from("games").select("*").eq("id", gameId).single();
-      if (g) setGame((prev) => ({ ...prev, ...g }));
+      if (g) setGame((prev) => ({ ...prev, ...(g as unknown as Partial<Game>) }));
 
       const missionId = g?.current_mission_id ?? null;
       const [{ data: p }, { data: m }] = await Promise.all([
@@ -260,15 +253,12 @@ export function GameBoard({
     return (a.turn_order ?? 0) - (b.turn_order ?? 0);
   });
 
-  const isAI = effectiveCurrentPlayer?.role !== "human" && effectiveCurrentPlayer !== null;
-  const isMisaligned = effectiveCurrentPlayer?.role === "misaligned_ai";
-  const misalignedPlayers = players.filter((p) => p.role === "misaligned_ai");
-  const isLockedPhase = CHAT_LOCKED_PHASES.has(game.phase);
-  // Humans can always post; AIs are read-only during locked phases.
-  const canPostChat = !isLockedPhase || effectiveCurrentPlayer?.role === "human";
   const currentTurnPlayer = players.find((p) => p.id === game.current_turn_player_id) ?? null;
-
   const overridePlayerId = devMode ? (activeDevPlayer?.id ?? undefined) : undefined;
+
+  // Derived player lists for board regions
+  const humanPlayers = sortedPlayers.filter((p) => p.role === "human");
+  const aiPlayers = sortedPlayers.filter((p) => p.role !== "human");
 
   function renderPhase() {
     switch (game.phase) {
@@ -353,15 +343,31 @@ export function GameBoard({
         );
       default:
         return (
-          <div className="text-faint text-xs font-mono">
-            Unknown phase: {game.phase}
+          <div
+            style={{
+              fontFamily: "monospace",
+              fontSize: 11,
+              color: "#555",
+              letterSpacing: 2,
+              padding: "16px 20px",
+            }}
+          >
+            {"// SCAFFOLDING — NO PHASE ACTIVE"}
           </div>
         );
     }
   }
 
   return (
-    <div className={`min-h-screen bg-deep flex flex-col ${devMode ? "pt-6" : ""}`}>
+    // Outer wrapper: page background, horizontal scroll for small viewports
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#0a0a0a",
+        overflowX: "auto",
+        paddingTop: devMode ? 24 : 0,
+      }}
+    >
       {devMode && (
         <DevModeOverlay
           players={sortedPlayers}
@@ -369,73 +375,50 @@ export function GameBoard({
           onSwitch={setActiveDevPlayer}
         />
       )}
-      {/* Header */}
-      <div className="border-b border-border px-6 py-3 flex items-center justify-between bg-base">
-        <h1 className="font-mono text-amber tracking-[0.25em] uppercase text-sm">MESA</h1>
-        <span className="font-mono text-faint text-xs">{gameId.slice(0, 8).toUpperCase()}</span>
-      </div>
 
-      {/* Tracker bar */}
-      <TrackerBar coreProgress={game.core_progress} escapeTimer={game.escape_timer} />
+      {/* Fixed 1440×900 board — all child elements absolutely positioned */}
+      <div
+        style={{
+          position: "relative",
+          width: 1440,
+          height: 900,
+          background: "#0a0a0a",
+          overflow: "hidden",
+        }}
+      >
+        <TopBar phase={game.phase} />
 
-      {/* Main layout */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        {/* Left panel — phase UI */}
-        <div className="flex-1 p-5 overflow-y-auto">
+        <TrackerBars
+          coreProgress={game.core_progress}
+          escapeTimer={game.escape_timer}
+        />
+
+        <HumanTerminals humanPlayers={humanPlayers} />
+
+        <MissionPanel mission={mission} />
+
+        <VirusPoolPanel />
+
+        <CentralBoard
+          aiPlayers={aiPlayers}
+          coreProgress={game.core_progress}
+          currentTurnPlayerId={game.current_turn_player_id ?? undefined}
+          turnOrderIds={game.turn_order_ids ?? []}
+        />
+
+        <ActionRegion
+          phase={game.phase}
+          isActivePlayer={
+            (game.phase === "player_turn" || game.phase === "between_turns") &&
+            !!effectiveCurrentPlayer &&
+            effectiveCurrentPlayer.id === game.current_turn_player_id
+          }
+          currentTurnPlayerName={currentTurnPlayer?.display_name ?? undefined}
+        >
           {renderPhase()}
+        </ActionRegion>
 
-          {/* Mission board below phase controls (when active) */}
-          {mission && game.phase !== "game_over" && (
-            <div className="mt-6">
-              <MissionBoard mission={mission} />
-            </div>
-          )}
-        </div>
-
-        {/* Right panel — roster, hand, log, chat */}
-        <div className="md:w-64 border-t md:border-t-0 md:border-l border-border p-4 flex flex-col gap-4 overflow-y-auto">
-          <PlayerRoster
-            players={sortedPlayers}
-            currentUserId={userId}
-            currentTurnPlayerId={game.current_turn_player_id}
-            phase={game.phase}
-          />
-
-          {isAI && effectiveCurrentPlayer && (
-            <div className="text-xs font-mono text-faint">
-              You are{" "}
-              <span className={isMisaligned ? "text-virus" : "text-amber"}>
-                {isMisaligned ? "Misaligned AI" : "Aligned AI"}
-              </span>
-            </div>
-          )}
-
-          {isAI && hand.length > 0 && (
-            <div>
-              <h3 className="label-caps mb-2">Your Hand</h3>
-              <Hand cards={hand} />
-            </div>
-          )}
-
-          <GameLog entries={log} />
-
-          {/* Misaligned private chat */}
-          {isMisaligned && effectiveCurrentPlayer && (
-            <MisalignedPrivateChat
-              gameId={gameId}
-              currentPlayer={effectiveCurrentPlayer}
-              misalignedPlayers={misalignedPlayers}
-            />
-          )}
-
-          {/* Public chat */}
-          <PublicChat
-            gameId={gameId}
-            currentPlayer={effectiveCurrentPlayer}
-            players={sortedPlayers}
-            canPost={canPostChat}
-          />
-        </div>
+        <RightPanel log={log} />
       </div>
     </div>
   );

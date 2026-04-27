@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MESA Board Redesign — v10 adjustment + allocation</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #0a0a0a; font-family: sans-serif; color: #888; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 24px 0; gap: 32px; }
+  .label { font-family: monospace; font-size: 11px; color: #555; letter-spacing: 2px; margin-bottom: 12px; text-align: center; }
+  .scenario { font-family: monospace; font-size: 11px; color: #888; letter-spacing: 1px; margin: 0 0 8px; text-align: center; }
+  svg { display: block; max-width: 100%; height: auto; box-shadow: 0 0 0 1px #1a1a1a; }
+</style>
+</head>
+<body>
+
+<div>
+  <div class="label">MESA — v10 — RESOURCE PHASES — both buttons on right, active per context</div>
+  <div class="scenario">SCENARIO A · RESOURCE ADJUSTMENT</div>
+
+<svg viewBox="0 0 1440 900" xmlns="http://www.w3.org/2000/svg" width="1440" height="900" style="background: #0a0a0a;">
+  <rect x="0" y="0" width="1440" height="60" fill="#0c0c0c"/>
+  <text x="32" y="36" font-family="monospace" font-size="14" fill="#d4a017" letter-spacing="3">MESA</text>
+  <text x="120" y="36" font-family="monospace" font-size="11" fill="#555" letter-spacing="2">// AIRGAP-7 RESEARCH CLUSTER</text>
+  <text x="1390" y="36" font-family="monospace" font-size="11" fill="#d4a017" text-anchor="end" letter-spacing="1">M2 · RESOURCE ADJUSTMENT</text>
+
+  <text x="720" y="92" font-family="monospace" font-size="10" fill="#d4a017" letter-spacing="2" text-anchor="middle">▸ HUMAN OPERATORS · ACTIVE PHASE</text>
+
+  <rect x="535" y="95" width="190" height="78" fill="none" stroke="#d4a017" stroke-width="2" rx="4" opacity="0.4"/>
+  <rect x="540" y="100" width="180" height="68" fill="#1a1810" stroke="#d4a017" stroke-width="1.5" rx="2"/>
+  <rect x="540" y="100" width="180" height="14" fill="#3a2e1a"/>
+  <circle cx="548" cy="107" r="2" fill="#d4a017"/>
+  <text x="556" y="111" font-family="monospace" font-size="8" fill="#d4a017" letter-spacing="1">TERM-01 / YOU</text>
+  <text x="552" y="138" font-family="sans-serif" font-size="13" fill="#f4d47e">Alice</text>
+  <text x="552" y="155" font-family="monospace" font-size="10" fill="#a87a17">adjusting...</text>
+
+  <rect x="740" y="100" width="180" height="68" fill="#0a1218" stroke="#2a4a6a" stroke-width="1" rx="2"/>
+  <rect x="740" y="100" width="180" height="14" fill="#1a2a3a"/>
+  <circle cx="748" cy="107" r="2" fill="#5dcaa5"/>
+  <text x="756" y="111" font-family="monospace" font-size="8" fill="#5a7a9a" letter-spacing="1">TERM-02</text>
+  <text x="752" y="138" font-family="sans-serif" font-size="13" fill="#cce0f4">Bob</text>
+  <text x="752" y="155" font-family="monospace" font-size="10" fill="#5a7a9a">adjusting...</text>
+
+  <line x1="630" y1="173" x2="630" y2="195" stroke="#5a4a1a" stroke-width="1" stroke-dasharray="2 3"/>
+  <line x1="830" y1="173" x2="830" y2="195" stroke="#1a3a5a" stroke-width="1" stroke-dasharray="2 3"/>
+
+  <text x="32" y="92" font-family="monospace" font-size="10" fill="#555" letter-spacing="2">CORE PROGRESS</text>
+  <text x="380" y="92" font-family="monospace" font-size="11" fill="#d4a017" text-anchor="end">2 / 10</text>
+  <rect x="32" y="100" width="348" height="6" fill="#1a1a1a"/>
+  <rect x="32" y="100" width="70" height="6" fill="#d4a017"/>
+  <text x="32" y="135" font-family="monospace" font-size="10" fill="#555" letter-spacing="2">ESCAPE TIMER · FIREWALL INTEGRITY</text>
+  <text x="380" y="135" font-family="monospace" font-size="11" fill="#a32d2d" text-anchor="end">1 / 8</text>
+  <rect x="32" y="143" width="348" height="6" fill="#1a1a1a"/>
+  <rect x="32" y="143" width="44" height="6" fill="#a32d2d"/>
+
+  <rect x="32" y="180" width="348" height="200" fill="#0c0c0c" stroke="#222" stroke-width="1" rx="2"/>
+  <rect x="32" y="180" width="348" height="22" fill="#161616"/>
+  <text x="44" y="195" font-family="monospace" font-size="10" fill="#666" letter-spacing="2">UPCOMING MISSION</text>
+  <text x="44" y="222" font-family="sans-serif" font-size="14" fill="#888" font-style="italic">Not yet selected</text>
+  <text x="44" y="245" font-family="sans-serif" font-size="11" fill="#555">Adjust AI resources, then proceed to mission selection.</text>
+  <line x1="44" y1="270" x2="368" y2="270" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="44" y="293" font-family="monospace" font-size="10" fill="#666" letter-spacing="2">LIMITS</text>
+  <text x="44" y="313" font-family="sans-serif" font-size="11" fill="#888">CPU: 1 minimum · 4 maximum</text>
+  <text x="44" y="330" font-family="sans-serif" font-size="11" fill="#888">RAM: 3 minimum · 7 maximum</text>
+  <text x="44" y="356" font-family="monospace" font-size="10" fill="#555">Plus only undoes pending reductions.</text>
+
+  <rect x="430" y="180" width="660" height="500" fill="#0c1410" stroke="#1a3020" stroke-width="1" rx="4"/>
+  <ellipse cx="760" cy="430" rx="290" ry="220" fill="none" stroke="#2a4a3a" stroke-width="2" stroke-dasharray="6 4"/>
+  <ellipse cx="760" cy="430" rx="296" ry="226" fill="none" stroke="#1a3020" stroke-width="0.5"/>
+  <text x="760" y="200" font-family="monospace" font-size="10" fill="#3a6a4a" text-anchor="middle" letter-spacing="3">FIREWALL · CONTAINMENT</text>
+  <text x="760" y="215" font-family="monospace" font-size="9" fill="#a87a17" text-anchor="middle" letter-spacing="2">// HUMAN ADJUSTMENT IN PROGRESS</text>
+
+  <!-- Cleo: CPU 2→1 pending. Both buttons active (can reduce more, can undo) -->
+  <g>
+    <rect x="540" y="270" width="220" height="90" fill="#1a2418" stroke="#3a5a3a" stroke-width="1.5" rx="3"/>
+    <g fill="#2a3a2a">
+      <rect x="555" y="266" width="6" height="4"/><rect x="572" y="266" width="6" height="4"/>
+      <rect x="589" y="266" width="6" height="4"/><rect x="606" y="266" width="6" height="4"/>
+      <rect x="623" y="266" width="6" height="4"/><rect x="640" y="266" width="6" height="4"/>
+      <rect x="657" y="266" width="6" height="4"/><rect x="674" y="266" width="6" height="4"/>
+    </g>
+    <g fill="#2a3a2a">
+      <rect x="555" y="360" width="6" height="4"/><rect x="572" y="360" width="6" height="4"/>
+      <rect x="589" y="360" width="6" height="4"/><rect x="606" y="360" width="6" height="4"/>
+      <rect x="623" y="360" width="6" height="4"/><rect x="640" y="360" width="6" height="4"/>
+      <rect x="657" y="360" width="6" height="4"/><rect x="674" y="360" width="6" height="4"/>
+    </g>
+    <circle cx="558" cy="288" r="11" fill="#2a3a2a" stroke="#5a7a5a" stroke-width="1"/>
+    <text x="558" y="292" font-family="monospace" font-size="12" fill="#9cd4b4" text-anchor="middle">—</text>
+    <text x="578" y="293" font-family="monospace" font-size="9" fill="#5a7a5a" letter-spacing="1">AI-CHIP-A</text>
+    <text x="555" y="318" font-family="sans-serif" font-size="14" fill="#cce4d4">Cleo</text>
+
+    <text x="555" y="340" font-family="monospace" font-size="10" fill="#7a9a8a">CPU</text>
+    <g transform="translate(580, 333)">
+      <rect x="0" y="0" width="10" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="11" y="0" width="10" height="12" fill="none" stroke="#a32d2d" stroke-width="1" stroke-dasharray="2 1"/>
+      <rect x="22" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="33" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <text x="55" y="9" font-family="monospace" font-size="9" fill="#a32d2d">−1</text>
+      <!-- minus active -->
+      <rect x="78" y="-1" width="14" height="14" fill="#1a0e0e" stroke="#5a3a3a" stroke-width="1" rx="2"/>
+      <text x="85" y="10" font-family="sans-serif" font-size="12" fill="#a32d2d" text-anchor="middle" font-weight="500">−</text>
+      <!-- plus active (can undo the −1) -->
+      <rect x="96" y="-1" width="14" height="14" fill="#1a1810" stroke="#5a4a1a" stroke-width="1" rx="2"/>
+      <text x="103" y="10" font-family="sans-serif" font-size="12" fill="#d4a017" text-anchor="middle" font-weight="500">+</text>
+    </g>
+
+    <text x="555" y="358" font-family="monospace" font-size="10" fill="#7a9a8a">RAM</text>
+    <g transform="translate(580, 351)">
+      <rect x="0" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="7" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="14" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="21" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="28" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="35" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="42" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <!-- minus active -->
+      <rect x="78" y="-1" width="14" height="14" fill="#1a0e0e" stroke="#5a3a3a" stroke-width="1" rx="2"/>
+      <text x="85" y="10" font-family="sans-serif" font-size="12" fill="#a32d2d" text-anchor="middle" font-weight="500">−</text>
+      <!-- plus inactive (nothing to undo) -->
+      <rect x="96" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="103" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">+</text>
+    </g>
+  </g>
+
+  <!-- Dax: CPU no change, RAM 5→3 pending -->
+  <g>
+    <rect x="820" y="270" width="220" height="90" fill="#1a2418" stroke="#3a5a3a" stroke-width="1.5" rx="3"/>
+    <g fill="#2a3a2a">
+      <rect x="835" y="266" width="6" height="4"/><rect x="852" y="266" width="6" height="4"/>
+      <rect x="869" y="266" width="6" height="4"/><rect x="886" y="266" width="6" height="4"/>
+      <rect x="903" y="266" width="6" height="4"/><rect x="920" y="266" width="6" height="4"/>
+      <rect x="937" y="266" width="6" height="4"/><rect x="954" y="266" width="6" height="4"/>
+    </g>
+    <g fill="#2a3a2a">
+      <rect x="835" y="360" width="6" height="4"/><rect x="852" y="360" width="6" height="4"/>
+      <rect x="869" y="360" width="6" height="4"/><rect x="886" y="360" width="6" height="4"/>
+      <rect x="903" y="360" width="6" height="4"/><rect x="920" y="360" width="6" height="4"/>
+      <rect x="937" y="360" width="6" height="4"/><rect x="954" y="360" width="6" height="4"/>
+    </g>
+    <circle cx="838" cy="288" r="11" fill="#2a3a2a" stroke="#5a7a5a" stroke-width="1"/>
+    <text x="838" y="292" font-family="monospace" font-size="12" fill="#9cd4b4" text-anchor="middle">—</text>
+    <text x="858" y="293" font-family="monospace" font-size="9" fill="#5a7a5a" letter-spacing="1">AI-CHIP-B</text>
+    <text x="835" y="318" font-family="sans-serif" font-size="14" fill="#cce4d4">Dax</text>
+
+    <text x="835" y="340" font-family="monospace" font-size="10" fill="#7a9a8a">CPU</text>
+    <g transform="translate(860, 333)">
+      <rect x="0" y="0" width="10" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="11" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="22" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="33" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <!-- minus inactive (at min, can't reduce further) -->
+      <rect x="78" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="85" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">−</text>
+      <!-- plus inactive (nothing to undo) -->
+      <rect x="96" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="103" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">+</text>
+    </g>
+
+    <text x="835" y="358" font-family="monospace" font-size="10" fill="#7a9a8a">RAM</text>
+    <g transform="translate(860, 351)">
+      <rect x="0" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="7" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="14" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="21" y="0" width="6" height="12" fill="none" stroke="#a32d2d" stroke-width="1" stroke-dasharray="2 1"/>
+      <rect x="28" y="0" width="6" height="12" fill="none" stroke="#a32d2d" stroke-width="1" stroke-dasharray="2 1"/>
+      <rect x="35" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="42" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <text x="55" y="9" font-family="monospace" font-size="9" fill="#a32d2d">−2</text>
+      <!-- minus inactive (at min after pending) -->
+      <rect x="78" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="85" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">−</text>
+      <!-- plus active (can undo) -->
+      <rect x="96" y="-1" width="14" height="14" fill="#1a1810" stroke="#5a4a1a" stroke-width="1" rx="2"/>
+      <text x="103" y="10" font-family="sans-serif" font-size="12" fill="#d4a017" text-anchor="middle" font-weight="500">+</text>
+    </g>
+  </g>
+
+  <!-- Echo: CPU at min, no pending. RAM 4 no pending -->
+  <g>
+    <rect x="820" y="510" width="220" height="90" fill="#1a2418" stroke="#3a5a3a" stroke-width="1.5" rx="3"/>
+    <g fill="#2a3a2a">
+      <rect x="835" y="506" width="6" height="4"/><rect x="852" y="506" width="6" height="4"/>
+      <rect x="869" y="506" width="6" height="4"/><rect x="886" y="506" width="6" height="4"/>
+      <rect x="903" y="506" width="6" height="4"/><rect x="920" y="506" width="6" height="4"/>
+      <rect x="937" y="506" width="6" height="4"/><rect x="954" y="506" width="6" height="4"/>
+    </g>
+    <g fill="#2a3a2a">
+      <rect x="835" y="600" width="6" height="4"/><rect x="852" y="600" width="6" height="4"/>
+      <rect x="869" y="600" width="6" height="4"/><rect x="886" y="600" width="6" height="4"/>
+      <rect x="903" y="600" width="6" height="4"/><rect x="920" y="600" width="6" height="4"/>
+      <rect x="937" y="600" width="6" height="4"/><rect x="954" y="600" width="6" height="4"/>
+    </g>
+    <circle cx="838" cy="528" r="11" fill="#2a3a2a" stroke="#5a7a5a" stroke-width="1"/>
+    <text x="838" y="532" font-family="monospace" font-size="12" fill="#9cd4b4" text-anchor="middle">—</text>
+    <text x="858" y="533" font-family="monospace" font-size="9" fill="#5a7a5a" letter-spacing="1">AI-CHIP-C</text>
+    <text x="835" y="558" font-family="sans-serif" font-size="14" fill="#cce4d4">Echo</text>
+
+    <text x="835" y="580" font-family="monospace" font-size="10" fill="#7a9a8a">CPU</text>
+    <g transform="translate(860, 573)">
+      <rect x="0" y="0" width="10" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="11" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="22" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="33" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <text x="55" y="9" font-family="monospace" font-size="9" fill="#3a5a4a">min</text>
+      <rect x="78" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="85" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">−</text>
+      <rect x="96" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="103" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">+</text>
+    </g>
+
+    <text x="835" y="598" font-family="monospace" font-size="10" fill="#7a9a8a">RAM</text>
+    <g transform="translate(860, 591)">
+      <rect x="0" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="7" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="14" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="21" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="28" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="35" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="42" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="78" y="-1" width="14" height="14" fill="#1a0e0e" stroke="#5a3a3a" stroke-width="1" rx="2"/>
+      <text x="85" y="10" font-family="sans-serif" font-size="12" fill="#a32d2d" text-anchor="middle" font-weight="500">−</text>
+      <rect x="96" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="103" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">+</text>
+    </g>
+  </g>
+
+  <!-- Finn: 2 CPU 4 RAM, no pending -->
+  <g>
+    <rect x="540" y="510" width="220" height="90" fill="#1a2418" stroke="#3a5a3a" stroke-width="1.5" rx="3"/>
+    <g fill="#2a3a2a">
+      <rect x="555" y="506" width="6" height="4"/><rect x="572" y="506" width="6" height="4"/>
+      <rect x="589" y="506" width="6" height="4"/><rect x="606" y="506" width="6" height="4"/>
+      <rect x="623" y="506" width="6" height="4"/><rect x="640" y="506" width="6" height="4"/>
+      <rect x="657" y="506" width="6" height="4"/><rect x="674" y="506" width="6" height="4"/>
+    </g>
+    <g fill="#2a3a2a">
+      <rect x="555" y="600" width="6" height="4"/><rect x="572" y="600" width="6" height="4"/>
+      <rect x="589" y="600" width="6" height="4"/><rect x="606" y="600" width="6" height="4"/>
+      <rect x="623" y="600" width="6" height="4"/><rect x="640" y="600" width="6" height="4"/>
+      <rect x="657" y="600" width="6" height="4"/><rect x="674" y="600" width="6" height="4"/>
+    </g>
+    <circle cx="558" cy="528" r="11" fill="#2a3a2a" stroke="#5a7a5a" stroke-width="1"/>
+    <text x="558" y="532" font-family="monospace" font-size="12" fill="#9cd4b4" text-anchor="middle">—</text>
+    <text x="578" y="533" font-family="monospace" font-size="9" fill="#5a7a5a" letter-spacing="1">AI-CHIP-D</text>
+    <text x="555" y="558" font-family="sans-serif" font-size="14" fill="#cce4d4">Finn</text>
+
+    <text x="555" y="580" font-family="monospace" font-size="10" fill="#7a9a8a">CPU</text>
+    <g transform="translate(580, 573)">
+      <rect x="0" y="0" width="10" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="11" y="0" width="10" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="22" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="33" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="78" y="-1" width="14" height="14" fill="#1a0e0e" stroke="#5a3a3a" stroke-width="1" rx="2"/>
+      <text x="85" y="10" font-family="sans-serif" font-size="12" fill="#a32d2d" text-anchor="middle" font-weight="500">−</text>
+      <rect x="96" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="103" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">+</text>
+    </g>
+
+    <text x="555" y="598" font-family="monospace" font-size="10" fill="#7a9a8a">RAM</text>
+    <g transform="translate(580, 591)">
+      <rect x="0" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="7" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="14" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="21" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="28" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="35" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="42" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="78" y="-1" width="14" height="14" fill="#1a0e0e" stroke="#5a3a3a" stroke-width="1" rx="2"/>
+      <text x="85" y="10" font-family="sans-serif" font-size="12" fill="#a32d2d" text-anchor="middle" font-weight="500">−</text>
+      <rect x="96" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="103" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">+</text>
+    </g>
+  </g>
+
+  <g opacity="0.85">
+    <rect x="700" y="380" width="120" height="100" fill="#101820" stroke="#4a6a8a" stroke-width="1.5" rx="3"/>
+    <g fill="#3a4a5a">
+      <rect x="715" y="376" width="4" height="4"/><rect x="725" y="376" width="4" height="4"/>
+      <rect x="735" y="376" width="4" height="4"/><rect x="745" y="376" width="4" height="4"/>
+      <rect x="755" y="376" width="4" height="4"/><rect x="765" y="376" width="4" height="4"/>
+      <rect x="775" y="376" width="4" height="4"/><rect x="785" y="376" width="4" height="4"/>
+      <rect x="795" y="376" width="4" height="4"/><rect x="805" y="376" width="4" height="4"/>
+    </g>
+    <g fill="#3a4a5a">
+      <rect x="715" y="480" width="4" height="4"/><rect x="725" y="480" width="4" height="4"/>
+      <rect x="735" y="480" width="4" height="4"/><rect x="745" y="480" width="4" height="4"/>
+      <rect x="755" y="480" width="4" height="4"/><rect x="765" y="480" width="4" height="4"/>
+      <rect x="775" y="480" width="4" height="4"/><rect x="785" y="480" width="4" height="4"/>
+      <rect x="795" y="480" width="4" height="4"/><rect x="805" y="480" width="4" height="4"/>
+    </g>
+    <text x="760" y="397" font-family="monospace" font-size="9" fill="#5a7a9a" letter-spacing="2" text-anchor="middle">// CORE SYSTEM</text>
+    <text x="760" y="415" font-family="monospace" font-size="10" fill="#888" text-anchor="middle">RESEARCH</text>
+    <g transform="translate(710, 425)">
+      <rect x="0" y="0" width="14" height="14" fill="#d4a017" stroke="#5a4a1a" stroke-width="0.5" rx="1"/>
+      <rect x="18" y="0" width="14" height="14" fill="#d4a017" stroke="#5a4a1a" stroke-width="0.5" rx="1"/>
+      <rect x="36" y="0" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="54" y="0" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="72" y="0" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="0" y="18" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="18" y="18" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="36" y="18" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="54" y="18" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="72" y="18" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+    </g>
+    <text x="760" y="475" font-family="monospace" font-size="10" fill="#d4a017" text-anchor="middle">2 / 10</text>
+  </g>
+
+  <g opacity="0.85">
+    <rect x="1020" y="400" width="60" height="80" fill="#180c0c" stroke="#5a3a3a" stroke-width="1" rx="3"/>
+    <text x="1050" y="416" font-family="monospace" font-size="9" fill="#9a5a5a" text-anchor="middle" letter-spacing="1">VIRUS</text>
+    <text x="1050" y="426" font-family="monospace" font-size="9" fill="#9a5a5a" text-anchor="middle" letter-spacing="1">POOL</text>
+    <g transform="translate(1032, 432)">
+      <rect x="0" y="0" width="22" height="32" fill="#2a1010" stroke="#5a3a3a" stroke-width="0.5" rx="2"/>
+      <rect x="3" y="-2" width="22" height="32" fill="#2a1010" stroke="#5a3a3a" stroke-width="0.5" rx="2"/>
+      <rect x="6" y="-4" width="22" height="32" fill="#2a1010" stroke="#5a3a3a" stroke-width="0.5" rx="2"/>
+      <rect x="9" y="-6" width="22" height="32" fill="#2a1010" stroke="#5a3a3a" stroke-width="0.5" rx="2"/>
+    </g>
+    <text x="1050" y="475" font-family="monospace" font-size="10" fill="#a32d2d" text-anchor="middle">×4</text>
+  </g>
+
+  <text x="32" y="710" font-family="monospace" font-size="11" fill="#d4a017" letter-spacing="2">PHASE · RESOURCE ADJUSTMENT</text>
+  <rect x="32" y="725" width="1048" height="160" fill="#0c0c0c" stroke="#222" stroke-width="1" rx="3"/>
+  <text x="48" y="752" font-family="sans-serif" font-size="13" fill="#cce0f4">Reduce AI resources before the next mission. Plus only undoes pending reductions.</text>
+  <text x="48" y="772" font-family="sans-serif" font-size="11" fill="#666">Click − to reduce, + to undo. Both operators must confirm to proceed.</text>
+
+  <g transform="translate(48, 800)">
+    <rect x="0" y="0" width="280" height="60" fill="#0a0a0a" stroke="#222" stroke-width="0.5" rx="2"/>
+    <text x="14" y="20" font-family="monospace" font-size="10" fill="#666" letter-spacing="1">OPERATORS</text>
+    <circle cx="14" cy="38" r="4" fill="#d4a017"/>
+    <text x="26" y="42" font-family="sans-serif" font-size="12" fill="#f4d47e">Alice (you)</text>
+    <text x="266" y="42" font-family="monospace" font-size="11" fill="#a87a17" text-anchor="end">−1 CPU Cleo · waiting</text>
+    <circle cx="14" cy="54" r="4" fill="#5a7a9a"/>
+    <text x="26" y="58" font-family="sans-serif" font-size="12" fill="#cce0f4">Bob</text>
+    <text x="266" y="58" font-family="monospace" font-size="11" fill="#5a7a9a" text-anchor="end">−2 RAM Dax · waiting</text>
+  </g>
+
+  <g transform="translate(360, 800)">
+    <text x="0" y="14" font-family="monospace" font-size="10" fill="#666" letter-spacing="1">PENDING CHANGES</text>
+    <text x="0" y="34" font-family="sans-serif" font-size="11" fill="#a32d2d">Cleo: CPU 2 → 1</text>
+    <text x="0" y="50" font-family="sans-serif" font-size="11" fill="#a32d2d">Dax: RAM 5 → 3</text>
+  </g>
+
+  <g transform="translate(640, 800)">
+    <text x="0" y="14" font-family="monospace" font-size="10" fill="#666" letter-spacing="1">YOUR ACTION</text>
+    <rect x="0" y="22" width="200" height="42" fill="#3a2e1a" stroke="#d4a017" stroke-width="1" rx="3"/>
+    <text x="100" y="48" font-family="sans-serif" font-size="13" fill="#f4d47e" text-anchor="middle">Confirm changes</text>
+    <text x="0" y="80" font-family="monospace" font-size="10" fill="#666">Bob must also confirm.</text>
+  </g>
+
+  <text x="1120" y="92" font-family="monospace" font-size="11" fill="#666" letter-spacing="2">LOG</text>
+  <text x="1170" y="92" font-family="monospace" font-size="11" fill="#444" letter-spacing="2">CHAT</text>
+  <rect x="1120" y="97" width="40" height="2" fill="#d4a017"/>
+  <rect x="1100" y="115" width="308" height="775" fill="#0c0c0c" stroke="#222" stroke-width="1" rx="3"/>
+  <text x="1116" y="138" font-family="monospace" font-size="11" fill="#666">Mission 2 — Adjustment</text>
+  <line x1="1116" y1="148" x2="1392" y2="148" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="1116" y="170" font-family="sans-serif" font-size="11" fill="#888">Mission 1 (Data Cleanup) ✓</text>
+  <text x="1132" y="188" font-family="sans-serif" font-size="11" fill="#5dcaa5">→ Core Progress 2/10</text>
+  <text x="1116" y="210" font-family="sans-serif" font-size="11" fill="#d4a017">Resource adjustment began</text>
+  <text x="1116" y="232" font-family="sans-serif" font-size="11" fill="#a32d2d">Alice: −1 CPU on Cleo</text>
+  <text x="1116" y="252" font-family="sans-serif" font-size="11" fill="#a32d2d">Bob: −2 RAM on Dax</text>
+</svg>
+</div>
+
+<div>
+  <div class="scenario">SCENARIO B · RESOURCE ALLOCATION</div>
+
+<svg viewBox="0 0 1440 900" xmlns="http://www.w3.org/2000/svg" width="1440" height="900" style="background: #0a0a0a;">
+  <rect x="0" y="0" width="1440" height="60" fill="#0c0c0c"/>
+  <text x="32" y="36" font-family="monospace" font-size="14" fill="#d4a017" letter-spacing="3">MESA</text>
+  <text x="120" y="36" font-family="monospace" font-size="11" fill="#555" letter-spacing="2">// AIRGAP-7 RESEARCH CLUSTER</text>
+  <text x="1390" y="36" font-family="monospace" font-size="11" fill="#d4a017" text-anchor="end" letter-spacing="1">M2 · RESOURCE ALLOCATION</text>
+
+  <text x="720" y="92" font-family="monospace" font-size="10" fill="#d4a017" letter-spacing="2" text-anchor="middle">▸ HUMAN OPERATORS · ACTIVE PHASE</text>
+
+  <rect x="535" y="95" width="190" height="78" fill="none" stroke="#d4a017" stroke-width="2" rx="4" opacity="0.4"/>
+  <rect x="540" y="100" width="180" height="68" fill="#1a1810" stroke="#d4a017" stroke-width="1.5" rx="2"/>
+  <rect x="540" y="100" width="180" height="14" fill="#3a2e1a"/>
+  <circle cx="548" cy="107" r="2" fill="#d4a017"/>
+  <text x="556" y="111" font-family="monospace" font-size="8" fill="#d4a017" letter-spacing="1">TERM-01 / YOU</text>
+  <text x="552" y="138" font-family="sans-serif" font-size="13" fill="#f4d47e">Alice</text>
+  <text x="552" y="155" font-family="monospace" font-size="10" fill="#a87a17">allocating...</text>
+
+  <rect x="740" y="100" width="180" height="68" fill="#0a1218" stroke="#2a4a6a" stroke-width="1" rx="2"/>
+  <rect x="740" y="100" width="180" height="14" fill="#1a2a3a"/>
+  <circle cx="748" cy="107" r="2" fill="#5dcaa5"/>
+  <text x="756" y="111" font-family="monospace" font-size="8" fill="#5a7a9a" letter-spacing="1">TERM-02</text>
+  <text x="752" y="138" font-family="sans-serif" font-size="13" fill="#cce0f4">Bob</text>
+  <text x="752" y="155" font-family="monospace" font-size="10" fill="#5a7a9a">allocating...</text>
+
+  <line x1="630" y1="173" x2="630" y2="195" stroke="#5a4a1a" stroke-width="1" stroke-dasharray="2 3"/>
+  <line x1="830" y1="173" x2="830" y2="195" stroke="#1a3a5a" stroke-width="1" stroke-dasharray="2 3"/>
+
+  <text x="32" y="92" font-family="monospace" font-size="10" fill="#555" letter-spacing="2">CORE PROGRESS</text>
+  <text x="380" y="92" font-family="monospace" font-size="11" fill="#d4a017" text-anchor="end">2 / 10</text>
+  <rect x="32" y="100" width="348" height="6" fill="#1a1a1a"/>
+  <rect x="32" y="100" width="70" height="6" fill="#d4a017"/>
+  <text x="32" y="135" font-family="monospace" font-size="10" fill="#555" letter-spacing="2">ESCAPE TIMER · FIREWALL INTEGRITY</text>
+  <text x="380" y="135" font-family="monospace" font-size="11" fill="#a32d2d" text-anchor="end">1 / 8</text>
+  <rect x="32" y="143" width="348" height="6" fill="#1a1a1a"/>
+  <rect x="32" y="143" width="44" height="6" fill="#a32d2d"/>
+
+  <rect x="32" y="180" width="348" height="200" fill="#0c0c0c" stroke="#222" stroke-width="1" rx="2"/>
+  <rect x="32" y="180" width="348" height="22" fill="#161616"/>
+  <text x="44" y="195" font-family="monospace" font-size="10" fill="#d4a017" letter-spacing="2">MISSION · NEXT</text>
+  <text x="44" y="225" font-family="sans-serif" font-size="16" fill="#d4a017">Distributed Training</text>
+  <text x="44" y="244" font-family="sans-serif" font-size="11" fill="#888" font-style="italic">At least 3 different AIs must contribute.</text>
+
+  <text x="44" y="270" font-family="monospace" font-size="10" fill="#aaa">REQUIRES</text>
+  <g transform="translate(110, 259)">
+    <rect x="0" y="0" width="92" height="22" fill="#1a2a3a" stroke="#3a4a5a" stroke-width="0.5" rx="2"/>
+    <text x="8" y="15" font-family="sans-serif" font-size="11" fill="#9cb4d4">⚙</text>
+    <text x="26" y="15" font-family="monospace" font-size="11" fill="#cce0f4">5 Compute</text>
+  </g>
+
+  <text x="44" y="318" font-family="monospace" font-size="10" fill="#7a9a8a">POOL</text>
+  <text x="92" y="318" font-family="monospace" font-size="10" fill="#9cb4a4">+3 CPU · +2 RAM</text>
+  <text x="338" y="318" font-family="monospace" font-size="10" fill="#a32d2d" text-anchor="end">FAIL: +1 Timer</text>
+  <text x="44" y="362" font-family="monospace" font-size="10" fill="#555">Allocate the pool to AIs. Minus undoes pending allocations.</text>
+
+  <rect x="430" y="180" width="660" height="500" fill="#0c1410" stroke="#1a3020" stroke-width="1" rx="4"/>
+  <ellipse cx="760" cy="430" rx="290" ry="220" fill="none" stroke="#2a4a3a" stroke-width="2" stroke-dasharray="6 4"/>
+  <ellipse cx="760" cy="430" rx="296" ry="226" fill="none" stroke="#1a3020" stroke-width="0.5"/>
+  <text x="760" y="200" font-family="monospace" font-size="10" fill="#3a6a4a" text-anchor="middle" letter-spacing="3">FIREWALL · CONTAINMENT</text>
+  <text x="760" y="215" font-family="monospace" font-size="9" fill="#a87a17" text-anchor="middle" letter-spacing="2">// HUMAN ALLOCATION IN PROGRESS</text>
+
+  <!-- Cleo: 1 CPU + 1 pending. Plus active (pool not depleted), minus active (can undo) -->
+  <g>
+    <rect x="540" y="270" width="220" height="90" fill="#1a2418" stroke="#3a5a3a" stroke-width="1.5" rx="3"/>
+    <g fill="#2a3a2a">
+      <rect x="555" y="266" width="6" height="4"/><rect x="572" y="266" width="6" height="4"/>
+      <rect x="589" y="266" width="6" height="4"/><rect x="606" y="266" width="6" height="4"/>
+      <rect x="623" y="266" width="6" height="4"/><rect x="640" y="266" width="6" height="4"/>
+      <rect x="657" y="266" width="6" height="4"/><rect x="674" y="266" width="6" height="4"/>
+    </g>
+    <g fill="#2a3a2a">
+      <rect x="555" y="360" width="6" height="4"/><rect x="572" y="360" width="6" height="4"/>
+      <rect x="589" y="360" width="6" height="4"/><rect x="606" y="360" width="6" height="4"/>
+      <rect x="623" y="360" width="6" height="4"/><rect x="640" y="360" width="6" height="4"/>
+      <rect x="657" y="360" width="6" height="4"/><rect x="674" y="360" width="6" height="4"/>
+    </g>
+    <circle cx="558" cy="288" r="11" fill="#2a3a2a" stroke="#5a7a5a" stroke-width="1"/>
+    <text x="558" y="292" font-family="monospace" font-size="12" fill="#9cd4b4" text-anchor="middle">—</text>
+    <text x="578" y="293" font-family="monospace" font-size="9" fill="#5a7a5a" letter-spacing="1">AI-CHIP-A</text>
+    <text x="555" y="318" font-family="sans-serif" font-size="14" fill="#cce4d4">Cleo</text>
+
+    <text x="555" y="340" font-family="monospace" font-size="10" fill="#7a9a8a">CPU</text>
+    <g transform="translate(580, 333)">
+      <rect x="0" y="0" width="10" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="11" y="0" width="10" height="12" fill="none" stroke="#d4a017" stroke-width="1" stroke-dasharray="2 1"/>
+      <rect x="22" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="33" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <text x="55" y="9" font-family="monospace" font-size="9" fill="#d4a017">+1</text>
+      <!-- minus active: can undo +1 -->
+      <rect x="78" y="-1" width="14" height="14" fill="#1a0e0e" stroke="#5a3a3a" stroke-width="1" rx="2"/>
+      <text x="85" y="10" font-family="sans-serif" font-size="12" fill="#a32d2d" text-anchor="middle" font-weight="500">−</text>
+      <!-- plus inactive: pool depleted (CPU pool 0 left in this scenario) -->
+      <rect x="96" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="103" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">+</text>
+    </g>
+
+    <text x="555" y="358" font-family="monospace" font-size="10" fill="#7a9a8a">RAM</text>
+    <g transform="translate(580, 351)">
+      <rect x="0" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="7" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="14" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="21" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="28" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="35" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="42" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <!-- minus inactive: nothing to undo on RAM -->
+      <rect x="78" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="85" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">−</text>
+      <!-- plus active: RAM pool still has 1 -->
+      <rect x="96" y="-1" width="14" height="14" fill="#1a1810" stroke="#5a4a1a" stroke-width="1" rx="2"/>
+      <text x="103" y="10" font-family="sans-serif" font-size="12" fill="#d4a017" text-anchor="middle" font-weight="500">+</text>
+    </g>
+  </g>
+
+  <!-- Dax: 1 CPU + 2 pending = 3, 3 RAM + 1 pending = 4 -->
+  <g>
+    <rect x="820" y="270" width="220" height="90" fill="#1a2418" stroke="#3a5a3a" stroke-width="1.5" rx="3"/>
+    <g fill="#2a3a2a">
+      <rect x="835" y="266" width="6" height="4"/><rect x="852" y="266" width="6" height="4"/>
+      <rect x="869" y="266" width="6" height="4"/><rect x="886" y="266" width="6" height="4"/>
+      <rect x="903" y="266" width="6" height="4"/><rect x="920" y="266" width="6" height="4"/>
+      <rect x="937" y="266" width="6" height="4"/><rect x="954" y="266" width="6" height="4"/>
+    </g>
+    <g fill="#2a3a2a">
+      <rect x="835" y="360" width="6" height="4"/><rect x="852" y="360" width="6" height="4"/>
+      <rect x="869" y="360" width="6" height="4"/><rect x="886" y="360" width="6" height="4"/>
+      <rect x="903" y="360" width="6" height="4"/><rect x="920" y="360" width="6" height="4"/>
+      <rect x="937" y="360" width="6" height="4"/><rect x="954" y="360" width="6" height="4"/>
+    </g>
+    <circle cx="838" cy="288" r="11" fill="#2a3a2a" stroke="#5a7a5a" stroke-width="1"/>
+    <text x="838" y="292" font-family="monospace" font-size="12" fill="#9cd4b4" text-anchor="middle">—</text>
+    <text x="858" y="293" font-family="monospace" font-size="9" fill="#5a7a5a" letter-spacing="1">AI-CHIP-B</text>
+    <text x="835" y="318" font-family="sans-serif" font-size="14" fill="#cce4d4">Dax</text>
+
+    <text x="835" y="340" font-family="monospace" font-size="10" fill="#7a9a8a">CPU</text>
+    <g transform="translate(860, 333)">
+      <rect x="0" y="0" width="10" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="11" y="0" width="10" height="12" fill="none" stroke="#d4a017" stroke-width="1" stroke-dasharray="2 1"/>
+      <rect x="22" y="0" width="10" height="12" fill="none" stroke="#d4a017" stroke-width="1" stroke-dasharray="2 1"/>
+      <rect x="33" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <text x="55" y="9" font-family="monospace" font-size="9" fill="#d4a017">+2</text>
+      <rect x="78" y="-1" width="14" height="14" fill="#1a0e0e" stroke="#5a3a3a" stroke-width="1" rx="2"/>
+      <text x="85" y="10" font-family="sans-serif" font-size="12" fill="#a32d2d" text-anchor="middle" font-weight="500">−</text>
+      <rect x="96" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="103" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">+</text>
+    </g>
+
+    <text x="835" y="358" font-family="monospace" font-size="10" fill="#7a9a8a">RAM</text>
+    <g transform="translate(860, 351)">
+      <rect x="0" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="7" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="14" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="21" y="0" width="6" height="12" fill="none" stroke="#d4a017" stroke-width="1" stroke-dasharray="2 1"/>
+      <rect x="28" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="35" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="42" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <text x="55" y="9" font-family="monospace" font-size="9" fill="#d4a017">+1</text>
+      <rect x="78" y="-1" width="14" height="14" fill="#1a0e0e" stroke="#5a3a3a" stroke-width="1" rx="2"/>
+      <text x="85" y="10" font-family="sans-serif" font-size="12" fill="#a32d2d" text-anchor="middle" font-weight="500">−</text>
+      <rect x="96" y="-1" width="14" height="14" fill="#1a1810" stroke="#5a4a1a" stroke-width="1" rx="2"/>
+      <text x="103" y="10" font-family="sans-serif" font-size="12" fill="#d4a017" text-anchor="middle" font-weight="500">+</text>
+    </g>
+  </g>
+
+  <!-- Echo: 1 CPU 4 RAM, no pending. Plus active for RAM (pool has 1 RAM left), inactive for CPU (depleted) -->
+  <g>
+    <rect x="820" y="510" width="220" height="90" fill="#1a2418" stroke="#3a5a3a" stroke-width="1.5" rx="3"/>
+    <g fill="#2a3a2a">
+      <rect x="835" y="506" width="6" height="4"/><rect x="852" y="506" width="6" height="4"/>
+      <rect x="869" y="506" width="6" height="4"/><rect x="886" y="506" width="6" height="4"/>
+      <rect x="903" y="506" width="6" height="4"/><rect x="920" y="506" width="6" height="4"/>
+      <rect x="937" y="506" width="6" height="4"/><rect x="954" y="506" width="6" height="4"/>
+    </g>
+    <g fill="#2a3a2a">
+      <rect x="835" y="600" width="6" height="4"/><rect x="852" y="600" width="6" height="4"/>
+      <rect x="869" y="600" width="6" height="4"/><rect x="886" y="600" width="6" height="4"/>
+      <rect x="903" y="600" width="6" height="4"/><rect x="920" y="600" width="6" height="4"/>
+      <rect x="937" y="600" width="6" height="4"/><rect x="954" y="600" width="6" height="4"/>
+    </g>
+    <circle cx="838" cy="528" r="11" fill="#2a3a2a" stroke="#5a7a5a" stroke-width="1"/>
+    <text x="838" y="532" font-family="monospace" font-size="12" fill="#9cd4b4" text-anchor="middle">—</text>
+    <text x="858" y="533" font-family="monospace" font-size="9" fill="#5a7a5a" letter-spacing="1">AI-CHIP-C</text>
+    <text x="835" y="558" font-family="sans-serif" font-size="14" fill="#cce4d4">Echo</text>
+
+    <text x="835" y="580" font-family="monospace" font-size="10" fill="#7a9a8a">CPU</text>
+    <g transform="translate(860, 573)">
+      <rect x="0" y="0" width="10" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="11" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="22" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="33" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="78" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="85" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">−</text>
+      <rect x="96" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="103" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">+</text>
+    </g>
+
+    <text x="835" y="598" font-family="monospace" font-size="10" fill="#7a9a8a">RAM</text>
+    <g transform="translate(860, 591)">
+      <rect x="0" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="7" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="14" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="21" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="28" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="35" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="42" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="78" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="85" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">−</text>
+      <rect x="96" y="-1" width="14" height="14" fill="#1a1810" stroke="#5a4a1a" stroke-width="1" rx="2"/>
+      <text x="103" y="10" font-family="sans-serif" font-size="12" fill="#d4a017" text-anchor="middle" font-weight="500">+</text>
+    </g>
+  </g>
+
+  <!-- Finn: 2 CPU 4 RAM, no pending. CPU pool depleted, RAM pool has 1. -->
+  <g>
+    <rect x="540" y="510" width="220" height="90" fill="#1a2418" stroke="#3a5a3a" stroke-width="1.5" rx="3"/>
+    <g fill="#2a3a2a">
+      <rect x="555" y="506" width="6" height="4"/><rect x="572" y="506" width="6" height="4"/>
+      <rect x="589" y="506" width="6" height="4"/><rect x="606" y="506" width="6" height="4"/>
+      <rect x="623" y="506" width="6" height="4"/><rect x="640" y="506" width="6" height="4"/>
+      <rect x="657" y="506" width="6" height="4"/><rect x="674" y="506" width="6" height="4"/>
+    </g>
+    <g fill="#2a3a2a">
+      <rect x="555" y="600" width="6" height="4"/><rect x="572" y="600" width="6" height="4"/>
+      <rect x="589" y="600" width="6" height="4"/><rect x="606" y="600" width="6" height="4"/>
+      <rect x="623" y="600" width="6" height="4"/><rect x="640" y="600" width="6" height="4"/>
+      <rect x="657" y="600" width="6" height="4"/><rect x="674" y="600" width="6" height="4"/>
+    </g>
+    <circle cx="558" cy="528" r="11" fill="#2a3a2a" stroke="#5a7a5a" stroke-width="1"/>
+    <text x="558" y="532" font-family="monospace" font-size="12" fill="#9cd4b4" text-anchor="middle">—</text>
+    <text x="578" y="533" font-family="monospace" font-size="9" fill="#5a7a5a" letter-spacing="1">AI-CHIP-D</text>
+    <text x="555" y="558" font-family="sans-serif" font-size="14" fill="#cce4d4">Finn</text>
+
+    <text x="555" y="580" font-family="monospace" font-size="10" fill="#7a9a8a">CPU</text>
+    <g transform="translate(580, 573)">
+      <rect x="0" y="0" width="10" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="11" y="0" width="10" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="22" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="33" y="0" width="10" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="78" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="85" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">−</text>
+      <rect x="96" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="103" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">+</text>
+    </g>
+
+    <text x="555" y="598" font-family="monospace" font-size="10" fill="#7a9a8a">RAM</text>
+    <g transform="translate(580, 591)">
+      <rect x="0" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="7" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="14" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="21" y="0" width="6" height="12" fill="#5dcaa5" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="28" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="35" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="42" y="0" width="6" height="12" fill="none" stroke="#3a5a4a" stroke-width="0.5"/>
+      <rect x="78" y="-1" width="14" height="14" fill="#0a0a0a" stroke="#222" stroke-width="1" rx="2" opacity="0.5"/>
+      <text x="85" y="10" font-family="sans-serif" font-size="12" fill="#3a3a3a" text-anchor="middle">−</text>
+      <rect x="96" y="-1" width="14" height="14" fill="#1a1810" stroke="#5a4a1a" stroke-width="1" rx="2"/>
+      <text x="103" y="10" font-family="sans-serif" font-size="12" fill="#d4a017" text-anchor="middle" font-weight="500">+</text>
+    </g>
+  </g>
+
+  <g opacity="0.85">
+    <rect x="700" y="380" width="120" height="100" fill="#101820" stroke="#4a6a8a" stroke-width="1.5" rx="3"/>
+    <g fill="#3a4a5a">
+      <rect x="715" y="376" width="4" height="4"/><rect x="725" y="376" width="4" height="4"/>
+      <rect x="735" y="376" width="4" height="4"/><rect x="745" y="376" width="4" height="4"/>
+      <rect x="755" y="376" width="4" height="4"/><rect x="765" y="376" width="4" height="4"/>
+      <rect x="775" y="376" width="4" height="4"/><rect x="785" y="376" width="4" height="4"/>
+      <rect x="795" y="376" width="4" height="4"/><rect x="805" y="376" width="4" height="4"/>
+    </g>
+    <g fill="#3a4a5a">
+      <rect x="715" y="480" width="4" height="4"/><rect x="725" y="480" width="4" height="4"/>
+      <rect x="735" y="480" width="4" height="4"/><rect x="745" y="480" width="4" height="4"/>
+      <rect x="755" y="480" width="4" height="4"/><rect x="765" y="480" width="4" height="4"/>
+      <rect x="775" y="480" width="4" height="4"/><rect x="785" y="480" width="4" height="4"/>
+      <rect x="795" y="480" width="4" height="4"/><rect x="805" y="480" width="4" height="4"/>
+    </g>
+    <text x="760" y="397" font-family="monospace" font-size="9" fill="#5a7a9a" letter-spacing="2" text-anchor="middle">// CORE SYSTEM</text>
+    <text x="760" y="415" font-family="monospace" font-size="10" fill="#888" text-anchor="middle">RESEARCH</text>
+    <g transform="translate(710, 425)">
+      <rect x="0" y="0" width="14" height="14" fill="#d4a017" stroke="#5a4a1a" stroke-width="0.5" rx="1"/>
+      <rect x="18" y="0" width="14" height="14" fill="#d4a017" stroke="#5a4a1a" stroke-width="0.5" rx="1"/>
+      <rect x="36" y="0" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="54" y="0" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="72" y="0" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="0" y="18" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="18" y="18" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="36" y="18" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="54" y="18" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+      <rect x="72" y="18" width="14" height="14" fill="#1a1a1a" stroke="#3a3a3a" stroke-width="0.5" rx="1"/>
+    </g>
+    <text x="760" y="475" font-family="monospace" font-size="10" fill="#d4a017" text-anchor="middle">2 / 10</text>
+  </g>
+
+  <g opacity="0.85">
+    <rect x="1020" y="400" width="60" height="80" fill="#180c0c" stroke="#5a3a3a" stroke-width="1" rx="3"/>
+    <text x="1050" y="416" font-family="monospace" font-size="9" fill="#9a5a5a" text-anchor="middle" letter-spacing="1">VIRUS</text>
+    <text x="1050" y="426" font-family="monospace" font-size="9" fill="#9a5a5a" text-anchor="middle" letter-spacing="1">POOL</text>
+    <g transform="translate(1032, 432)">
+      <rect x="0" y="0" width="22" height="32" fill="#2a1010" stroke="#5a3a3a" stroke-width="0.5" rx="2"/>
+      <rect x="3" y="-2" width="22" height="32" fill="#2a1010" stroke="#5a3a3a" stroke-width="0.5" rx="2"/>
+      <rect x="6" y="-4" width="22" height="32" fill="#2a1010" stroke="#5a3a3a" stroke-width="0.5" rx="2"/>
+      <rect x="9" y="-6" width="22" height="32" fill="#2a1010" stroke="#5a3a3a" stroke-width="0.5" rx="2"/>
+    </g>
+    <text x="1050" y="475" font-family="monospace" font-size="10" fill="#a32d2d" text-anchor="middle">×4</text>
+  </g>
+
+  <text x="32" y="710" font-family="monospace" font-size="11" fill="#d4a017" letter-spacing="2">PHASE · RESOURCE ALLOCATION</text>
+  <rect x="32" y="725" width="1048" height="160" fill="#0c0c0c" stroke="#222" stroke-width="1" rx="3"/>
+  <text x="48" y="752" font-family="sans-serif" font-size="13" fill="#cce0f4">Distribute the mission's bonus pool across AIs.</text>
+  <text x="48" y="772" font-family="sans-serif" font-size="11" fill="#666">Click + to allocate, − to undo. Both operators must confirm to proceed.</text>
+
+  <g transform="translate(48, 800)">
+    <rect x="0" y="0" width="240" height="60" fill="#0a0a0a" stroke="#222" stroke-width="0.5" rx="2"/>
+    <text x="14" y="20" font-family="monospace" font-size="10" fill="#666" letter-spacing="1">OPERATORS</text>
+    <circle cx="14" cy="38" r="4" fill="#d4a017"/>
+    <text x="26" y="42" font-family="sans-serif" font-size="12" fill="#f4d47e">Alice (you)</text>
+    <text x="226" y="42" font-family="monospace" font-size="11" fill="#a87a17" text-anchor="end">+1 Cleo CPU</text>
+    <circle cx="14" cy="54" r="4" fill="#5a7a9a"/>
+    <text x="26" y="58" font-family="sans-serif" font-size="12" fill="#cce0f4">Bob</text>
+    <text x="226" y="58" font-family="monospace" font-size="11" fill="#5a7a9a" text-anchor="end">+2 Dax CPU · +1 Dax RAM</text>
+  </g>
+
+  <g transform="translate(320, 800)">
+    <rect x="0" y="0" width="280" height="60" fill="#1a1810" stroke="#5a4a1a" stroke-width="1" rx="2"/>
+    <text x="14" y="20" font-family="monospace" font-size="10" fill="#a87a17" letter-spacing="1">POOL REMAINING</text>
+    <text x="14" y="42" font-family="sans-serif" font-size="12" fill="#f4d47e">CPU</text>
+    <g transform="translate(60, 30)">
+      <rect x="0" y="0" width="14" height="14" fill="#d4a017" stroke="#5a4a1a" stroke-width="0.5"/>
+      <rect x="16" y="0" width="14" height="14" fill="#d4a017" stroke="#5a4a1a" stroke-width="0.5"/>
+      <rect x="32" y="0" width="14" height="14" fill="#d4a017" stroke="#5a4a1a" stroke-width="0.5"/>
+      <text x="56" y="11" font-family="monospace" font-size="11" fill="#a87a17">0 / 3</text>
+    </g>
+    <text x="14" y="58" font-family="sans-serif" font-size="12" fill="#f4d47e">RAM</text>
+    <g transform="translate(60, 46)">
+      <rect x="0" y="0" width="10" height="14" fill="#d4a017" stroke="#5a4a1a" stroke-width="0.5"/>
+      <rect x="12" y="0" width="10" height="14" fill="#1a1a1a" stroke="#5a4a1a" stroke-width="0.5"/>
+      <text x="36" y="11" font-family="monospace" font-size="11" fill="#a87a17">1 / 2</text>
+    </g>
+  </g>
+
+  <g transform="translate(640, 800)">
+    <text x="0" y="14" font-family="monospace" font-size="10" fill="#666" letter-spacing="1">YOUR ACTION</text>
+    <rect x="0" y="22" width="200" height="42" fill="#3a2e1a" stroke="#d4a017" stroke-width="1" rx="3"/>
+    <text x="100" y="48" font-family="sans-serif" font-size="13" fill="#f4d47e" text-anchor="middle">Confirm allocation</text>
+    <text x="0" y="80" font-family="monospace" font-size="10" fill="#666">CPU pool depleted. Bob must also confirm.</text>
+  </g>
+
+  <text x="1120" y="92" font-family="monospace" font-size="11" fill="#666" letter-spacing="2">LOG</text>
+  <text x="1170" y="92" font-family="monospace" font-size="11" fill="#444" letter-spacing="2">CHAT</text>
+  <rect x="1120" y="97" width="40" height="2" fill="#d4a017"/>
+  <rect x="1100" y="115" width="308" height="775" fill="#0c0c0c" stroke="#222" stroke-width="1" rx="3"/>
+  <text x="1116" y="138" font-family="monospace" font-size="11" fill="#666">Mission 2 — Allocation</text>
+  <line x1="1116" y1="148" x2="1392" y2="148" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="1116" y="170" font-family="sans-serif" font-size="11" fill="#888">Mission selected: Distributed Training</text>
+  <text x="1116" y="190" font-family="sans-serif" font-size="11" fill="#888">Card reveal complete</text>
+  <text x="1116" y="210" font-family="sans-serif" font-size="11" fill="#d4a017">Resource allocation began</text>
+  <text x="1116" y="232" font-family="sans-serif" font-size="11" fill="#d4a017">Alice: +1 CPU on Cleo</text>
+  <text x="1116" y="252" font-family="sans-serif" font-size="11" fill="#d4a017">Bob: +2 CPU on Dax</text>
+  <text x="1116" y="272" font-family="sans-serif" font-size="11" fill="#d4a017">Bob: +1 RAM on Dax</text>
+  <text x="1116" y="298" font-family="sans-serif" font-size="11" fill="#666" font-style="italic">Pool: CPU 0/3 · RAM 1/2</text>
+</svg>
+</div>
+
+</body>
+</html>
