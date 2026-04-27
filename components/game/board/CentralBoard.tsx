@@ -253,7 +253,7 @@ function AIChipGroup({
     (resourceChip.cpuMinus || resourceChip.cpuPlus || resourceChip.ramMinus || resourceChip.ramPlus)
   );
 
-  const isTargetSelectable = targetingChip?.state === "selectable" && !targetingChip.isSelf;
+  const isTargetSelectable = targetingChip?.state === "selectable";
   const isTargetNominated = targetingChip?.state === "nominated";
 
   return (

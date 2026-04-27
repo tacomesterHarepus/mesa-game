@@ -493,7 +493,6 @@ export function GameBoard({
             const isSelf = player.id === effectiveCurrentPlayer?.id;
             const isFellow = player.role === "misaligned_ai" && !isSelf;
             const state: TargetingChipConfig["state"] =
-              isSelf ? "watching" :
               player.id === localNominationId ? "nominated" : "selectable";
             return [
               player.id,
@@ -501,7 +500,7 @@ export function GameBoard({
                 state,
                 isSelf,
                 isFellow,
-                onNominate: isSelf ? undefined : () => setLocalNominationId(player.id),
+                onNominate: () => setLocalNominationId(player.id),
               } as TargetingChipConfig,
             ];
           })
