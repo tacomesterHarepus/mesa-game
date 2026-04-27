@@ -6,6 +6,7 @@ import { ResourcePhase } from "./phases/ResourcePhase";
 import { MissionSelection } from "./phases/MissionSelection";
 import { CardReveal } from "./phases/CardReveal";
 import { PlayerTurn } from "./phases/PlayerTurn";
+import { VirusPull } from "./phases/VirusPull";
 import { VirusResolution } from "./phases/VirusResolution";
 import { SecretTargeting } from "./phases/SecretTargeting";
 import { GameOver } from "./phases/GameOver";
@@ -452,6 +453,16 @@ export function GameBoard({
             overridePlayerId={overridePlayerId}
           />
         );
+      case "virus_pull":
+        return (
+          <VirusPull
+            gameId={gameId}
+            currentPlayer={effectiveCurrentPlayer}
+            currentTurnPlayerId={game.current_turn_player_id ?? undefined}
+            pendingPullCount={game.pending_pull_count ?? 0}
+            overridePlayerId={overridePlayerId}
+          />
+        );
       case "virus_resolution":
         return (
           <VirusResolution
@@ -564,7 +575,7 @@ export function GameBoard({
         <ActionRegion
           phase={game.phase}
           isActivePlayer={
-            ((game.phase === "player_turn" || game.phase === "between_turns") &&
+            ((game.phase === "player_turn" || game.phase === "between_turns" || game.phase === "virus_pull") &&
               !!effectiveCurrentPlayer &&
               effectiveCurrentPlayer.id === game.current_turn_player_id) ||
             (game.phase === "mission_selection" &&

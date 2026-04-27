@@ -11,6 +11,7 @@ export function ActionRegion({ children, phase, isActivePlayer, currentTurnPlaye
   const isActionPhase =
     phase === "player_turn" ||
     phase === "between_turns" ||
+    phase === "virus_pull" ||
     phase === "mission_selection" ||
     phase === "resource_adjustment" ||
     phase === "resource_allocation" ||
@@ -37,6 +38,10 @@ export function ActionRegion({ children, phase, isActivePlayer, currentTurnPlaye
       ? isActivePlayer
         ? "▸ YOUR ACTION REQUIRED · REVEAL ONE CARD"
         : "// AIs REVEALING CARDS"
+      : phase === "virus_pull"
+      ? isActivePlayer
+        ? "▸ YOUR ACTION REQUIRED · PULL FROM VIRUS POOL"
+        : `// WAITING — ${currentTurnPlayerName ?? "ACTIVE AI"} PULLING`
       : showAmber
       ? "▸ YOUR ACTION REQUIRED · YOUR TURN"
       : isActionPhase && currentTurnPlayerName
