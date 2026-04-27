@@ -479,39 +479,34 @@ test.describe("secret targeting", () => {
     expect(afterGame.targeting_deadline).toBeNull();
   });
 
-  // ── Test 5: SecretTargeting UI shows countdown and misaligned voter UI ────────
+  // ── Test 5: SecretTargeting UI shows chip-based targeting flow ────────────
 
-  // SKIPPED: depends on pre-redesign UI; revisit after role_indicators task
-  test.skip("SecretTargeting UI shows correct views for misaligned and non-misaligned players", async () => {
-    // This test verifies the component renders when the game is in secret_targeting.
-    // We drive the game to player_turn, then navigate to a state where we can inspect the UI.
-    // Since getting to secret_targeting is non-deterministic, we verify the component structure
-    // using what we know about the rendered output from the previous tests.
-    //
-    // For a lightweight check: verify the game board doesn't crash in player_turn phase.
+  test("SecretTargeting UI shows chip-based targeting for misaligned and waiting state for others", async () => {
     const gameState = await fetchGame(sharedGameId, sharedToken);
     const phase = gameState.phase as string;
 
-    // The game board should be visible regardless of phase
-    await expect(sharedPage.locator("h1")).toContainText("MESA");
-
-    // If we're in secret_targeting, check both views
     if (phase === "secret_targeting") {
-      // Check misaligned view
+      // Old "Submit Vote" button must be gone; new "APPROVE & VOTE" (or voted confirmation) shown
       for (const mid of misalignedIds) {
         const switcher = sharedPage.locator(".fixed.top-7");
         const btn = switcher.locator(`[data-player-id="${mid}"]`);
         if (await btn.isVisible().catch(() => false)) {
           await btn.click();
           await sharedPage.waitForTimeout(500);
-          // Misaligned should see the vote UI
-          await expect(sharedPage.getByText("Secret Targeting")).toBeVisible();
-          await expect(sharedPage.getByText("Submit Vote")).toBeVisible();
+          // Old UI is gone
+          await expect(sharedPage.getByRole("button", { name: /Submit Vote/i })).not.toBeVisible();
+          // New UI: either the APPROVE button or the "VOTE SUBMITTED" confirmation
+          const approveBtn = sharedPage.getByRole("button", { name: /APPROVE.*VOTE/i });
+          const votedText = sharedPage.getByText(/VOTE SUBMITTED/);
+          const hasNewUI =
+            (await approveBtn.isVisible().catch(() => false)) ||
+            (await votedText.isVisible().catch(() => false));
+          expect(hasNewUI).toBe(true);
           break;
         }
       }
 
-      // Check non-misaligned view (aligned AI or human)
+      // Non-misaligned view shows the waiting message
       const nonMisalignedId = aiIds.find((id) => !misalignedIds.includes(id));
       if (nonMisalignedId) {
         const switcher = sharedPage.locator(".fixed.top-7");
@@ -519,14 +514,15 @@ test.describe("secret targeting", () => {
         if (await btn.isVisible().catch(() => false)) {
           await btn.click();
           await sharedPage.waitForTimeout(500);
-          // Non-misaligned should see waiting message
-          await expect(sharedPage.getByText("Secret Targeting")).toBeVisible();
-          await expect(sharedPage.getByText(/Misaligned AIs are selecting/)).toBeVisible();
+          await expect(sharedPage.getByText(/MISALIGNED AIs ARE TARGETING/)).toBeVisible();
         }
       }
     } else {
-      // Not in targeting phase — just confirm game board renders
-      expect(["player_turn", "between_turns", "virus_resolution", "resource_adjustment", "game_over"]).toContain(phase);
+      // Not in targeting phase — verify the game board renders without crashing
+      expect([
+        "player_turn", "between_turns", "virus_resolution",
+        "resource_adjustment", "game_over", "secret_targeting",
+      ]).toContain(phase);
     }
   });
 });
