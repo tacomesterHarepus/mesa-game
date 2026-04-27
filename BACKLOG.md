@@ -22,6 +22,18 @@ Ideas and polish items that aren't blocking current phases. Add freely; prioriti
 
 ---
 
+## UI / UX Polish (post-redesign)
+
+Items to revisit after the final board-redesign phase task (game_over) ships.
+
+- **Resource allocation — make pool distribution more obvious** — It is currently easy for a human to press "Start Mission" without distributing any pool CPU/RAM, since there is no enforcement or visual prompt. Possible approaches: (a) pulsing or highlighted pool counter when pool > 0; (b) disabled "Start Mission" button until pool is 0 or an explicit "skip" is confirmed; (c) amber callout on the ActionRegion header when pool is non-zero. Decide during the post-redesign UI polish pass. *(Added 2026-04-27)*
+
+- **Layout density pass** — At 1440×900 the right panel has unused empty space and hand cards in the ActionRegion are oversized for the available area. Defer until after the final phase task (game_over) ships, since remaining phases will continue shifting the layout. Then do a dedicated pass: right panel sizing, hand card scaling, ActionRegion proportions. *(Added 2026-04-27)*
+
+- **Mockup re-render — RAM track** — `mockup_resource_phases_human.html` (and any other mockup showing AI chip RAM tracks) needs re-rendering with 7-square RAM (currently shows 5). The spec was corrected as part of the RAM track width fix (2026-04-27). *(Added 2026-04-27)*
+
+---
+
 ## Game Balance
 
 *(empty)*
