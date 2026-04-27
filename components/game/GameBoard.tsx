@@ -17,7 +17,7 @@ import { HumanTerminals } from "./board/HumanTerminals";
 import { MissionPanel } from "./board/MissionPanel";
 import { MissionCandidatesPanel } from "./board/MissionCandidatesPanel";
 import { VirusPoolPanel } from "./board/VirusPoolPanel";
-import { CentralBoard, type ResourceChipConfig, type RevealChipConfig, type VirusResolvingCard } from "./board/CentralBoard";
+import { CentralBoard, type ResourceChipConfig, type RevealChipConfig, type VirusResolvingCard, type TargetingChipConfig } from "./board/CentralBoard";
 import { ActionRegion } from "./board/ActionRegion";
 import { RightPanel } from "./board/RightPanel";
 import { MISSION_MAP } from "@/lib/game/missions";
@@ -74,6 +74,7 @@ export function GameBoard({
   const [log, setLog] = useState<LogEntry[]>(initialLog);
   const [poolCount, setPoolCount] = useState(4);
   const [virusQueue, setVirusQueue] = useState<QueueCard[]>([]);
+  const [localNominationId, setLocalNominationId] = useState<string | null>(null);
   const [missionSelected, setMissionSelected] = useState<string | null>(null);
   const [resPendingCpu, setResPendingCpu] = useState<Record<string, number>>({});
   const [resPendingRam, setResPendingRam] = useState<Record<string, number>>({});
@@ -289,6 +290,10 @@ export function GameBoard({
   }, [game.phase]);
 
   useEffect(() => {
+    if (game.phase !== "secret_targeting") setLocalNominationId(null);
+  }, [game.phase]);
+
+  useEffect(() => {
     const isResPhase = game.phase === "resource_adjustment" || game.phase === "resource_allocation";
     if (!isResPhase) {
       setResPendingCpu({});
@@ -477,6 +482,32 @@ export function GameBoard({
       )
     : undefined;
 
+  // ── Targeting chip config ─────────────────────────────────────────────────
+  const isTargetingPhase = game.phase === "secret_targeting";
+  const isMisalignedViewer = effectiveCurrentPlayer?.role === "misaligned_ai";
+
+  const targetingChips: Record<string, TargetingChipConfig> | undefined =
+    isTargetingPhase && isMisalignedViewer
+      ? Object.fromEntries(
+          aiPlayers.map((player) => {
+            const isSelf = player.id === effectiveCurrentPlayer?.id;
+            const isFellow = player.role === "misaligned_ai" && !isSelf;
+            const state: TargetingChipConfig["state"] =
+              isSelf ? "watching" :
+              player.id === localNominationId ? "nominated" : "selectable";
+            return [
+              player.id,
+              {
+                state,
+                isSelf,
+                isFellow,
+                onNominate: isSelf ? undefined : () => setLocalNominationId(player.id),
+              } as TargetingChipConfig,
+            ];
+          })
+        )
+      : undefined;
+
   // ── Card reveal chip config ───────────────────────────────────────────────
   const isRevealPhase = game.phase === "card_reveal";
   const revealSlots: Record<string, RevealChipConfig> | undefined = isRevealPhase
@@ -580,6 +611,8 @@ export function GameBoard({
             targetingDeadline={game.targeting_deadline}
             cardKey={game.current_targeting_card_key}
             overridePlayerId={overridePlayerId}
+            localNominationId={localNominationId}
+            resolutionId={game.current_targeting_resolution_id}
           />
         );
       case "game_over":
@@ -670,13 +703,16 @@ export function GameBoard({
         <CentralBoard
           aiPlayers={aiPlayers}
           coreProgress={game.core_progress}
-          // Suppress active-chip styling during resource + reveal phases (no single "active" AI)
+          // Suppress active-chip styling during resource, reveal, and targeting phases
           currentTurnPlayerId={
-            isResPhase || isRevealPhase ? undefined : (game.current_turn_player_id ?? undefined)
+            isResPhase || isRevealPhase || isTargetingPhase
+              ? undefined
+              : (game.current_turn_player_id ?? undefined)
           }
           turnOrderIds={game.turn_order_ids ?? []}
           resourceChips={resourceChips}
           revealSlots={revealSlots}
+          targetingChips={targetingChips}
           dimCore={game.phase === "virus_resolution"}
           virusResolvingCard={(virusQueue[0] ?? null) as VirusResolvingCard | null}
         />
@@ -695,7 +731,9 @@ export function GameBoard({
             (game.phase === "card_reveal" &&
               !!effectiveCurrentPlayer &&
               effectiveCurrentPlayer.role !== "human" &&
-              !effectiveCurrentPlayer.has_revealed_card)
+              !effectiveCurrentPlayer.has_revealed_card) ||
+            (game.phase === "secret_targeting" &&
+              effectiveCurrentPlayer?.role === "misaligned_ai")
           }
           currentTurnPlayerName={currentTurnPlayer?.display_name ?? undefined}
         >

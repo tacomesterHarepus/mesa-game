@@ -571,7 +571,7 @@ Use this consistently. Amber border is the strongest "this is your turn to do so
 | Mission selection | Humans post; all AIs locked | Locked |
 | Resource adjustment / allocation | Humans post; all AIs locked | Locked |
 | Card reveal | Humans post; AIs locked | Open |
-| Virus pull / resolution | Humans post; active AI locked, others open | Open |
+| Virus pull / resolution | Everyone can post | Open |
 | Secret targeting | Locked for all | Open for misaligned |
 | Game over | All unlocked (debrief mode) | N/A (panel removed) |
 
