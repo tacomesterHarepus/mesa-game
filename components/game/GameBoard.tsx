@@ -17,7 +17,7 @@ import { HumanTerminals } from "./board/HumanTerminals";
 import { MissionPanel } from "./board/MissionPanel";
 import { MissionCandidatesPanel } from "./board/MissionCandidatesPanel";
 import { VirusPoolPanel } from "./board/VirusPoolPanel";
-import { CentralBoard, type ResourceChipConfig, type RevealChipConfig } from "./board/CentralBoard";
+import { CentralBoard, type ResourceChipConfig, type RevealChipConfig, type VirusResolvingCard } from "./board/CentralBoard";
 import { ActionRegion } from "./board/ActionRegion";
 import { RightPanel } from "./board/RightPanel";
 import { MISSION_MAP } from "@/lib/game/missions";
@@ -28,6 +28,14 @@ type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
 type ActiveMission = Database["public"]["Tables"]["active_mission"]["Row"];
 type LogEntry = Database["public"]["Tables"]["game_log"]["Row"];
 type HandCard = Database["public"]["Tables"]["hands"]["Row"];
+
+interface QueueCard {
+  id: string;
+  card_key: string;
+  card_type: string;
+  position: number;
+  cascaded_from: string | null;
+}
 
 const CPU_MIN = 1;
 const CPU_MAX = 4;
@@ -65,6 +73,7 @@ export function GameBoard({
   const [mission, setMission] = useState<ActiveMission | null>(initialMission);
   const [log, setLog] = useState<LogEntry[]>(initialLog);
   const [poolCount, setPoolCount] = useState(4);
+  const [virusQueue, setVirusQueue] = useState<QueueCard[]>([]);
   const [missionSelected, setMissionSelected] = useState<string | null>(null);
   const [resPendingCpu, setResPendingCpu] = useState<Record<string, number>>({});
   const [resPendingRam, setResPendingRam] = useState<Record<string, number>>({});
@@ -287,6 +296,63 @@ export function GameBoard({
     }
   }, [game.phase]);
 
+  // Virus resolution queue — subscribe while phase = virus_resolution; clear on exit.
+  // Provides currentCard (queue[0]) and remaining count to CentralBoard + VirusResolution.
+  useEffect(() => {
+    if (game.phase !== "virus_resolution") {
+      setVirusQueue([]);
+      return;
+    }
+    const supabase = createClient();
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const setup = async () => {
+      await supabase.auth.getSession();
+      if (cancelled) return;
+
+      const { data } = await supabase
+        .from("virus_resolution_queue")
+        .select("*")
+        .eq("game_id", gameId)
+        .eq("resolved", false)
+        .order("position", { ascending: true });
+      if (!cancelled && data) setVirusQueue(data as QueueCard[]);
+
+      channel = supabase
+        .channel(`virus-queue-${gameId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "virus_resolution_queue", filter: `game_id=eq.${gameId}` },
+          (payload) => {
+            const card = payload.new as QueueCard & { resolved: boolean };
+            if (!card.resolved) {
+              setVirusQueue((prev) =>
+                [...prev, card].sort((a, b) => a.position - b.position)
+              );
+            }
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "virus_resolution_queue", filter: `game_id=eq.${gameId}` },
+          (payload) => {
+            const updated = payload.new as QueueCard & { resolved: boolean };
+            if (updated.resolved) {
+              setVirusQueue((prev) => prev.filter((c) => c.id !== updated.id));
+            }
+          }
+        )
+        .subscribe();
+    };
+
+    setup();
+    return () => {
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [gameId, game.phase]);
+
   const isHost = game.host_user_id === userId;
 
   // In dev mode the "current player" is whoever is selected in the switcher.
@@ -501,6 +567,8 @@ export function GameBoard({
             gameId={gameId}
             currentPlayer={effectiveCurrentPlayer}
             overridePlayerId={overridePlayerId}
+            currentCard={virusQueue[0] ?? null}
+            remaining={virusQueue.length}
           />
         );
       case "secret_targeting":
@@ -609,6 +677,8 @@ export function GameBoard({
           turnOrderIds={game.turn_order_ids ?? []}
           resourceChips={resourceChips}
           revealSlots={revealSlots}
+          dimCore={game.phase === "virus_resolution"}
+          virusResolvingCard={(virusQueue[0] ?? null) as VirusResolvingCard | null}
         />
 
         <ActionRegion

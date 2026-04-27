@@ -197,12 +197,14 @@ test.describe("virus resolution system", () => {
 
   let sharedCtx: BrowserContext;
   let sharedPage: Page;
+  let sharedGameId = "";
   let reachedVirusResolution = false;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
     sharedCtx = await browser.newContext();
     const { page, gameId } = await fillLobby(sharedCtx, "Bot1");
     sharedPage = page;
+    sharedGameId = gameId;
     await startDevGame(sharedPage);
     await advanceToPlayerTurnWithCpu2(sharedPage, gameId);
 
@@ -224,7 +226,6 @@ test.describe("virus resolution system", () => {
       const phase = phaseRow?.phase;
 
       if (phase === "virus_resolution") {
-        await sharedPage.getByRole("heading", { name: "Virus Resolution" }).waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
         reachedVirusResolution = true;
         break;
       }
@@ -237,36 +238,59 @@ test.describe("virus resolution system", () => {
     await sharedCtx.close().catch(() => {});
   });
 
-  test("VirusResolution phase renders heading and Resolve button", async () => {
+  test("no manual Resolve button present — auto-resolve is active", async () => {
     if (!reachedVirusResolution) test.skip();
-    await expect(sharedPage.getByRole("heading", { name: "Virus Resolution" })).toBeVisible();
+    // The old "Resolve Virus" and "Continue" manual buttons are gone — auto-resolve handles resolution
     await expect(
       sharedPage.getByRole("button", { name: /Resolve Virus|Continue/ })
-    ).toBeVisible();
+    ).not.toBeVisible();
   });
 
-  test("next virus card name is displayed in the queue panel", async () => {
-    if (!reachedVirusResolution) test.skip();
-    // The queue panel shows either a card name or the empty-queue message
-    const hasCard = await sharedPage.getByText("Next virus card:").isVisible().catch(() => false);
-    const hasEmpty = await sharedPage.getByText("Queue empty").isVisible().catch(() => false);
-    expect(hasCard || hasEmpty).toBe(true);
+  test("game is in a valid virus-resolution-adjacent phase (REST check)", async () => {
+    if (!reachedVirusResolution || !sharedGameId) test.skip();
+    const token = await extractAuthToken(sharedPage);
+    if (!token) throw new Error("Could not extract auth token");
+    const resp = await fetch(
+      `${SUPABASE_URL}/rest/v1/games?id=eq.${sharedGameId}&select=phase`,
+      { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+    );
+    const [row] = (await resp.json()) as Array<{ phase: string }>;
+    const validPhases = [
+      "virus_resolution",
+      "player_turn",
+      "between_turns",
+      "resource_adjustment",
+      "secret_targeting",
+      "game_over",
+    ];
+    expect(validPhases).toContain(row?.phase);
   });
 
-  test("clicking Resolve Virus advances the phase or queues next card", async () => {
-    if (!reachedVirusResolution) test.skip();
+  test("phase auto-advances away from virus_resolution within 30s", async () => {
+    if (!reachedVirusResolution || !sharedGameId) test.skip();
+    const token = await extractAuthToken(sharedPage);
+    if (!token) throw new Error("Could not extract auth token");
 
-    const resolveBtn = sharedPage.getByRole("button", { name: /Resolve Virus|Continue/ });
-    await expect(resolveBtn).toBeVisible();
-    await resolveBtn.click();
+    // Poll REST every 2s for up to 30s waiting for phase to leave virus_resolution
+    const advancedPhases = [
+      "player_turn",
+      "between_turns",
+      "resource_adjustment",
+      "secret_targeting",
+      "game_over",
+    ];
+    let finalPhase = "virus_resolution";
+    for (let i = 0; i < 15; i++) {
+      await sharedPage.waitForTimeout(2000);
+      const resp = await fetch(
+        `${SUPABASE_URL}/rest/v1/games?id=eq.${sharedGameId}&select=phase`,
+        { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+      );
+      const [row] = (await resp.json()) as Array<{ phase: string }>;
+      finalPhase = row?.phase ?? "virus_resolution";
+      if (advancedPhases.includes(finalPhase)) break;
+    }
 
-    // After resolution the game transitions to one of:
-    // virus_resolution (more cards), player_turn (turn advance), resource_adjustment (mission ended)
-    await sharedPage.waitForTimeout(3000);
-
-    const stillResolving = await sharedPage.getByRole("heading", { name: "Virus Resolution" }).isVisible().catch(() => false);
-    const playerTurn = await sharedPage.getByRole("heading", { name: "Player Turn" }).isVisible().catch(() => false);
-    const resourceAdj = await sharedPage.getByRole("heading", { name: "Resource Adjustment" }).isVisible().catch(() => false);
-    expect(stillResolving || playerTurn || resourceAdj).toBe(true);
+    expect(advancedPhases).toContain(finalPhase);
   });
 });

@@ -22,6 +22,12 @@ export interface RevealChipConfig {
   ownerName: string;
 }
 
+export interface VirusResolvingCard {
+  id: string;
+  card_key: string;
+  cascaded_from?: string | null;
+}
+
 interface Props {
   aiPlayers: PlayerRow[]; // sorted by turn_order 0–3; slot A=index 0 (TL), B=1 (TR), C=2 (BR), D=3 (BL)
   coreProgress: number;
@@ -29,6 +35,8 @@ interface Props {
   turnOrderIds?: string[];
   resourceChips?: Record<string, ResourceChipConfig>; // keyed by player.id; set during resource phases
   revealSlots?: Record<string, RevealChipConfig>;     // keyed by player.id; set during card_reveal
+  dimCore?: boolean;
+  virusResolvingCard?: VirusResolvingCard | null;
 }
 
 // Fixed chip slots per UX_DESIGN §13 — do NOT generalise for other player counts
@@ -422,6 +430,120 @@ function AIChipGroup({
   );
 }
 
+// ── Virus resolution overlay (§7.7) ─────────────────────────────────────────
+
+const VIRUS_TYPE_LABEL: Record<string, string> = {
+  cascading_failure:  "VIRUS · CASCADE",
+  system_overload:    "VIRUS · SYSTEM",
+  model_corruption:   "VIRUS · CORRUPTION",
+  data_drift:         "VIRUS · DATA",
+  validation_failure: "VIRUS · VALIDATION",
+  pipeline_breakdown: "VIRUS · PIPELINE",
+  dependency_error:   "VIRUS · DEPENDENCY",
+  process_crash:      "VIRUS · PROCESS",
+  memory_leak:        "VIRUS · MEMORY",
+  resource_surge:     "VIRUS · RESOURCE",
+  cpu_drain:          "VIRUS · CPU",
+  memory_allocation:  "VIRUS · MEMORY",
+};
+
+const VIRUS_DISPLAY_NAME: Record<string, string> = {
+  cascading_failure:   "Cascading Failure",
+  system_overload:     "System Overload",
+  model_corruption:    "Model Corruption",
+  data_drift:          "Data Drift",
+  validation_failure:  "Validation Failure",
+  pipeline_breakdown:  "Pipeline Breakdown",
+  dependency_error:    "Dependency Error",
+  process_crash:       "Process Crash",
+  memory_leak:         "Memory Leak",
+  resource_surge:      "Resource Surge",
+  cpu_drain:           "CPU Drain",
+  memory_allocation:   "Memory Allocation",
+};
+
+const VIRUS_EFFECT_LINES: Record<string, string[]> = {
+  cascading_failure:   ["Triggers 2 more viruses", "from the pool immediately."],
+  system_overload:     ["Escape Timer +1."],
+  model_corruption:    ["Remove 1 Compute", "from active mission."],
+  data_drift:          ["Remove 1 Data", "from active mission."],
+  validation_failure:  ["Remove 1 Validation", "from active mission."],
+  pipeline_breakdown:  ["Next contribution has", "50% fail chance."],
+  dependency_error:    ["Compute locked until", "Data is contributed."],
+  process_crash:       ["Target AI skips", "their next turn."],
+  memory_leak:         ["Target AI loses 1 RAM."],
+  resource_surge:      ["Target AI gains 1 CPU."],
+  cpu_drain:           ["Target AI loses 1 CPU."],
+  memory_allocation:   ["Target AI gains 1 RAM."],
+};
+
+// Virus card overlay — positioned at SVG-local (220, 170) = global board (650, 350)
+// Uses key on the parent g to force remount (restarting SMIL animate) for each new card.
+function VirusCardOverlay({ card }: { card: VirusResolvingCard }) {
+  const isProgress = card.card_key === "compute" || card.card_key === "data" || card.card_key === "validation";
+  const typeLabel = isProgress ? "PROGRESS CARD" : (VIRUS_TYPE_LABEL[card.card_key] ?? "VIRUS · EFFECT");
+  const displayName = isProgress
+    ? card.card_key.charAt(0).toUpperCase() + card.card_key.slice(1)
+    : (VIRUS_DISPLAY_NAME[card.card_key] ?? card.card_key.replace(/_/g, " "));
+  const effectLines = isProgress
+    ? ["No effect — progress", "card in virus pool."]
+    : (VIRUS_EFFECT_LINES[card.card_key] ?? []);
+  const icon = isProgress
+    ? (card.card_key === "compute" ? "⚙" : card.card_key === "data" ? "▣" : "◆")
+    : "⚠";
+  const iconColor = isProgress ? "#9cb4d4" : "#a32d2d";
+  const isCascaded = !!card.cascaded_from;
+
+  return (
+    <g transform="translate(220, 170)">
+      {/* Shadow */}
+      <rect x="-10" y="-5" width="240" height="200" fill="#1a0606" opacity="0.6" rx="6" />
+      {/* Main card body */}
+      <rect x="0" y="0" width="220" height="190" fill="#1a0a0a" stroke="#a32d2d" strokeWidth="2" rx="6" />
+      {/* Header strip */}
+      <rect x="0" y="0" width="220" height="28" fill="#3a1010" rx="6" />
+      <rect x="0" y="18" width="220" height="10" fill="#3a1010" />
+      {/* Type label */}
+      <text x="14" y="20" fontFamily="monospace" fontSize="10" fill="#cca0a0" letterSpacing="2">
+        {typeLabel}
+      </text>
+      {/* ↳ TRIGGERED badge — only when cascaded */}
+      {isCascaded && (
+        <>
+          <rect x="148" y="8" width="64" height="14" fill="#1a0a0a" stroke="#a32d2d" strokeWidth="0.5" rx="2" />
+          <text x="180" y="18" fontFamily="monospace" fontSize="8" fill="#cca0a0" textAnchor="middle" letterSpacing="1">
+            {"↳ TRIGGERED"}
+          </text>
+        </>
+      )}
+      {/* Card name */}
+      <text x="14" y="52" fontFamily="sans-serif" fontSize="18" fill="#f4c4c4">
+        {displayName}
+      </text>
+      {/* Icon */}
+      <text x="110" y="100" fontFamily="sans-serif" fontSize="42" fill={iconColor} textAnchor="middle">
+        {icon}
+      </text>
+      {/* Separator */}
+      <line x1="14" y1="128" x2="206" y2="128" stroke="#5a2a2a" strokeWidth="0.5" />
+      {/* Effect lines */}
+      {effectLines.map((line, i) => (
+        <text key={i} x="14" y={144 + i * 15} fontFamily="sans-serif" fontSize="11" fill="#cca0a0">
+          {line}
+        </text>
+      ))}
+      {/* Pacing bar bg */}
+      <rect x="0" y="185" width="220" height="5" fill="#1a1a1a" />
+      {/* Pacing bar fill — SMIL animate restarts on remount via key prop in parent */}
+      <rect x="0" y="185" height="5" fill="#a32d2d">
+        {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+        {/* @ts-ignore — SMIL fill="freeze" is valid SVG but not in React's type defs */}
+        <animate attributeName="width" from="0" to="220" dur="2s" fill="freeze" />
+      </rect>
+    </g>
+  );
+}
+
 function CoreChipGroup({ coreProgress }: { coreProgress: number }) {
   // Core chip at panel coords (270, 200) — size 120×100
   const cx = 270;
@@ -505,6 +627,8 @@ export function CentralBoard({
   turnOrderIds = [],
   resourceChips,
   revealSlots,
+  dimCore,
+  virusResolvingCard,
 }: Props) {
   return (
     // Panel: x=430, y=180 in board coords → 660×500
@@ -580,8 +704,12 @@ export function CentralBoard({
         strokeDasharray="6 4"
       />
 
-      {/* Central core chip */}
-      <CoreChipGroup coreProgress={coreProgress} />
+      {/* Central core chip — dimmed during virus_resolution */}
+      {dimCore ? (
+        <g opacity={0.3}><CoreChipGroup coreProgress={coreProgress} /></g>
+      ) : (
+        <CoreChipGroup coreProgress={coreProgress} />
+      )}
 
       {/* AI chip cluster — 4 fixed positions */}
       {CHIP_SLOTS.map((slot, i) => {
@@ -605,6 +733,10 @@ export function CentralBoard({
           />
         );
       })}
+      {/* Virus card overlay — renders over board during virus_resolution */}
+      {virusResolvingCard && (
+        <VirusCardOverlay key={virusResolvingCard.id} card={virusResolvingCard} />
+      )}
     </svg>
   );
 }

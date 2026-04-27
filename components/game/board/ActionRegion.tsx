@@ -42,13 +42,15 @@ export function ActionRegion({ children, phase, isActivePlayer, currentTurnPlaye
       ? isActivePlayer
         ? "▸ YOUR ACTION REQUIRED · PULL FROM VIRUS POOL"
         : `// WAITING — ${currentTurnPlayerName ?? "ACTIVE AI"} PULLING`
+      : phase === "virus_resolution"
+      ? "// AUTO-RESOLVING · NO ACTION NEEDED"
       : showAmber
       ? "▸ YOUR ACTION REQUIRED · YOUR TURN"
       : isActionPhase && currentTurnPlayerName
       ? `// ${currentTurnPlayerName}'s TURN`
       : null;
 
-  const headerColor = showAmber ? "#d4a017" : "#555";
+  const headerColor = showAmber ? "#d4a017" : phase === "virus_resolution" ? "#a32d2d" : "#555";
 
   return (
     <div
