@@ -15,6 +15,7 @@ import { TopBar } from "./board/TopBar";
 import { TrackerBars } from "./board/TrackerBars";
 import { HumanTerminals } from "./board/HumanTerminals";
 import { MissionPanel } from "./board/MissionPanel";
+import { MissionCandidatesPanel } from "./board/MissionCandidatesPanel";
 import { VirusPoolPanel } from "./board/VirusPoolPanel";
 import { CentralBoard } from "./board/CentralBoard";
 import { ActionRegion } from "./board/ActionRegion";
@@ -57,6 +58,7 @@ export function GameBoard({
   );
   const [mission, setMission] = useState<ActiveMission | null>(initialMission);
   const [log, setLog] = useState<LogEntry[]>(initialLog);
+  const [missionSelected, setMissionSelected] = useState<string | null>(null);
 
   const gameId = game.id;
 
@@ -232,6 +234,11 @@ export function GameBoard({
       });
   }, [devMode, activeDevPlayer?.id]);
 
+  // Reset mission candidate selection when leaving mission_selection phase
+  useEffect(() => {
+    if (game.phase !== "mission_selection") setMissionSelected(null);
+  }, [game.phase]);
+
   const isHost = game.host_user_id === userId;
 
   // In dev mode the "current player" is whoever is selected in the switcher.
@@ -275,9 +282,9 @@ export function GameBoard({
         return (
           <MissionSelection
             gameId={gameId}
-            pendingOptions={game.pending_mission_options}
             currentPlayer={effectiveCurrentPlayer}
             overridePlayerId={overridePlayerId}
+            selected={missionSelected}
           />
         );
       case "card_reveal":
@@ -395,9 +402,19 @@ export function GameBoard({
 
         <HumanTerminals humanPlayers={humanPlayers} />
 
-        <MissionPanel mission={mission} />
-
-        <VirusPoolPanel />
+        {game.phase === "mission_selection" ? (
+          <MissionCandidatesPanel
+            pendingOptions={game.pending_mission_options}
+            selected={missionSelected}
+            onSelect={setMissionSelected}
+            isHuman={effectiveCurrentPlayer?.role === "human"}
+          />
+        ) : (
+          <>
+            <MissionPanel mission={mission} />
+            <VirusPoolPanel />
+          </>
+        )}
 
         <CentralBoard
           aiPlayers={aiPlayers}
@@ -409,9 +426,11 @@ export function GameBoard({
         <ActionRegion
           phase={game.phase}
           isActivePlayer={
-            (game.phase === "player_turn" || game.phase === "between_turns") &&
-            !!effectiveCurrentPlayer &&
-            effectiveCurrentPlayer.id === game.current_turn_player_id
+            ((game.phase === "player_turn" || game.phase === "between_turns") &&
+              !!effectiveCurrentPlayer &&
+              effectiveCurrentPlayer.id === game.current_turn_player_id) ||
+            (game.phase === "mission_selection" &&
+              effectiveCurrentPlayer?.role === "human")
           }
           currentTurnPlayerName={currentTurnPlayer?.display_name ?? undefined}
         >
