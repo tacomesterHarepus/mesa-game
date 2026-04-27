@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { invokeWithRetry } from "@/lib/supabase/invokeWithRetry";
 import type { Database } from "@/types/supabase";
 
 type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
@@ -8,9 +11,49 @@ interface Props {
   players: PlayerRow[];
   activePlayer: PlayerRow | null;
   onSwitch: (player: PlayerRow) => void;
+  gameId?: string;
+  phase?: string;
+  turnOrderIds?: string[] | null;
 }
 
-export function DevModeOverlay({ players, activePlayer, onSwitch }: Props) {
+export function DevModeOverlay({
+  players,
+  activePlayer,
+  onSwitch,
+  gameId,
+  phase,
+  turnOrderIds,
+}: Props) {
+  const [revealing, setRevealing] = useState(false);
+
+  async function handleRevealAll() {
+    if (!gameId || !turnOrderIds) return;
+    setRevealing(true);
+    const supabase = createClient();
+
+    for (const playerId of turnOrderIds) {
+      const player = players.find((p) => p.id === playerId);
+      if (!player || player.has_revealed_card) continue;
+
+      const { data: hand } = await supabase
+        .from("hands")
+        .select("*")
+        .eq("player_id", playerId)
+        .eq("game_id", gameId);
+
+      if (!hand || hand.length === 0) continue;
+
+      const firstCard = [...hand].sort((a, b) => a.id.localeCompare(b.id))[0];
+      await invokeWithRetry("reveal-card", {
+        game_id: gameId,
+        card_key: firstCard.card_key,
+        override_player_id: playerId,
+      });
+    }
+
+    setRevealing(false);
+  }
+
   return (
     <>
       {/* Full-width banner */}
@@ -47,6 +90,16 @@ export function DevModeOverlay({ players, activePlayer, onSwitch }: Props) {
             </button>
           );
         })}
+
+        {phase === "card_reveal" && (
+          <button
+            onClick={handleRevealAll}
+            disabled={revealing}
+            className="mt-2 px-2 py-1 text-xs font-mono rounded border border-border text-muted bg-base hover:border-muted hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {revealing ? "Revealing…" : "Reveal All"}
+          </button>
+        )}
       </div>
     </>
   );

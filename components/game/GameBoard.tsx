@@ -556,6 +556,9 @@ export function GameBoard({
           players={sortedPlayers}
           activePlayer={activeDevPlayer}
           onSwitch={setActiveDevPlayer}
+          gameId={gameId}
+          phase={game.phase}
+          turnOrderIds={game.turn_order_ids}
         />
       )}
 
