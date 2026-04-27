@@ -80,8 +80,7 @@ async function collectPlayerIds(page: Page): Promise<{ humanId: string | null; a
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 test.describe("card reveal", () => {
-  // SKIPPED: depends on pre-redesign UI; revisit after card_reveal task
-  test.skip("Reveal Card button text resets when switching to next AI after a reveal", async ({ browser }) => {
+  test("Reveal Card button text resets when switching to next AI after a reveal", async ({ browser }) => {
     const ctx: BrowserContext = await browser.newContext();
 
     try {

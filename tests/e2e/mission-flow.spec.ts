@@ -216,16 +216,22 @@ test.describe("game phase flow", () => {
         await cardBtn.click();
       }
       await revealBtn.click();
-      // Brief pause so the function call completes before moving to next AI
-      await page.waitForTimeout(1500);
+      // Wait for this AI's reveal to land before moving to the next.
+      // "You've revealed" appears when has_revealed_card=true propagates back via realtime.
+      // On the last AI the phase transitions and CardReveal unmounts — .catch() handles that.
+      await page.getByText(/You've revealed|Resource Allocation/).waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
     }
 
-    // All AIs revealed — game should advance to resource_allocation
+    // All AIs revealed — game should advance to resource_allocation.
+    // Use waitFor (not isVisible) so we actually wait for the realtime event to propagate.
     let sawResourceAllocation = false;
     for (const page of pages) {
-      if (await page.getByText("Resource Allocation").isVisible({ timeout: 15_000 }).catch(() => false)) {
+      try {
+        await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 15_000 });
         sawResourceAllocation = true;
         break;
+      } catch {
+        // not on this page
       }
     }
     expect(sawResourceAllocation).toBe(true);
