@@ -1,5 +1,6 @@
 "use client";
 
+import { CARD_MAP } from "@/lib/game/cards";
 import type { Database } from "@/types/supabase";
 
 type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
@@ -14,12 +15,20 @@ export interface ResourceChipConfig {
   ramPlus: { enabled: boolean; onClick: () => void } | null;
 }
 
+export interface RevealChipConfig {
+  hasRevealed: boolean;
+  revealedCardKey: string | null;
+  isOwnSlot: boolean;
+  ownerName: string;
+}
+
 interface Props {
   aiPlayers: PlayerRow[]; // sorted by turn_order 0–3; slot A=index 0 (TL), B=1 (TR), C=2 (BR), D=3 (BL)
   coreProgress: number;
   currentTurnPlayerId?: string;
   turnOrderIds?: string[];
   resourceChips?: Record<string, ResourceChipConfig>; // keyed by player.id; set during resource phases
+  revealSlots?: Record<string, RevealChipConfig>;     // keyed by player.id; set during card_reveal
 }
 
 // Fixed chip slots per UX_DESIGN §13 — do NOT generalise for other player counts
@@ -78,6 +87,65 @@ function SVGChipButton({
   );
 }
 
+function RevealSlotGroup({
+  slot,
+  slotSide,
+}: {
+  slot: RevealChipConfig;
+  slotSide: "left" | "right";
+}) {
+  const slotX = slotSide === "left" ? -65 : 165;
+  const slotY = 3;
+
+  if (slot.hasRevealed && slot.revealedCardKey) {
+    const cardDef = CARD_MAP[slot.revealedCardKey];
+    const isVirus = cardDef?.type === "virus";
+    const icon =
+      slot.revealedCardKey === "compute" ? "⚙"
+      : slot.revealedCardKey === "data" ? "▣"
+      : slot.revealedCardKey === "validation" ? "◆"
+      : "⚠";
+    const iconColor =
+      isVirus ? "#a32d2d"
+      : slot.revealedCardKey === "data" ? "#5dcaa5"
+      : slot.revealedCardKey === "validation" ? "#caa55d"
+      : "#9cb4d4";
+    const cardName = (cardDef?.name ?? slot.revealedCardKey).toUpperCase().slice(0, 9);
+
+    return (
+      <g transform={`translate(${slotX}, ${slotY})`}>
+        <rect x="0" y="0" width="60" height="84" fill={isVirus ? "#180c0c" : "#0c1410"}
+          stroke={isVirus ? "#a32d2d" : "#3a5a4a"} strokeWidth="1" rx="2" />
+        <rect x="0" y="0" width="60" height="18" fill={isVirus ? "#2a1010" : "#0f1820"} rx="2" />
+        <text x="30" y="44" textAnchor="middle" fontFamily="sans-serif" fontSize="22" fill={iconColor}>{icon}</text>
+        <text x="30" y="62" textAnchor="middle" fontFamily="monospace" fontSize="7"
+          fill={iconColor} letterSpacing="0.5">{cardName}</text>
+        <text x="30" y="76" textAnchor="middle" fontFamily="sans-serif" fontSize="8"
+          fill="#888">{slot.ownerName.slice(0, 8)}</text>
+      </g>
+    );
+  }
+
+  // Pending (selecting) state
+  const borderColor = slot.isOwnSlot ? "#d4a017" : "#3a3a3a";
+  const borderWidth = slot.isOwnSlot ? 1.5 : 1;
+  const questionColor = slot.isOwnSlot ? "#d4a017" : "#444";
+  const labelColor = slot.isOwnSlot ? "#a87a17" : "#555";
+
+  return (
+    <g transform={`translate(${slotX}, ${slotY})`}>
+      <rect x="0" y="0" width="60" height="84" fill="none"
+        stroke={borderColor} strokeWidth={borderWidth} strokeDasharray="3 2" rx="2" />
+      <text x="30" y="48" textAnchor="middle" fontFamily="monospace" fontSize="24" fill={questionColor}>?</text>
+      <text x="30" y="70" textAnchor="middle" fontFamily="monospace" fontSize="7"
+        fill={labelColor} letterSpacing="1">SELECTING</text>
+    </g>
+  );
+}
+
+// Slot sides by chip index: A(TL)=left, B(TR)=right, C(BR)=right, D(BL)=left
+const SLOT_SIDES: ("left" | "right")[] = ["left", "right", "right", "left"];
+
 function AIChipGroup({
   slotLabel,
   chipX,
@@ -87,6 +155,8 @@ function AIChipGroup({
   isActive,
   missionSeatNum,
   resourceChip,
+  revealSlot,
+  slotSide = "left",
 }: {
   slotLabel: string;
   chipX: number;
@@ -96,6 +166,8 @@ function AIChipGroup({
   isActive: boolean;
   missionSeatNum: number | null;
   resourceChip?: ResourceChipConfig;
+  revealSlot?: RevealChipConfig;
+  slotSide?: "left" | "right";
 }) {
   const cpuFilled = Math.min(player?.cpu ?? 1, 4);
   const ramFilled = Math.min(player?.ram ?? 4, 5);
@@ -340,6 +412,11 @@ function AIChipGroup({
             )}
           </g>
         )}
+
+        {/* Reveal slot — rendered in chip-local coords, to outside edge */}
+        {revealSlot && (
+          <RevealSlotGroup slot={revealSlot} slotSide={slotSide} />
+        )}
       </g>
     </g>
   );
@@ -427,6 +504,7 @@ export function CentralBoard({
   currentTurnPlayerId,
   turnOrderIds = [],
   resourceChips,
+  revealSlots,
 }: Props) {
   return (
     // Panel: x=430, y=180 in board coords → 660×500
@@ -522,6 +600,8 @@ export function CentralBoard({
             isActive={isActive}
             missionSeatNum={missionSeatNum}
             resourceChip={player ? resourceChips?.[player.id] : undefined}
+            revealSlot={player ? revealSlots?.[player.id] : undefined}
+            slotSide={SLOT_SIDES[i]}
           />
         );
       })}
