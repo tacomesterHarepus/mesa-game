@@ -223,7 +223,8 @@ export function RightPanel({
           </div>
         )}
 
-        {activeTab === "chat" && (
+        {/* Always mounted so Realtime subscription and onNewMessage stay alive on inactive tabs */}
+        <div style={{ display: activeTab === "chat" ? "flex" : "none", flex: 1, minHeight: 0, flexDirection: "column" }}>
           <PublicChat
             gameId={gameId}
             currentPlayer={currentPlayer}
@@ -231,16 +232,18 @@ export function RightPanel({
             canPost={canPostPublic(phase, currentPlayer)}
             onNewMessage={handleNewChatMessage}
           />
-        )}
+        </div>
 
-        {activeTab === "private" && isMisaligned && currentPlayer && (
-          <MisalignedPrivateChat
-            gameId={gameId}
-            currentPlayer={currentPlayer}
-            misalignedPlayers={misalignedPlayers}
-            canPost={canPostPrivate(phase)}
-            onNewMessage={handleNewPrivateMessage}
-          />
+        {isMisaligned && currentPlayer && (
+          <div style={{ display: activeTab === "private" ? "flex" : "none", flex: 1, minHeight: 0, flexDirection: "column" }}>
+            <MisalignedPrivateChat
+              gameId={gameId}
+              currentPlayer={currentPlayer}
+              misalignedPlayers={misalignedPlayers}
+              canPost={canPostPrivate(phase)}
+              onNewMessage={handleNewPrivateMessage}
+            />
+          </div>
         )}
       </div>
     </div>
