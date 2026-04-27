@@ -8,6 +8,20 @@
 
 When the user asks a question during a planning or design phase, respond with analysis only. Do not begin implementation until the user explicitly says "approved" or "go."
 
+## Commit and push discipline
+
+After completing any task that produces commits:
+
+1. Commit work in logical chunks as you go (not at the end as one mega-commit).
+2. Update SESSION_NOTES.md as the final commit of the task.
+3. Push to origin/master before reporting "DONE" to the user.
+
+Pushing is part of "done." A task is not complete until it is on origin.
+
+Rationale: the user reviews work from a separate Claude chat that reads the GitHub repo state. Unpushed commits are invisible to that chat, which breaks the review workflow. If a task is committed but not pushed, the user cannot effectively review or plan next steps from a different device.
+
+Exception: if the user has explicitly said "don't push yet" for a specific task, hold the push and report ready-to-push status instead.
+
 ## Diagnosis files
 
 When a substantial investigation produces analysis worth preserving (root cause traces, architectural findings, state audits), save to `DIAGNOSIS_YYYY-MM-DD.md` in the project root and reference from SESSION_NOTES.md. These files are historical record, not instructions - read them when SESSION_NOTES references them for context on past decisions.
