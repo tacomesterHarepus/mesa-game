@@ -1,12 +1,25 @@
+"use client";
+
 import type { Database } from "@/types/supabase";
 
 type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
+
+export interface ResourceChipConfig {
+  mode: "adjustment" | "allocation";
+  pendingCpu: number;
+  pendingRam: number;
+  cpuMinus: { enabled: boolean; onClick: () => void } | null;
+  cpuPlus: { enabled: boolean; onClick: () => void } | null;
+  ramMinus: { enabled: boolean; onClick: () => void } | null;
+  ramPlus: { enabled: boolean; onClick: () => void } | null;
+}
 
 interface Props {
   aiPlayers: PlayerRow[]; // sorted by turn_order 0–3; slot A=index 0 (TL), B=1 (TR), C=2 (BR), D=3 (BL)
   coreProgress: number;
   currentTurnPlayerId?: string;
   turnOrderIds?: string[];
+  resourceChips?: Record<string, ResourceChipConfig>; // keyed by player.id; set during resource phases
 }
 
 // Fixed chip slots per UX_DESIGN §13 — do NOT generalise for other player counts
@@ -22,6 +35,49 @@ const AI_PIN_X = [15, 32, 49, 66, 83, 100, 117, 134] as const;
 // Pin x-offsets for the wider core chip (10 pins, 4×4 each)
 const CORE_PIN_X = [15, 25, 35, 45, 55, 65, 75, 85, 95, 105] as const;
 
+function SVGChipButton({
+  x,
+  y,
+  label,
+  enabled,
+  onClick,
+}: {
+  x: number;
+  y: number;
+  label: string;
+  enabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <g
+      transform={`translate(${x}, ${y})`}
+      onClick={enabled ? onClick : undefined}
+      style={{ cursor: enabled ? "pointer" : "default" }}
+    >
+      <rect
+        x="0"
+        y="0"
+        width="12"
+        height="10"
+        fill={enabled ? "#2a3a2a" : "#141414"}
+        stroke={enabled ? "#5a7a5a" : "#222"}
+        strokeWidth="0.5"
+        rx="1"
+      />
+      <text
+        x="6"
+        y="8"
+        fontFamily="monospace"
+        fontSize="9"
+        fill={enabled ? "#9cd4b4" : "#333"}
+        textAnchor="middle"
+      >
+        {label}
+      </text>
+    </g>
+  );
+}
+
 function AIChipGroup({
   slotLabel,
   chipX,
@@ -30,6 +86,7 @@ function AIChipGroup({
   player,
   isActive,
   missionSeatNum,
+  resourceChip,
 }: {
   slotLabel: string;
   chipX: number;
@@ -38,6 +95,7 @@ function AIChipGroup({
   player: PlayerRow | undefined;
   isActive: boolean;
   missionSeatNum: number | null;
+  resourceChip?: ResourceChipConfig;
 }) {
   const cpuFilled = Math.min(player?.cpu ?? 1, 4);
   const ramFilled = Math.min(player?.ram ?? 4, 5);
@@ -61,6 +119,49 @@ function AIChipGroup({
   const trackStroke  = isActive ? "#5a4a1a" : "#3a5a4a";
   const counterText  = isActive ? "#a87a17" : "#7a8a9a";
   const dotSep       = isActive ? "#5a4a1a" : "#3a4a3a";
+
+  // Pending-state visual helpers (§5.2)
+  // For each CPU square i (0–3):
+  //   adjustment: squares below target = solid; squares [target..cpu) = outlined red dashed
+  //   allocation: squares below cpu = solid; squares [cpu..cpu+pending) = outlined amber dashed
+  function cpuSquareProps(i: number) {
+    if (!resourceChip) {
+      return { fill: i < cpuFilled ? trackFill : "none", stroke: trackStroke, strokeWidth: 0.5, strokeDasharray: undefined };
+    }
+    if (resourceChip.mode === "adjustment") {
+      const target = cpuFilled - resourceChip.pendingCpu;
+      if (i < target) return { fill: trackFill, stroke: trackStroke, strokeWidth: 0.5, strokeDasharray: undefined };
+      if (i < cpuFilled) return { fill: "none", stroke: "#a32d2d", strokeWidth: 1.5, strokeDasharray: "2 1" };
+      return { fill: "none", stroke: trackStroke, strokeWidth: 0.5, strokeDasharray: undefined };
+    } else {
+      const addEnd = cpuFilled + resourceChip.pendingCpu;
+      if (i < cpuFilled) return { fill: trackFill, stroke: trackStroke, strokeWidth: 0.5, strokeDasharray: undefined };
+      if (i < addEnd) return { fill: "none", stroke: "#d4a017", strokeWidth: 1.5, strokeDasharray: "2 1" };
+      return { fill: "none", stroke: trackStroke, strokeWidth: 0.5, strokeDasharray: undefined };
+    }
+  }
+
+  function ramSquareProps(i: number) {
+    if (!resourceChip) {
+      return { fill: i < ramFilled ? trackFill : "none", stroke: trackStroke, strokeWidth: 0.5, strokeDasharray: undefined };
+    }
+    if (resourceChip.mode === "adjustment") {
+      const target = ramFilled - resourceChip.pendingRam;
+      if (i < target) return { fill: trackFill, stroke: trackStroke, strokeWidth: 0.5, strokeDasharray: undefined };
+      if (i < ramFilled) return { fill: "none", stroke: "#a32d2d", strokeWidth: 1.5, strokeDasharray: "2 1" };
+      return { fill: "none", stroke: trackStroke, strokeWidth: 0.5, strokeDasharray: undefined };
+    } else {
+      const addEnd = ramFilled + resourceChip.pendingRam;
+      if (i < ramFilled) return { fill: trackFill, stroke: trackStroke, strokeWidth: 0.5, strokeDasharray: undefined };
+      if (i < addEnd) return { fill: "none", stroke: "#d4a017", strokeWidth: 1.5, strokeDasharray: "2 1" };
+      return { fill: "none", stroke: trackStroke, strokeWidth: 0.5, strokeDasharray: undefined };
+    }
+  }
+
+  const showButtons = !!(
+    resourceChip &&
+    (resourceChip.cpuMinus || resourceChip.cpuPlus || resourceChip.ramMinus || resourceChip.ramPlus)
+  );
 
   return (
     <g>
@@ -144,18 +245,22 @@ function AIChipGroup({
         </text>
 
         {/* CPU track — 4 squares of 10×10, stride 11 */}
-        {([0, 1, 2, 3] as const).map((i) => (
-          <rect
-            key={i}
-            x={40 + i * 11}
-            y={61}
-            width="10"
-            height="10"
-            fill={i < cpuFilled ? trackFill : "none"}
-            stroke={trackStroke}
-            strokeWidth="0.5"
-          />
-        ))}
+        {([0, 1, 2, 3] as const).map((i) => {
+          const sq = cpuSquareProps(i);
+          return (
+            <rect
+              key={i}
+              x={40 + i * 11}
+              y={61}
+              width="10"
+              height="10"
+              fill={sq.fill}
+              stroke={sq.stroke}
+              strokeWidth={sq.strokeWidth}
+              strokeDasharray={sq.strokeDasharray}
+            />
+          );
+        })}
 
         {/* RAM label */}
         <text x="90" y="68" fontFamily="monospace" fontSize="10" fill={trackLabel}>
@@ -163,24 +268,78 @@ function AIChipGroup({
         </text>
 
         {/* RAM track — 5 squares of 6×10, stride 7 */}
-        {([0, 1, 2, 3, 4] as const).map((i) => (
-          <rect
-            key={i}
-            x={115 + i * 7}
-            y={61}
-            width="6"
-            height="10"
-            fill={i < ramFilled ? trackFill : "none"}
-            stroke={trackStroke}
-            strokeWidth="0.5"
-          />
-        ))}
+        {([0, 1, 2, 3, 4] as const).map((i) => {
+          const sq = ramSquareProps(i);
+          return (
+            <rect
+              key={i}
+              x={115 + i * 7}
+              y={61}
+              width="6"
+              height="10"
+              fill={sq.fill}
+              stroke={sq.stroke}
+              strokeWidth={sq.strokeWidth}
+              strokeDasharray={sq.strokeDasharray}
+            />
+          );
+        })}
 
         {/* Hand stack placeholder — 3 overlapping 14×10 cards */}
         <rect x="4"  y="74" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" strokeWidth="0.5" rx="1" />
         <rect x="2"  y="76" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" strokeWidth="0.5" rx="1" />
         <rect x="0"  y="78" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" strokeWidth="0.5" rx="1" />
         <text x="22" y="86" fontFamily="monospace" fontSize="9" fill="#9cb4a4">×? cards</text>
+
+        {/* Resource [-]/[+] buttons — rendered outside chip body to the right */}
+        {showButtons && resourceChip && (
+          <g>
+            {/* CPU row label */}
+            <text x="163" y="69" fontFamily="monospace" fontSize="7" fill="#7a9a8a">C</text>
+            {/* CPU [-] */}
+            {resourceChip.cpuMinus && (
+              <SVGChipButton
+                x={171}
+                y={61}
+                label="−"
+                enabled={resourceChip.cpuMinus.enabled}
+                onClick={resourceChip.cpuMinus.onClick}
+              />
+            )}
+            {/* CPU [+] */}
+            {resourceChip.cpuPlus && (
+              <SVGChipButton
+                x={185}
+                y={61}
+                label="+"
+                enabled={resourceChip.cpuPlus.enabled}
+                onClick={resourceChip.cpuPlus.onClick}
+              />
+            )}
+            {/* RAM row label */}
+            <text x="163" y="82" fontFamily="monospace" fontSize="7" fill="#7a9a8a">R</text>
+            {/* RAM [-] */}
+            {resourceChip.ramMinus && (
+              <SVGChipButton
+                x={171}
+                y={74}
+                label="−"
+                enabled={resourceChip.ramMinus.enabled}
+                onClick={resourceChip.ramMinus.onClick}
+              />
+            )}
+            {/* RAM [+] */}
+            {resourceChip.ramPlus && (
+              <SVGChipButton
+                x={185}
+                y={74}
+                label="+"
+                enabled={resourceChip.ramPlus.enabled}
+                onClick={resourceChip.ramPlus.onClick}
+              />
+            )}
+          </g>
+        )}
       </g>
     </g>
   );
@@ -262,7 +421,13 @@ function CoreChipGroup({ coreProgress }: { coreProgress: number }) {
   );
 }
 
-export function CentralBoard({ aiPlayers, coreProgress, currentTurnPlayerId, turnOrderIds = [] }: Props) {
+export function CentralBoard({
+  aiPlayers,
+  coreProgress,
+  currentTurnPlayerId,
+  turnOrderIds = [],
+  resourceChips,
+}: Props) {
   return (
     // Panel: x=430, y=180 in board coords → 660×500
     <svg
@@ -356,6 +521,7 @@ export function CentralBoard({ aiPlayers, coreProgress, currentTurnPlayerId, tur
             player={player}
             isActive={isActive}
             missionSeatNum={missionSeatNum}
+            resourceChip={player ? resourceChips?.[player.id] : undefined}
           />
         );
       })}
