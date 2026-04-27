@@ -28,6 +28,7 @@ type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
 type ActiveMission = Database["public"]["Tables"]["active_mission"]["Row"];
 type LogEntry = Database["public"]["Tables"]["game_log"]["Row"];
 type HandCard = Database["public"]["Tables"]["hands"]["Row"];
+type MissionContribution = Database["public"]["Tables"]["mission_contributions"]["Row"];
 
 interface QueueCard {
   id: string;
@@ -75,6 +76,7 @@ export function GameBoard({
   const [poolCount, setPoolCount] = useState(4);
   const [virusQueue, setVirusQueue] = useState<QueueCard[]>([]);
   const [localNominationId, setLocalNominationId] = useState<string | null>(null);
+  const [contributions, setContributions] = useState<MissionContribution[]>([]);
   const [missionSelected, setMissionSelected] = useState<string | null>(null);
   const [resPendingCpu, setResPendingCpu] = useState<Record<string, number>>({});
   const [resPendingRam, setResPendingRam] = useState<Record<string, number>>({});
@@ -98,17 +100,21 @@ export function GameBoard({
       if (g) setGame((prev) => ({ ...prev, ...(g as unknown as Partial<Game>) }));
 
       const missionId = g?.current_mission_id ?? null;
-      const [{ data: p }, { data: m }, poolResult] = await Promise.all([
+      const [{ data: p }, { data: m }, poolResult, { data: contrib }] = await Promise.all([
         supabase.from("players").select("*").eq("game_id", gameId),
         missionId
           ? supabase.from("active_mission").select("*").eq("id", missionId).maybeSingle()
           : Promise.resolve({ data: null }),
         supabase.from("virus_pool").select("id", { count: "exact", head: true }).eq("game_id", gameId),
+        missionId
+          ? supabase.from("mission_contributions").select("*").eq("mission_id", missionId)
+          : Promise.resolve({ data: [] }),
       ]);
       if (p && p.length > 0) setPlayers(p);
       // m is null when there is no active mission (lobby, resource_adjustment, etc.) — that is valid
       if (m !== undefined) setMission(m);
       if (poolResult.count !== null) setPoolCount(poolResult.count);
+      setContributions(contrib ?? []);
 
       // game_log poll backup: Realtime INSERT can be missed silently; poll catches stragglers.
       // Fetches the 50 most-recent rows and appends any not yet in state. gameId is referenced
@@ -358,6 +364,42 @@ export function GameBoard({
     };
   }, [gameId, game.phase]);
 
+  // mission_contributions subscription — scoped to current mission_id so it re-creates on mission change.
+  // mission_contributions has no game_id column, so we filter by mission_id directly.
+  useEffect(() => {
+    const missionId = mission?.id;
+    if (!missionId) {
+      setContributions([]);
+      return;
+    }
+
+    const supabase = createClient();
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const setup = async () => {
+      await supabase.auth.getSession();
+      if (cancelled) return;
+
+      channel = supabase
+        .channel(`mission-contrib-${missionId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "mission_contributions", filter: `mission_id=eq.${missionId}` },
+          (payload) => {
+            setContributions((prev) => [...prev, payload.new as MissionContribution]);
+          }
+        )
+        .subscribe();
+    };
+
+    setup();
+    return () => {
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [mission?.id]);
+
   const isHost = game.host_user_id === userId;
 
   // In dev mode the "current player" is whoever is selected in the switcher.
@@ -485,6 +527,20 @@ export function GameBoard({
   // ── Targeting chip config ─────────────────────────────────────────────────
   const isTargetingPhase = game.phase === "secret_targeting";
   const isMisalignedViewer = effectiveCurrentPlayer?.role === "misaligned_ai";
+
+  // Per-player contribution counts derived from mission_contributions state.
+  // Excludes failed contributions (pipeline_breakdown kills) since they don't count toward the mission.
+  const contributionMap: Record<string, { compute: number; data: number; validation: number }> = {};
+  for (const c of contributions) {
+    if (!c.failed) {
+      if (!contributionMap[c.player_id]) {
+        contributionMap[c.player_id] = { compute: 0, data: 0, validation: 0 };
+      }
+      if (c.card_type === "compute") contributionMap[c.player_id].compute++;
+      else if (c.card_type === "data") contributionMap[c.player_id].data++;
+      else if (c.card_type === "validation") contributionMap[c.player_id].validation++;
+    }
+  }
 
   const targetingChips: Record<string, TargetingChipConfig> | undefined =
     isTargetingPhase && isMisalignedViewer
@@ -712,6 +768,7 @@ export function GameBoard({
           resourceChips={resourceChips}
           revealSlots={revealSlots}
           targetingChips={targetingChips}
+          contributions={contributionMap}
           dimCore={game.phase === "virus_resolution"}
           virusResolvingCard={(virusQueue[0] ?? null) as VirusResolvingCard | null}
         />

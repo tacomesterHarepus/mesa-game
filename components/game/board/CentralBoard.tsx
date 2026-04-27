@@ -43,6 +43,7 @@ interface Props {
   resourceChips?: Record<string, ResourceChipConfig>; // keyed by player.id; set during resource phases
   revealSlots?: Record<string, RevealChipConfig>;     // keyed by player.id; set during card_reveal
   targetingChips?: Record<string, TargetingChipConfig>; // keyed by player.id; set during secret_targeting
+  contributions?: Record<string, { compute: number; data: number; validation: number }>;
   dimCore?: boolean;
   virusResolvingCard?: VirusResolvingCard | null;
 }
@@ -173,6 +174,7 @@ function AIChipGroup({
   resourceChip,
   revealSlot,
   targetingChip,
+  contributions,
   slotSide = "left",
 }: {
   slotLabel: string;
@@ -185,6 +187,7 @@ function AIChipGroup({
   resourceChip?: ResourceChipConfig;
   revealSlot?: RevealChipConfig;
   targetingChip?: TargetingChipConfig;
+  contributions?: { compute: number; data: number; validation: number };
   slotSide?: "left" | "right";
 }) {
   const cpuFilled = Math.min(player?.cpu ?? 1, 4);
@@ -317,13 +320,13 @@ function AIChipGroup({
         ) : (
           <>
             <text x="14" y="14" fontFamily="sans-serif" fontSize="11" fill="#9cb4d4" textAnchor="middle">⚙</text>
-            <text x="26" y="14" fontFamily="monospace" fontSize="11" fill={counterText}>0</text>
+            <text x="26" y="14" fontFamily="monospace" fontSize="11" fill={counterText}>{contributions?.compute ?? 0}</text>
             <text x="44" y="13" fontFamily="monospace" fontSize="9" fill={dotSep}>·</text>
             <text x="68" y="14" fontFamily="sans-serif" fontSize="11" fill="#5dcaa5" textAnchor="middle">▣</text>
-            <text x="80" y="14" fontFamily="monospace" fontSize="11" fill={counterText}>0</text>
+            <text x="80" y="14" fontFamily="monospace" fontSize="11" fill={counterText}>{contributions?.data ?? 0}</text>
             <text x="98" y="13" fontFamily="monospace" fontSize="9" fill={dotSep}>·</text>
             <text x="122" y="14" fontFamily="sans-serif" fontSize="11" fill="#caa55d" textAnchor="middle">◆</text>
-            <text x="134" y="14" fontFamily="monospace" fontSize="11" fill={counterText}>0</text>
+            <text x="134" y="14" fontFamily="monospace" fontSize="11" fill={counterText}>{contributions?.validation ?? 0}</text>
           </>
         )}
       </g>
@@ -691,6 +694,7 @@ export function CentralBoard({
   resourceChips,
   revealSlots,
   targetingChips,
+  contributions,
   dimCore,
   virusResolvingCard,
 }: Props) {
@@ -794,6 +798,7 @@ export function CentralBoard({
             resourceChip={player ? resourceChips?.[player.id] : undefined}
             revealSlot={player ? revealSlots?.[player.id] : undefined}
             targetingChip={player ? targetingChips?.[player.id] : undefined}
+            contributions={player ? contributions?.[player.id] : undefined}
             slotSide={SLOT_SIDES[i]}
           />
         );
