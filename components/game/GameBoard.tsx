@@ -16,7 +16,7 @@ import { HumanTerminals } from "./board/HumanTerminals";
 import { MissionPanel } from "./board/MissionPanel";
 import { MissionCandidatesPanel } from "./board/MissionCandidatesPanel";
 import { VirusPoolPanel } from "./board/VirusPoolPanel";
-import { CentralBoard, type ResourceChipConfig } from "./board/CentralBoard";
+import { CentralBoard, type ResourceChipConfig, type RevealChipConfig } from "./board/CentralBoard";
 import { ActionRegion } from "./board/ActionRegion";
 import { RightPanel } from "./board/RightPanel";
 import { MISSION_MAP } from "@/lib/game/missions";
@@ -378,6 +378,22 @@ export function GameBoard({
       )
     : undefined;
 
+  // ── Card reveal chip config ───────────────────────────────────────────────
+  const isRevealPhase = game.phase === "card_reveal";
+  const revealSlots: Record<string, RevealChipConfig> | undefined = isRevealPhase
+    ? Object.fromEntries(
+        aiPlayers.map((player) => [
+          player.id,
+          {
+            hasRevealed: player.has_revealed_card,
+            revealedCardKey: player.revealed_card_key,
+            isOwnSlot: effectiveCurrentPlayer?.id === player.id,
+            ownerName: player.display_name,
+          },
+        ])
+      )
+    : undefined;
+
   function renderPhase() {
     switch (game.phase) {
       case "resource_adjustment":
@@ -536,12 +552,13 @@ export function GameBoard({
         <CentralBoard
           aiPlayers={aiPlayers}
           coreProgress={game.core_progress}
-          // Suppress active-chip styling during resource phases (no AI is "active" §7.3)
+          // Suppress active-chip styling during resource + reveal phases (no single "active" AI)
           currentTurnPlayerId={
-            isResPhase ? undefined : (game.current_turn_player_id ?? undefined)
+            isResPhase || isRevealPhase ? undefined : (game.current_turn_player_id ?? undefined)
           }
           turnOrderIds={game.turn_order_ids ?? []}
           resourceChips={resourceChips}
+          revealSlots={revealSlots}
         />
 
         <ActionRegion
@@ -554,7 +571,11 @@ export function GameBoard({
               effectiveCurrentPlayer?.role === "human") ||
             ((game.phase === "resource_adjustment" ||
               game.phase === "resource_allocation") &&
-              effectiveCurrentPlayer?.role === "human")
+              effectiveCurrentPlayer?.role === "human") ||
+            (game.phase === "card_reveal" &&
+              !!effectiveCurrentPlayer &&
+              effectiveCurrentPlayer.role !== "human" &&
+              !effectiveCurrentPlayer.has_revealed_card)
           }
           currentTurnPlayerName={currentTurnPlayer?.display_name ?? undefined}
         >

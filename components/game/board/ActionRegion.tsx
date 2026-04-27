@@ -13,7 +13,8 @@ export function ActionRegion({ children, phase, isActivePlayer, currentTurnPlaye
     phase === "between_turns" ||
     phase === "mission_selection" ||
     phase === "resource_adjustment" ||
-    phase === "resource_allocation";
+    phase === "resource_allocation" ||
+    phase === "card_reveal";
   const showAmber = isActionPhase && isActivePlayer;
 
   const border = showAmber ? "2px solid #d4a017" : "1px solid #3a3a3a";
@@ -32,6 +33,10 @@ export function ActionRegion({ children, phase, isActivePlayer, currentTurnPlaye
       ? isActivePlayer
         ? "▸ YOUR ACTION REQUIRED · ALLOCATE RESOURCES"
         : "// HUMANS ALLOCATING RESOURCES"
+      : phase === "card_reveal"
+      ? isActivePlayer
+        ? "▸ YOUR ACTION REQUIRED · REVEAL ONE CARD"
+        : "// AIs REVEALING CARDS"
       : showAmber
       ? "▸ YOUR ACTION REQUIRED · YOUR TURN"
       : isActionPhase && currentTurnPlayerName
