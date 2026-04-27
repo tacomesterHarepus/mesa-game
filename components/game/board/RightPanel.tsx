@@ -35,19 +35,24 @@ function formatTime(ts: string): string {
 export function RightPanel({ log }: Props) {
   const [activeTab, setActiveTab] = useState<"log" | "chat">("log");
   const logRef = useRef<HTMLDivElement>(null);
-  const mountedRef = useRef(false);
+  // Track whether user was at the bottom BEFORE the render — checked via scroll listener
+  // so batch additions (e.g. from poll catch-up) don't falsely measure post-render distance.
+  const wasAtBottomRef = useRef(true);
 
-  // Scroll to bottom on first mount; auto-follow if near bottom
   useEffect(() => {
     const el = logRef.current;
     if (!el) return;
-    if (!mountedRef.current) {
-      mountedRef.current = true;
-      el.scrollTop = el.scrollHeight;
-      return;
-    }
-    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    if (distFromBottom <= 40) {
+    const onScroll = () => {
+      wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 40;
+    };
+    el.addEventListener("scroll", onScroll);
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const el = logRef.current;
+    if (!el) return;
+    if (wasAtBottomRef.current) {
       el.scrollTop = el.scrollHeight;
     }
   }, [log.length]);

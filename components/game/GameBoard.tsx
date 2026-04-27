@@ -97,6 +97,25 @@ export function GameBoard({
       // m is null when there is no active mission (lobby, resource_adjustment, etc.) — that is valid
       if (m !== undefined) setMission(m);
 
+      // game_log poll backup: Realtime INSERT can be missed silently; poll catches stragglers.
+      // Fetches the 50 most-recent rows and appends any not yet in state. gameId is referenced
+      // only in the query (captured at useEffect setup); setLog uses a functional update so
+      // prev is current at apply time, no stale-closure risk on game switch.
+      // Assumes game_log is append-only — no edge function ever DELETEs from it.
+      const { data: recentLog } = await supabase
+        .from("game_log")
+        .select("*")
+        .eq("game_id", gameId)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (recentLog && recentLog.length > 0) {
+        setLog((prev) => {
+          const existingIds = new Set(prev.map((e) => e.id));
+          const newRows = recentLog.filter((r) => !existingIds.has(r.id)).reverse();
+          return newRows.length > 0 ? [...prev, ...newRows] : prev;
+        });
+      }
+
       // Hand poll backup: avoids invisible cards when Realtime INSERT/DELETE is dropped.
       // Sort by id ensures stable display order across polls (hands table has no position column).
       if (handPlayerId && handPlayerRole !== "human") {
