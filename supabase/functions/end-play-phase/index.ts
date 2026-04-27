@@ -170,32 +170,21 @@ Deno.serve(async (req) => {
     const cardsPlayedThisTurn = game.turn_play_count;
     const numViruses = virusCount(callerPlayer.cpu, cardsPlayedThisTurn);
 
-    // ── 4. Queue resolution or advance directly ───────────────────────────────
+    // ── 4. Fork to virus_pull or advance directly ────────────────────────────
     if (numViruses > 0) {
-      const { data: pool } = await admin.from("virus_pool")
-        .select("*").eq("game_id", game_id).order("position").limit(numViruses);
+      const { count: poolSize } = await admin.from("virus_pool")
+        .select("id", { count: "exact", head: true }).eq("game_id", game_id);
 
-      if (pool && pool.length > 0) {
-        await admin.from("virus_resolution_queue").insert(
-          pool.map((card: any, i: number) => ({
-            game_id,
-            card_key: card.card_key,
-            card_type: card.card_type,
-            position: i,
-            resolved: false,
-          }))
-        );
-        await admin.from("virus_pool").delete().in("id", pool.map((c: any) => c.id));
-        const { count: poolSizeAfter } = await admin.from("virus_pool")
-          .select("id", { count: "exact", head: true }).eq("game_id", game_id);
-        const queueStartLog: GameLogInsert<"virus_queue_start"> = {
+      if ((poolSize ?? 0) > 0) {
+        const virusPullLog: GameLogInsert<"virus_pull_initiated"> = {
           game_id,
-          event_type: "virus_queue_start",
-          public_description: `${callerPlayer.display_name} generated ${pool.length} virus${pool.length > 1 ? "es" : ""}.`,
-          metadata: { actor_player_id: callerPlayer.id, virus_count: pool.length, pool_size_after: poolSizeAfter ?? 0 },
+          event_type: "virus_pull_initiated",
+          public_description: `${callerPlayer.display_name} generated ${numViruses} virus${numViruses > 1 ? "es" : ""} — pulling from pool.`,
+          metadata: { actor_player_id: callerPlayer.id, virus_count: numViruses, pool_size_before: poolSize ?? 0 },
         };
-        await admin.from("game_log").insert(queueStartLog);
-        gameUpdates.phase = "virus_resolution";
+        await admin.from("game_log").insert(virusPullLog);
+        gameUpdates.phase = "virus_pull";
+        gameUpdates.pending_pull_count = numViruses;
         if (missionOutcomeForTransition !== undefined) {
           gameUpdates.pending_mission_outcome = missionOutcomeForTransition;
         }
