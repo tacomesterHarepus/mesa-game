@@ -1,24 +1,22 @@
 # Latest Task
 
-**Task:** Mobile workflow setup
+**Task:** Mobile workflow iteration 2 — NTFY 5-line cap test
 **Date:** 2026-04-27
 **Status:** DONE
 
 ## What shipped
 
-- `MOBILE_TEST.md` created — placeholder file for testing the mobile review loop (NTFY → reviewer Claude → Remote Control → CC → repeat).
-- `CLAUDE.md` "Task completion ritual" section updated by user: ritual now includes writing `LATEST_TASK.md` and sending an NTFY ping before reporting DONE.
+- `MOBILE_TEST.md` — current state updated; task log entry appended (2026-04-27 17:13).
+- `SESSION_NOTES.md` — iteration 2 noted.
 
 ## Commits
 
-- `1eee64a` Docs: add MOBILE_TEST.md for mobile workflow loop testing
-- (CLAUDE.md ritual update was applied directly by user before this task)
+- `d6739e5` Docs: MOBILE_TEST.md iteration 2 — NTFY 5-line cap test
+- (docs commit follows)
 
 ## Files changed
 
-- `MOBILE_TEST.md` — new, docs only
-- `SESSION_NOTES.md` — mobile workflow setup noted
-- `LATEST_TASK.md` — this file (new)
+- `MOBILE_TEST.md`, `SESSION_NOTES.md`, `LATEST_TASK.md` — docs only.
 
 ## Test status
 
@@ -26,4 +24,4 @@ No code changed. Build and tests unaffected.
 
 ## Suggested next step
 
-User tests the mobile loop: send a small task to CC via Remote Control (e.g. "append a timestamped entry to MOBILE_TEST.md Task log"). Confirm NTFY ping arrives and LATEST_TASK.md updates correctly. If the loop works end-to-end, retire MOBILE_TEST.md or keep it as a scratch pad.
+Confirm NTFY ping arrived on phone within the 5-line cap. If loop feels good, retire MOBILE_TEST.md or run iteration 3 with a real board-redesign task prompt.
