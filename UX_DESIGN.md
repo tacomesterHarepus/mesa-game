@@ -567,7 +567,7 @@ Use this consistently. Amber border is the strongest "this is your turn to do so
 
 | Phase type | Public chat | Private chat (misaligned) |
 |---|---|---|
-| Player turn (any AI) | Humans + active AI post; non-active AIs locked | Locked or open (TBD per Phase 12) |
+| Player turn | Everyone can post | Locked or open (TBD per Phase 12) |
 | Mission selection | Humans post; all AIs locked | Locked |
 | Resource adjustment / allocation | Humans post; all AIs locked | Locked |
 | Card reveal | Humans post; AIs locked | Open |

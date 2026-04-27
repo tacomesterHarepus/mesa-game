@@ -14,7 +14,6 @@ interface Props {
   currentPlayer: PlayerRow | null;
   allPlayers: PlayerRow[];
   phase: string;
-  currentTurnPlayerId: string | null;
 }
 
 const BOLD_EVENTS = new Set([
@@ -32,18 +31,13 @@ function formatTime(ts: string): string {
   }
 }
 
-function canPostPublic(
-  phase: string,
-  currentPlayer: PlayerRow | null,
-  currentTurnPlayerId: string | null
-): boolean {
+function canPostPublic(phase: string, currentPlayer: PlayerRow | null): boolean {
   if (!currentPlayer) return false;
   if (phase === "secret_targeting") return false;
-  if (phase === "player_turn") {
-    return currentPlayer.role === "human" || currentPlayer.id === currentTurnPlayerId;
+  if (["mission_selection", "resource_adjustment", "resource_allocation", "card_reveal"].includes(phase)) {
+    return currentPlayer.role === "human";
   }
-  if (["virus_pull", "virus_resolution", "between_turns", "game_over"].includes(phase)) return true;
-  return currentPlayer.role === "human";
+  return true;
 }
 
 function canPostPrivate(phase: string): boolean {
@@ -65,7 +59,6 @@ export function RightPanel({
   currentPlayer,
   allPlayers,
   phase,
-  currentTurnPlayerId,
 }: Props) {
   const isMisaligned = currentPlayer?.role === "misaligned_ai";
   const [activeTab, setActiveTab] = useState<TabId>("log");
@@ -235,7 +228,7 @@ export function RightPanel({
             gameId={gameId}
             currentPlayer={currentPlayer}
             players={allPlayers}
-            canPost={canPostPublic(phase, currentPlayer, currentTurnPlayerId)}
+            canPost={canPostPublic(phase, currentPlayer)}
             onNewMessage={handleNewChatMessage}
           />
         )}

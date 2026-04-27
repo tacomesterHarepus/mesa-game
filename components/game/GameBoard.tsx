@@ -746,7 +746,6 @@ export function GameBoard({
           currentPlayer={effectiveCurrentPlayer}
           allPlayers={sortedPlayers}
           phase={game.phase}
-          currentTurnPlayerId={game.current_turn_player_id ?? null}
         />
       </div>
     </div>
