@@ -1,19 +1,27 @@
 # Latest Task
 
 ## Summary
-Board redesign — virus_resolution visual pass. CentralBoard gains a `VirusCardOverlay` SVG component that renders the resolving virus card at board position (650, 350) — dark red theme (`#1a0a0a` bg, `#a32d2d` border), pacing bar using SMIL `<animate>`, per-card type label / display name / icon / effect lines from lookup tables, and a `↳ TRIGGERED` badge when the card cascaded. A `dimCore` prop dims the CoreChipGroup to 30% opacity during resolution. GameBoard adds `virusQueue` state with a phase-gated Realtime subscription to `virus_resolution_queue`, threading `currentCard` / `remaining` props down to VirusResolution and `dimCore` / `virusResolvingCard` to CentralBoard. VirusResolution is fully rewritten: no more internal subscription or manual "Resolve Virus" button — a `useEffect` keyed on `currentCard?.id` fires `resolve-next-virus` after 2s (matching the pacing bar) or 500ms for the empty-queue advance. Error fallback shows a manual Continue button. ActionRegion already had the muted-red "AUTO-RESOLVING" header from a prior partial commit. virus-system.spec.ts rewired: removed old button-click assertions, added three new assertions (no Resolve button visible, valid phase via REST, phase auto-advances within 30s).
+Board redesign — secret_targeting + secret_chat + 3-tab right panel. RightPanel rewritten with LOG/CHAT/🔒PRIV tab structure, activeTabRef for stale-closure-safe unread badges, and phase-aware chat lock logic (canPostPublic/canPostPrivate). PublicChat and MisalignedPrivateChat redesigned as tab-content components: inline monospace styles, 3s poll backup, onNewMessage callbacks, locked input UI. CentralBoard gains TargetingChipConfig export interface with per-chip selectable/nominated/watching states: amber dashed ring + "CLICK TO NOMINATE" label (selectable), red solid ring + "▸ NOMINATED" label (nominated), MIS badge for misaligned fellows. ActionRegion adds secret_targeting to isActionPhase with amber header for misaligned (action required) and muted-red header for others. SecretTargeting fully rewritten: chip-click nomination via localNominationId prop from GameBoard, MISALIGNED COLLECTIVE roster from votes subscription, CURRENT NOMINATION panel, APPROVE & VOTE button (replaced old dropdown + Submit Vote). GameBoard adds localNominationId state, targetingChips config build, secret_targeting in isActivePlayer, suppressed active chip during targeting phase, new RightPanel props. UX_DESIGN §8.4 virus_pull/resolution corrected to "everyone can post" per session decision. secret-actions.spec.ts test 5 unskipped with chip-click assertions.
 
 ## Files changed
-- `components/game/board/CentralBoard.tsx` — added `VirusResolvingCard` interface, lookup tables (`VIRUS_TYPE_LABEL`, `VIRUS_DISPLAY_NAME`, `VIRUS_EFFECT_LINES`), `VirusCardOverlay` component, `dimCore` + `virusResolvingCard` props; `CentralBoard` body updated to use them
-- `components/game/board/ActionRegion.tsx` — `virus_resolution` header case + muted-red `headerColor`
-- `components/game/GameBoard.tsx` — import `VirusResolvingCard`; `QueueCard` interface; `virusQueue` state; phase-gated subscription `useEffect`; `dimCore` + `virusResolvingCard` → CentralBoard; `currentCard` + `remaining` → VirusResolution
-- `components/game/phases/VirusResolution.tsx` — full rewrite: auto-resolve loop, CSS pacing bar, error fallback, props from GameBoard
-- `tests/e2e/virus-system.spec.ts` — removed manual button tests, added `sharedGameId`, three new phase-polling assertions
+- `components/chat/PublicChat.tsx` — redesigned to inline styles, added onNewMessage callback, 3s poll backup, locked UI when canPost=false
+- `components/chat/MisalignedPrivateChat.tsx` — redesigned to inline styles, added canPost + onNewMessage props, 3s poll backup, stripped outer border/heading shell
+- `components/game/board/RightPanel.tsx` — full rewrite: 3-tab structure (LOG/CHAT/PRIV), activeTabRef, unread badges, canPostPublic/canPostPrivate logic, PublicChat + MisalignedPrivateChat as tab content
+- `components/game/board/CentralBoard.tsx` — added TargetingChipConfig export interface; AIChipGroup targeting rings (amber dashed = selectable, red solid = nominated), "CLICK TO NOMINATE"/"▸ NOMINATED" counter-row labels, MIS badge; targetingChips prop wired
+- `components/game/board/ActionRegion.tsx` — added secret_targeting to isActionPhase; secret_targeting header cases (amber for misaligned, muted-red for others); headerColor updated
+- `components/game/phases/SecretTargeting.tsx` — full rewrite: chip-click nomination via localNominationId prop, votes subscription (MISALIGNED COLLECTIVE), CURRENT NOMINATION panel, APPROVE & VOTE button; countdown + handleDeadline preserved
+- `components/game/GameBoard.tsx` — import TargetingChipConfig; localNominationId state + phase-reset useEffect; targetingChips config build; updated CentralBoard currentTurnPlayerId suppression; updated ActionRegion isActivePlayer for secret_targeting; updated SecretTargeting render with new props; updated RightPanel with new props
+- `UX_DESIGN.md` — §8.4: virus_pull/resolution row corrected to "Everyone can post"
+- `tests/e2e/secret-actions.spec.ts` — test 5 unskipped with chip-click assertions (no Submit Vote, APPROVE & VOTE or VOTE SUBMITTED, MISALIGNED AIs ARE TARGETING text)
 
 ## Test status
-- virus-system.spec.ts: 3/3 pass
-- Canary (error-handling, turn-order, multi-mission, abort-mission): 8/8 pass
-- build: clean
+- Build: clean
+- secret-actions.spec.ts test 5: unskipped, selectors updated for new UI
+- Canary (error-handling, turn-order, multi-mission, abort-mission): requires running dev server (pre-existing webServer timeout environment issue per CLAUDE.md — tests pass when server started manually)
 
 ## Suggested next
-Per UX_DESIGN ordering, the next board redesign tasks are the **end-game screen** (§10 — game_over phase visual) or the **end-of-redesign test cleanup pass** (unskip all `.skip`'d UI tests, run full suite, fix remaining stale selectors). The test cleanup pass is the safer next step: it validates the whole redesign end-to-end before adding more. See CLAUDE.md "End of redesign" section for the procedure.
+Per UX_DESIGN ordering, the next board redesign tasks are either:
+- **End-game screen** (§10 — game_over phase visual): role reveal, per-player stats, winner announcement
+- **End-of-redesign test cleanup pass**: unskip all `.skip`'d UI tests, run full suite, fix remaining stale selectors (see CLAUDE.md "End of redesign" section)
+
+The test cleanup pass is the safer next step: it validates the whole redesign end-to-end before adding more complexity. The game_over visual is the last phase before the cleanup pass anyway.
