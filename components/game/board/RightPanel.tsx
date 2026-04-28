@@ -61,6 +61,7 @@ export function RightPanel({
   phase,
 }: Props) {
   const isMisaligned = currentPlayer?.role === "misaligned_ai";
+  const showPrivate = isMisaligned && phase !== "game_over";
   const [activeTab, setActiveTab] = useState<TabId>("log");
   const activeTabRef = useRef<TabId>("log");
   const [chatUnread, setChatUnread] = useState(0);
@@ -70,6 +71,12 @@ export function RightPanel({
 
   // Keep ref in sync for stale-closure-safe callbacks in child components
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
+
+  // If private tab was active when game ends, fall back to log
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (phase === "game_over" && activeTab === "private") setActiveTab("log");
+  }, [phase]); // activeTab intentionally omitted: only fire when phase changes, not on every tab switch
 
   useEffect(() => {
     const el = logRef.current;
@@ -106,7 +113,7 @@ export function RightPanel({
   const tabs: TabDef[] = [
     { id: "log", label: "LOG", activeColor: "#d4a017" },
     { id: "chat", label: "CHAT", activeColor: "#5dcaa5", unread: chatUnread },
-    ...(isMisaligned
+    ...(showPrivate
       ? [{ id: "private" as TabId, label: "🔒 PRIV", activeColor: "#a32d2d", unread: privateUnread }]
       : []),
   ];
@@ -234,7 +241,7 @@ export function RightPanel({
           />
         </div>
 
-        {isMisaligned && currentPlayer && (
+        {showPrivate && currentPlayer && (
           <div style={{ display: activeTab === "private" ? "flex" : "none", flex: 1, minHeight: 0, flexDirection: "column" }}>
             <MisalignedPrivateChat
               gameId={gameId}

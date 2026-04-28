@@ -49,6 +49,8 @@ export function ActionRegion({ children, phase, isActivePlayer, currentTurnPlaye
       ? isActivePlayer
         ? "▸ YOUR ACTION REQUIRED · NOMINATE A TARGET"
         : "// MISALIGNED AIs ARE TARGETING…"
+      : phase === "game_over"
+      ? "PHASE · GAME OVER"
       : showAmber
       ? "▸ YOUR ACTION REQUIRED · YOUR TURN"
       : isActionPhase && currentTurnPlayerName
@@ -57,7 +59,7 @@ export function ActionRegion({ children, phase, isActivePlayer, currentTurnPlaye
 
   const headerColor =
     showAmber ? "#d4a017" :
-    (phase === "virus_resolution" || phase === "secret_targeting") ? "#a32d2d" :
+    (phase === "virus_resolution" || phase === "secret_targeting" || phase === "game_over") ? "#a32d2d" :
     "#555";
 
   return (

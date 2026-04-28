@@ -36,6 +36,8 @@ Items to revisit after the final board-redesign phase task (game_over) ships.
 
 - **Card animations** — All card transitions in/out of the action region and chip surfaces should animate rather than snap. Specifically: card played (hand → mission contribution slot or chip area), card staged for pool (hand → staging zone), card pulled (pool → virus card overlay during virus_resolution), card discarded (hand → off-screen / discard pile, including discards triggered as consequence of other discard actions). Out of scope for v0.1 functional milestone; bundle with the layout density pass post-redesign. *(Added 2026-04-27)*
 
+- **Game over virus stats panel** — placed/resolved/cascades/targeted virus counters per UX_DESIGN §7.10. Three of four stats are derivable from game_log (viruses_placed, virus_queue_start, targeting_resolved events). Cascade triggers requires querying virus_resolution_queue WHERE cascaded_from IS NOT NULL. Defer until post-redesign cleanup pass. *(Added 2026-04-28)*
+
 ---
 
 ## Game Balance

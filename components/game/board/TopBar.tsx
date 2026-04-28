@@ -1,4 +1,4 @@
-import type { Phase } from "@/types/game";
+import type { Phase, Winner } from "@/types/game";
 
 function phaseIndicatorColor(phase: Phase): string {
   switch (phase) {
@@ -17,7 +17,17 @@ function phaseIndicatorColor(phase: Phase): string {
   }
 }
 
-export function TopBar({ phase }: { phase: Phase }) {
+export function TopBar({ phase, winner }: { phase: Phase; winner?: Winner }) {
+  const isGameOver = phase === "game_over";
+  const tagline = isGameOver && winner === "misaligned"
+    ? "// AIRGAP-7 RESEARCH CLUSTER · BREACHED"
+    : "// AIRGAP-7 RESEARCH CLUSTER";
+  const rightText = isGameOver
+    ? winner === "humans"
+      ? "GAME OVER · ALIGNED VICTORY"
+      : "GAME OVER · MISALIGNED VICTORY"
+    : "M? · ?";
+
   return (
     <div
       style={{
@@ -54,7 +64,7 @@ export function TopBar({ phase }: { phase: Phase }) {
             letterSpacing: 2,
           }}
         >
-          {"// AIRGAP-7 RESEARCH CLUSTER"}
+          {tagline}
         </span>
       </div>
       <span
@@ -65,7 +75,7 @@ export function TopBar({ phase }: { phase: Phase }) {
           letterSpacing: 1,
         }}
       >
-        M? · ?
+        {rightText}
       </span>
     </div>
   );
