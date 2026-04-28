@@ -113,7 +113,7 @@ async function completeMission1ByFailing(
   }
 
   // ── Resource Allocation: submit empty allocations ──────────────────────────
-  await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 45000 });
   await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

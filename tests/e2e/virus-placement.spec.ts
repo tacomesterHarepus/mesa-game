@@ -222,7 +222,7 @@ test.describe("virus placement", () => {
       }
       await page.waitForTimeout(500);
 
-      await expect(page.getByText("It's your turn.")).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText("Player Turn")).toBeVisible({ timeout: 10000 });
 
       // Complete the discard step before staging is available
       const skipDiscardBtn = page.getByRole("button", { name: "Skip Discard" });

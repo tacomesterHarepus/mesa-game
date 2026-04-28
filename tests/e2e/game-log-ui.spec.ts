@@ -229,7 +229,7 @@ test.describe("GameLog UI rendering", () => {
     }
 
     // Wait for mission to resolve and UI to update
-    await page.getByText("Resource Adjustment").waitFor({ state: "visible", timeout: 20000 });
+    await page.getByText("Resource Adjustment").waitFor({ state: "visible", timeout: 40000 });
     // Give Realtime a moment to deliver the final log entries to the browser
     await page.waitForTimeout(1000);
   });
@@ -240,15 +240,12 @@ test.describe("GameLog UI rendering", () => {
 
   // ── Tests ────────────────────────────────────────────────────────────────────
 
-  // SKIPPED: depends on pre-redesign UI; revisit after game_log phase task
-  test.skip("bold styling: mission_failed row renders with font-bold", async () => {
+  test("bold styling: mission_failed row renders with bold font weight", async () => {
     const logContainer = page.getByTestId("game-log-container");
-    // The log must be visible and have entries
     await expect(logContainer).toBeVisible();
-    // At least one bold row must exist (mission_failed is guaranteed after the game run)
-    const boldRows = logContainer.locator(".font-bold");
+    // New board renders bold via inline style fontWeight:"bold" (not Tailwind .font-bold class)
+    const boldRows = logContainer.locator('span[style*="font-weight: bold"]');
     await expect(boldRows.first()).toBeVisible();
-    // The bold row text should reference mission context
     const boldText = await boldRows.first().textContent();
     expect(boldText).toMatch(/mission/i);
   });

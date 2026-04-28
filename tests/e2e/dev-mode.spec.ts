@@ -133,7 +133,6 @@ test.describe("dev mode shared game — phase content and chat", () => {
 
   test("Human can post in public chat during mission_selection; AI input is read-only", async () => {
     const switcherPanel = sharedPage.locator(".fixed.top-7");
-    const chatInput = sharedPage.locator("input[placeholder]").last();
     const playerButtons = switcherPanel.getByRole("button");
     const count = await playerButtons.count();
 
@@ -148,9 +147,13 @@ test.describe("dev mode shared game — phase content and chat", () => {
     // Roles are randomly assigned; skip gracefully if no human appears in this run.
     if (!humanFound) { test.skip(); return; }
 
-    // Human: chat input must be enabled
+    // Open the CHAT tab so the input is in the active view.
+    await sharedPage.getByRole("button", { name: "CHAT" }).click();
+    await sharedPage.waitForTimeout(200);
+
+    // Human: public chat input must be enabled (canPost=true renders an <input>).
+    const chatInput = sharedPage.locator('[placeholder="Message…"]');
     await expect(chatInput).not.toBeDisabled();
-    await expect(chatInput).toHaveAttribute("placeholder", "Message…");
 
     // Switch to an AI player (aligned or misaligned)
     for (let i = 0; i < count; i++) {
@@ -160,8 +163,7 @@ test.describe("dev mode shared game — phase content and chat", () => {
       if (label?.includes("A") || label?.includes("M")) { break; }
     }
 
-    // AI: chat input must be disabled with "Read only" placeholder
-    await expect(chatInput).toBeDisabled();
-    await expect(chatInput).toHaveAttribute("placeholder", "Read only");
+    // AI: canPost=false renders "// LOCKED" instead of an input field.
+    await expect(sharedPage.getByText("// LOCKED")).toBeVisible();
   });
 });

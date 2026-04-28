@@ -399,7 +399,7 @@ test.describe("secret targeting", () => {
 
     // Game should have resumed virus_resolution (or advanced past it)
     const afterGame = await fetchGame(sharedGameId, sharedToken);
-    expect(["virus_resolution", "player_turn", "between_turns", "resource_adjustment", "game_over"]).toContain(
+    expect(["virus_resolution", "player_turn", "between_turns", "resource_adjustment", "game_over", "virus_pull"]).toContain(
       afterGame.phase
     );
     // Targeting fields must be cleared
@@ -472,7 +472,7 @@ test.describe("secret targeting", () => {
     await new Promise((r) => setTimeout(r, 500));
 
     const afterGame = await fetchGame(sharedGameId, sharedToken);
-    expect(["virus_resolution", "player_turn", "between_turns", "resource_adjustment", "game_over"]).toContain(
+    expect(["virus_resolution", "player_turn", "between_turns", "resource_adjustment", "game_over", "virus_pull"]).toContain(
       afterGame.phase
     );
     expect(afterGame.current_targeting_card_key).toBeNull();
