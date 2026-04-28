@@ -29,6 +29,8 @@ export function MisalignedPrivateChat({ gameId, currentPlayer, misalignedPlayers
 
   useEffect(() => {
     const supabase = createClient();
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
     supabase
       .from("chat_messages")
@@ -38,22 +40,32 @@ export function MisalignedPrivateChat({ gameId, currentPlayer, misalignedPlayers
       .order("created_at")
       .then(({ data }) => setMessages(data ?? []));
 
-    const channel = supabase
-      .channel(`chat-misaligned-${gameId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chat_messages", filter: `game_id=eq.${gameId}` },
-        (payload) => {
-          const row = payload.new as ChatMessage;
-          if (row.channel === "misaligned_private") {
-            setMessages((prev) => [...prev, row]);
-            onNewMsgRef.current?.();
+    // Await getSession() before subscribing so the JWT is loaded by the time
+    // the channel JOIN message is sent — avoids anonymous-user RLS failures.
+    const setup = async () => {
+      await supabase.auth.getSession();
+      if (cancelled) return;
+      channel = supabase
+        .channel(`chat-misaligned-${gameId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "chat_messages", filter: `game_id=eq.${gameId}` },
+          (payload) => {
+            const row = payload.new as ChatMessage;
+            if (row.channel === "misaligned_private") {
+              setMessages((prev) => [...prev, row]);
+              onNewMsgRef.current?.();
+            }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
+    };
 
-    return () => { supabase.removeChannel(channel); };
+    setup();
+    return () => {
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [gameId]);
 
   // Poll backup — 3s id-dedup

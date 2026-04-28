@@ -29,6 +29,8 @@ export function PublicChat({ gameId, currentPlayer, players, canPost, onNewMessa
 
   useEffect(() => {
     const supabase = createClient();
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
     supabase
       .from("chat_messages")
@@ -38,22 +40,32 @@ export function PublicChat({ gameId, currentPlayer, players, canPost, onNewMessa
       .order("created_at")
       .then(({ data }) => setMessages(data ?? []));
 
-    const channel = supabase
-      .channel(`chat-public-${gameId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chat_messages", filter: `game_id=eq.${gameId}` },
-        (payload) => {
-          const row = payload.new as ChatMessage;
-          if (row.channel === "public") {
-            setMessages((prev) => [...prev, row]);
-            onNewMsgRef.current?.();
+    // Await getSession() before subscribing so the JWT is loaded by the time
+    // the channel JOIN message is sent — avoids anonymous-user RLS failures.
+    const setup = async () => {
+      await supabase.auth.getSession();
+      if (cancelled) return;
+      channel = supabase
+        .channel(`chat-public-${gameId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "chat_messages", filter: `game_id=eq.${gameId}` },
+          (payload) => {
+            const row = payload.new as ChatMessage;
+            if (row.channel === "public") {
+              setMessages((prev) => [...prev, row]);
+              onNewMsgRef.current?.();
+            }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
+    };
 
-    return () => { supabase.removeChannel(channel); };
+    setup();
+    return () => {
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [gameId]);
 
   // Poll backup — 3s id-dedup catches Realtime misses
