@@ -717,10 +717,10 @@ export function GameBoard({
         minHeight: "100vh",
         background: "#0a0a0a",
         overflowX: "auto",
-        paddingTop: devMode ? 24 : 0,
+        paddingTop: devMode && isHost ? 24 : 0,
       }}
     >
-      {devMode && (
+      {devMode && isHost && (
         <DevModeOverlay
           players={sortedPlayers}
           activePlayer={activeDevPlayer}
