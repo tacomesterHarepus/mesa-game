@@ -224,23 +224,23 @@ test.describe("virus placement", () => {
 
       await expect(page.getByText("Player Turn")).toBeVisible({ timeout: 10000 });
 
-      // Complete the discard step before staging is available
+      // Complete the discard step before staging is available.
+      // "STAGE N MORE" appears even before hasDiscarded=true (endTurnBlocked doesn't gate on hasDiscarded),
+      // so we must wait for "DISCARD DONE" — the label that only appears once hasDiscarded=true.
       const skipDiscardBtn = page.getByRole("button", { name: "Skip Discard" });
-      if (await skipDiscardBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await skipDiscardBtn.click();
-        // Wait for play phase to appear (button shows END TURN or STAGE N MORE depending on CPU)
-        await page.getByRole("button", { name: /end turn|stage \d+ more/i }).waitFor({ state: "visible", timeout: 10000 });
-      }
+      await skipDiscardBtn.waitFor({ state: "visible", timeout: 10000 });
+      await skipDiscardBtn.click();
+      await page.getByRole("button", { name: "Discard Done" }).waitFor({ state: "visible", timeout: 15000 });
 
       // Select and stage the known card: click by display name, then "Stage for Pool"
       // Card name is rendered in UPPERCASE in the new board; use case-insensitive match (no exact:true)
       await page.getByRole("button", { name: stagedCardName }).first().click();
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(500);
       await page.getByRole("button", { name: "Stage for Pool" }).click();
-      await page.waitForTimeout(200);
 
-      // Staging zone confirms 1 card staged — text format is "STAGING — 1 / 1"
-      await expect(page.getByText(/1 \/ 1/)).toBeVisible({ timeout: 5000 });
+      // Confirm staging completed: end-turn button label switches from "STAGE 1 MORE" → "END TURN"
+      // (The staging-zone text "STAGING — 1 / 1" is rendered but clipped by overflow:hidden in the layout)
+      await expect(page.getByRole("button", { name: /^end turn$/i })).toBeVisible({ timeout: 5000 });
 
       // Click End Turn — now unblocked (stagingNeeded = 0)
       await page.getByRole("button", { name: "End Turn" }).click();
