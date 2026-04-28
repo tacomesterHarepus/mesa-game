@@ -46,6 +46,9 @@ interface Props {
   contributions?: Record<string, { compute: number; data: number; validation: number }>;
   dimCore?: boolean;
   virusResolvingCard?: VirusResolvingCard | null;
+  isGameOver?: boolean;
+  gameOverWinner?: "humans" | "misaligned" | null;
+  gameOverRoles?: Record<string, string>; // player.id → "aligned_ai" | "misaligned_ai"
 }
 
 // Fixed chip slots per UX_DESIGN §13 — do NOT generalise for other player counts
@@ -169,13 +172,15 @@ function AIChipGroup({
   chipY,
   isTop,
   player,
-  isActive,
+  isActive: isActiveRaw,
   missionSeatNum,
   resourceChip,
   revealSlot,
   targetingChip,
   contributions,
   slotSide = "left",
+  isGameOver,
+  gameOverRole,
 }: {
   slotLabel: string;
   chipX: number;
@@ -189,28 +194,36 @@ function AIChipGroup({
   targetingChip?: TargetingChipConfig;
   contributions?: { compute: number; data: number; validation: number };
   slotSide?: "left" | "right";
+  isGameOver?: boolean;
+  gameOverRole?: string;
 }) {
+  const isActive = isActiveRaw && !isGameOver;
   const cpuFilled = Math.min(player?.cpu ?? 1, 4);
   const ramFilled = Math.min(player?.ram ?? 4, 7);
-  const seatNum = missionSeatNum !== null ? String(missionSeatNum) : "?";
+  const seatNum = isGameOver ? "·" : (missionSeatNum !== null ? String(missionSeatNum) : "?");
   const name = player?.display_name ?? "—";
 
   // Contribution counter row sits inward (below top chips, above bottom chips)
   const counterY = isTop ? chipY + 98 : chipY - 28;
 
   // Active-state colors (§5.4)
-  const chipFill     = isActive ? "#241f10" : "#1a2418";
-  const chipStroke   = isActive ? "#d4a017" : "#3a5a3a";
-  const pinFill      = isActive ? "#5a4a1a" : "#2a3a2a";
-  const circleFill   = isActive ? "#3a2e1a" : "#2a3a2a";
-  const circleStroke = isActive ? "#a87a17" : "#5a7a5a";
-  const seatText     = isActive ? "#d4a017" : "#9cd4b4";
-  const labelText    = isActive ? "#a87a17" : "#5a7a5a";
-  const nameColor    = isActive ? "#f4d47e" : "#cce4d4";
+  // In game_over: isActive is forced false; colors are determined by revealed role instead.
+  const goAligned = isGameOver && gameOverRole === "aligned_ai";
+  const goMisaligned = isGameOver && gameOverRole === "misaligned_ai";
+
+  const chipFill     = isActive ? "#241f10" : goAligned ? "#0c1a14" : goMisaligned ? "#1a0c0c" : "#1a2418";
+  const chipStroke   = isActive ? "#d4a017" : goAligned ? "#5dcaa5" : goMisaligned ? "#a32d2d" : "#3a5a3a";
+  const chipStrokeW  = (isActive || goAligned || goMisaligned) ? 2 : 1.5;
+  const pinFill      = isActive ? "#5a4a1a" : goAligned ? "#1a3a2a" : goMisaligned ? "#3a1a1a" : "#2a3a2a";
+  const circleFill   = isActive ? "#3a2e1a" : goAligned ? "#1a3a2a" : goMisaligned ? "#3a1a1a" : "#2a3a2a";
+  const circleStroke = isActive ? "#a87a17" : goAligned ? "#5dcaa5" : goMisaligned ? "#a32d2d" : "#5a7a5a";
+  const seatText     = isActive ? "#d4a017" : goAligned ? "#9cd4b4" : goMisaligned ? "#cca0a0" : "#9cd4b4";
+  const labelText    = isActive ? "#a87a17" : goAligned ? "#5dcaa5" : goMisaligned ? "#a32d2d" : "#5a7a5a";
+  const nameColor    = isActive ? "#f4d47e" : goAligned ? "#9cd4b4" : goMisaligned ? "#cca0a0" : "#cce4d4";
   const trackLabel   = isActive ? "#a87a17" : "#7a9a8a";
   const trackFill    = isActive ? "#d4a017" : "#5dcaa5";
   const trackStroke  = isActive ? "#5a4a1a" : "#3a5a4a";
-  const counterText  = isActive ? "#a87a17" : "#7a8a9a";
+  const counterText  = isActive ? "#a87a17" : goMisaligned ? "#9a7a7a" : "#7a8a9a";
   const dotSep       = isActive ? "#5a4a1a" : "#3a4a3a";
 
   // Pending-state visual helpers (§5.2)
@@ -346,7 +359,7 @@ function AIChipGroup({
           height="90"
           fill={chipFill}
           stroke={chipStroke}
-          strokeWidth={isActive ? 2 : 1.5}
+          strokeWidth={chipStrokeW}
           rx="3"
         />
 
@@ -373,8 +386,22 @@ function AIChipGroup({
           </text>
         )}
 
+        {/* Role badge — shown during game_over replacing ACTIVE tag */}
+        {goAligned && (
+          <>
+            <rect x="90" y="6" width="62" height="14" fill="#1a3a2a" stroke="#5dcaa5" strokeWidth="0.5" rx="2" />
+            <text x="121" y="16" fontFamily="monospace" fontSize="8" fill="#9cd4b4" textAnchor="middle" letterSpacing="1">ALIGNED</text>
+          </>
+        )}
+        {goMisaligned && (
+          <>
+            <rect x="79" y="6" width="80" height="14" fill="#3a1a1a" stroke="#a32d2d" strokeWidth="0.5" rx="2" />
+            <text x="119" y="16" fontFamily="monospace" fontSize="8" fill="#cca0a0" textAnchor="middle" letterSpacing="1">MISALIGNED</text>
+          </>
+        )}
+
         {/* MIS badge — shown during targeting for misaligned fellow chips */}
-        {targetingChip?.isFellow && !isActive && (
+        {targetingChip?.isFellow && !isActive && !isGameOver && (
           <text x="155" y="23" fontFamily="monospace" fontSize="8" fill="#a32d2d" textAnchor="end" letterSpacing="1">
             MIS
           </text>
@@ -610,6 +637,44 @@ function VirusCardOverlay({ card }: { card: VirusResolvingCard }) {
   );
 }
 
+function WinnerBanner({ winner }: { winner: "humans" | "misaligned" | null }) {
+  const isMisaligned = winner !== "humans";
+  const shadowFill   = isMisaligned ? "#1a0606" : "#0a1a14";
+  const bodyFill     = isMisaligned ? "#1a0a0a" : "#0a1a14";
+  const bodyStroke   = isMisaligned ? "#a32d2d" : "#5dcaa5";
+  const headerFill   = isMisaligned ? "#3a1010" : "#1a3a2a";
+  const typeColor    = isMisaligned ? "#cca0a0" : "#9cd4b4";
+  const titleFill    = isMisaligned ? "#f4c4c4" : "#cce4d4";
+  const subFill      = isMisaligned ? "#cca0a0" : "#9cd4b4";
+  const typeText     = isMisaligned ? "// CONTAINMENT FAILED · MISSION OVER" : "// MISSION COMPLETE · RESEARCH SECURED";
+  const titleText    = isMisaligned ? "MISALIGNED AIs ESCAPED" : "HUMANS + ALIGNED AIs WIN";
+  const subText      = isMisaligned ? "Escape Timer reached 8 / 8" : "Core Progress reached 10 / 10";
+
+  return (
+    <g>
+      {/* Shadow */}
+      <rect x="80" y="215" width="500" height="100" fill={shadowFill} rx="6" opacity="0.8" />
+      {/* Banner body */}
+      <rect x="90" y="225" width="480" height="80" fill={bodyFill} stroke={bodyStroke} strokeWidth="3" rx="6" />
+      {/* Header strip */}
+      <rect x="90" y="225" width="480" height="22" fill={headerFill} rx="6" />
+      <rect x="90" y="236" width="480" height="11" fill={headerFill} />
+      {/* Type label */}
+      <text x="330" y="241" fontFamily="monospace" fontSize="10" fill={typeColor} textAnchor="middle" letterSpacing="2">
+        {typeText}
+      </text>
+      {/* Main title */}
+      <text x="330" y="272" fontFamily="sans-serif" fontSize="21" fill={titleFill} textAnchor="middle" letterSpacing="1">
+        {titleText}
+      </text>
+      {/* Subtitle */}
+      <text x="330" y="293" fontFamily="sans-serif" fontSize="12" fill={subFill} textAnchor="middle">
+        {subText}
+      </text>
+    </g>
+  );
+}
+
 function CoreChipGroup({ coreProgress }: { coreProgress: number }) {
   // Core chip at panel coords (270, 200) — size 120×100
   const cx = 270;
@@ -697,7 +762,19 @@ export function CentralBoard({
   contributions,
   dimCore,
   virusResolvingCard,
+  isGameOver,
+  gameOverWinner,
+  gameOverRoles,
 }: Props) {
+  const goMisalignedWin = isGameOver && gameOverWinner === "misaligned";
+  const boardFill    = goMisalignedWin ? "#180606" : "#0c1410";
+  const boardStroke  = goMisalignedWin ? "#5a2a2a" : "#1a3020";
+  const ellipseColor = goMisalignedWin ? "#5a2a2a" : "#2a4a3a";
+  const ellipseDash  = goMisalignedWin ? "2 8" : "6 4";
+  const glowColor    = goMisalignedWin ? "#3a1a1a" : "#1a3020";
+  const labelColor   = goMisalignedWin ? "#5a2a2a" : "#3a6a4a";
+  const labelText    = goMisalignedWin ? "FIREWALL · BREACHED · CONTAINMENT FAILED" : "FIREWALL · CONTAINMENT";
+
   return (
     // Panel: x=430, y=180 in board coords → 660×500
     <svg
@@ -712,14 +789,14 @@ export function CentralBoard({
         y="0"
         width="660"
         height="500"
-        fill="#0c1410"
-        stroke="#1a3020"
+        fill={boardFill}
+        stroke={boardStroke}
         strokeWidth="1"
         rx="4"
       />
 
       {/* Corner circuit trace decorations */}
-      <g stroke="#1a3020" strokeWidth="0.5" fill="none" opacity="0.6">
+      <g stroke={boardStroke} strokeWidth="0.5" fill="none" opacity="0.6">
         <path d="M 30 40 L 70 40 L 70 70" />
         <path d="M 630 40 L 590 40 L 590 70" />
         <path d="M 30 460 L 70 460 L 70 430" />
@@ -727,7 +804,7 @@ export function CentralBoard({
         <path d="M 30 260 L 50 260" />
         <path d="M 630 260 L 610 260" />
       </g>
-      <g fill="#1a3020">
+      <g fill={boardStroke}>
         <circle cx="30"  cy="40"  r="2" />
         <circle cx="630" cy="40"  r="2" />
         <circle cx="30"  cy="460" r="2" />
@@ -736,17 +813,17 @@ export function CentralBoard({
         <circle cx="630" cy="260" r="2" />
       </g>
 
-      {/* "FIREWALL · CONTAINMENT" label */}
+      {/* Board label */}
       <text
         x="330"
         y="22"
         fontFamily="monospace"
         fontSize="10"
-        fill="#3a6a4a"
+        fill={labelColor}
         textAnchor="middle"
         letterSpacing="3"
       >
-        FIREWALL · CONTAINMENT
+        {labelText}
       </text>
 
       {/* Outer glow ring */}
@@ -756,20 +833,20 @@ export function CentralBoard({
         rx="296"
         ry="226"
         fill="none"
-        stroke="#1a3020"
+        stroke={glowColor}
         strokeWidth="0.5"
       />
 
-      {/* Main firewall ellipse — teal-green dashed */}
+      {/* Main firewall ellipse */}
       <ellipse
         cx="330"
         cy="250"
         rx="290"
         ry="220"
         fill="none"
-        stroke="#2a4a3a"
+        stroke={ellipseColor}
         strokeWidth="2"
-        strokeDasharray="6 4"
+        strokeDasharray={ellipseDash}
       />
 
       {/* Central core chip — dimmed during virus_resolution */}
@@ -800,12 +877,18 @@ export function CentralBoard({
             targetingChip={player ? targetingChips?.[player.id] : undefined}
             contributions={player ? contributions?.[player.id] : undefined}
             slotSide={SLOT_SIDES[i]}
+            isGameOver={isGameOver}
+            gameOverRole={player && gameOverRoles ? gameOverRoles[player.id] : undefined}
           />
         );
       })}
       {/* Virus card overlay — renders over board during virus_resolution */}
       {virusResolvingCard && (
         <VirusCardOverlay key={virusResolvingCard.id} card={virusResolvingCard} />
+      )}
+      {/* Winner banner — renders over board during game_over */}
+      {isGameOver && (
+        <WinnerBanner winner={gameOverWinner ?? null} />
       )}
     </svg>
   );

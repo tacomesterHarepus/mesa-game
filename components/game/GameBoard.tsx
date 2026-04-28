@@ -16,6 +16,7 @@ import { TrackerBars } from "./board/TrackerBars";
 import { HumanTerminals } from "./board/HumanTerminals";
 import { MissionPanel } from "./board/MissionPanel";
 import { MissionCandidatesPanel } from "./board/MissionCandidatesPanel";
+import { MissionSummaryPanel } from "./board/MissionSummaryPanel";
 import { VirusPoolPanel } from "./board/VirusPoolPanel";
 import { CentralBoard, type ResourceChipConfig, type RevealChipConfig, type VirusResolvingCard, type TargetingChipConfig } from "./board/CentralBoard";
 import { ActionRegion } from "./board/ActionRegion";
@@ -401,6 +402,7 @@ export function GameBoard({
   }, [mission?.id]);
 
   const isHost = game.host_user_id === userId;
+  const isGameOver = game.phase === "game_over";
 
   // In dev mode the "current player" is whoever is selected in the switcher.
   const syncedCurrentPlayer = currentPlayer
@@ -427,6 +429,11 @@ export function GameBoard({
   // Derived player lists for board regions
   const humanPlayers = sortedPlayers.filter((p) => p.role === "human");
   const aiPlayers = sortedPlayers.filter((p) => p.role !== "human");
+
+  // In game_over: expose all AI roles for CentralBoard chip reveal
+  const gameOverRoles: Record<string, string> | undefined = isGameOver
+    ? Object.fromEntries(aiPlayers.map((p) => [p.id, p.role ?? ""]))
+    : undefined;
 
   // ── Resource phase chip config ────────────────────────────────────────────
   // Compute per-player ResourceChipConfig when in a resource phase.
@@ -678,6 +685,8 @@ export function GameBoard({
             players={sortedPlayers}
             currentPlayer={effectiveCurrentPlayer}
             isHost={isHost}
+            coreProgress={game.core_progress}
+            escapeTimer={game.escape_timer}
           />
         );
       default:
@@ -728,7 +737,7 @@ export function GameBoard({
           overflow: "hidden",
         }}
       >
-        <TopBar phase={game.phase} />
+        <TopBar phase={game.phase} winner={game.winner} />
 
         <TrackerBars
           coreProgress={game.core_progress}
@@ -737,7 +746,9 @@ export function GameBoard({
 
         <HumanTerminals humanPlayers={humanPlayers} />
 
-        {game.phase === "mission_selection" ? (
+        {isGameOver ? (
+          <MissionSummaryPanel gameId={gameId} />
+        ) : game.phase === "mission_selection" ? (
           <MissionCandidatesPanel
             pendingOptions={game.pending_mission_options}
             selected={missionSelected}
@@ -758,9 +769,9 @@ export function GameBoard({
         <CentralBoard
           aiPlayers={aiPlayers}
           coreProgress={game.core_progress}
-          // Suppress active-chip styling during resource, reveal, and targeting phases
+          // Suppress active-chip styling during resource, reveal, targeting, and game_over phases
           currentTurnPlayerId={
-            isResPhase || isRevealPhase || isTargetingPhase
+            isResPhase || isRevealPhase || isTargetingPhase || isGameOver
               ? undefined
               : (game.current_turn_player_id ?? undefined)
           }
@@ -771,6 +782,9 @@ export function GameBoard({
           contributions={contributionMap}
           dimCore={game.phase === "virus_resolution"}
           virusResolvingCard={(virusQueue[0] ?? null) as VirusResolvingCard | null}
+          isGameOver={isGameOver}
+          gameOverWinner={isGameOver ? (game.winner as "humans" | "misaligned" | null) : undefined}
+          gameOverRoles={gameOverRoles}
         />
 
         <ActionRegion
