@@ -780,11 +780,11 @@ export function CentralBoard({
   const labelText    = goMisalignedWin ? "FIREWALL · BREACHED · CONTAINMENT FAILED" : "FIREWALL · CONTAINMENT";
 
   return (
-    // Panel: x=430, y=180 in board coords → 660×500
+    // Panel: x=430, y=180 in board coords → 660×470
     <svg
       width="660"
-      height="500"
-      viewBox="0 0 660 500"
+      height="470"
+      viewBox="0 0 660 470"
       style={{ position: "absolute", left: 430, top: 180 }}
     >
       {/* Circuit board background */}
@@ -803,16 +803,16 @@ export function CentralBoard({
       <g stroke={boardStroke} strokeWidth="0.5" fill="none" opacity="0.6">
         <path d="M 30 40 L 70 40 L 70 70" />
         <path d="M 630 40 L 590 40 L 590 70" />
-        <path d="M 30 460 L 70 460 L 70 430" />
-        <path d="M 630 460 L 590 460 L 590 430" />
+        <path d="M 30 430 L 70 430 L 70 400" />
+        <path d="M 630 430 L 590 430 L 590 400" />
         <path d="M 30 260 L 50 260" />
         <path d="M 630 260 L 610 260" />
       </g>
       <g fill={boardStroke}>
         <circle cx="30"  cy="40"  r="2" />
         <circle cx="630" cy="40"  r="2" />
-        <circle cx="30"  cy="460" r="2" />
-        <circle cx="630" cy="460" r="2" />
+        <circle cx="30"  cy="430" r="2" />
+        <circle cx="630" cy="430" r="2" />
         <circle cx="30"  cy="260" r="2" />
         <circle cx="630" cy="260" r="2" />
       </g>
@@ -833,9 +833,9 @@ export function CentralBoard({
       {/* Outer glow ring */}
       <ellipse
         cx="330"
-        cy="250"
+        cy="240"
         rx="296"
-        ry="226"
+        ry="210"
         fill="none"
         stroke={glowColor}
         strokeWidth="0.5"
@@ -844,7 +844,7 @@ export function CentralBoard({
       {/* Main firewall ellipse */}
       <ellipse
         cx="330"
-        cy="250"
+        cy="240"
         rx="290"
         ry="220"
         fill="none"
