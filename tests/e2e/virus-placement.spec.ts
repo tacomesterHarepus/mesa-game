@@ -233,13 +233,14 @@ test.describe("virus placement", () => {
       }
 
       // Select and stage the known card: click by display name, then "Stage for Pool"
-      await page.getByRole("button", { name: stagedCardName, exact: true }).first().click();
+      // Card name is rendered in UPPERCASE in the new board; use case-insensitive match (no exact:true)
+      await page.getByRole("button", { name: stagedCardName }).first().click();
       await page.waitForTimeout(200);
       await page.getByRole("button", { name: "Stage for Pool" }).click();
       await page.waitForTimeout(200);
 
-      // Staging zone should show "1 / 1 staged" confirming local state
-      await expect(page.getByText("1 / 1 staged")).toBeVisible({ timeout: 5000 });
+      // Staging zone confirms 1 card staged — text format is "STAGING — 1 / 1"
+      await expect(page.getByText(/1 \/ 1/)).toBeVisible({ timeout: 5000 });
 
       // Click End Turn — now unblocked (stagingNeeded = 0)
       await page.getByRole("button", { name: "End Turn" }).click();
