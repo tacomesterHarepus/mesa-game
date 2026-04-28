@@ -64,6 +64,12 @@ Items to revisit after the final board-redesign phase task (game_over) ships.
 
 ---
 
+## Workflow / Process
+
+- **CLAUDE.md NTFY rule needs strengthening** — NTFY must fire when CC is idle and waiting for user, regardless of whether manual user verification is pending. NTFY is the trigger for user to come to the PC — it is wrong to send it AFTER asking the user to test something. The trigger condition is "CC has no more autonomous work to do," not "user has confirmed work is correct." All docs commits and SESSION_NOTES updates land before NTFY; NTFY is the final step. *(Added 2026-04-28)*
+
+---
+
 ## Future Features
 
 - **End game early** — Host or unanimous-player vote to terminate an in-progress game without a winner. Should set `games.winner = 'aborted'` (new enum value) or similar, transition to `game_over`, and handle the end screen gracefully (role reveal and stats may be suppressed or shown as-is). Useful for: abandoned games that started by mistake, dev testing cleanup, players who need to quit before completion. Open questions: who can trigger it (host-only vs. unanimous vote), what the end screen shows, whether the game counts toward stats. *(Added 2026-04-26)*
