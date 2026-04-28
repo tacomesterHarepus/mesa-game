@@ -1,7 +1,7 @@
 # Session Notes
 
 ## Current Phase
-**Lobby Fill Lobby button fixed (commit c0eab9e). Next: manual browser verification. Then BACKLOG — UI/UX polish or chat Phase 12.**
+**Dev mode multi-user fix shipped (commit c523f4f). Manual verification recommended: solo dev flow + multi-user (incognito joins). Then BACKLOG — UI/UX polish or chat Phase 12.**
 
 Recent completed work:
 - **Lobby Fill Lobby button fix** — Gate was `NODE_ENV !== "production" && ?dev_mode=true URL param`. Normal game creation never adds that param, so button never appeared. Changed LobbyPage.devMode to `NODE_ENV !== "production"` only — matching CreateGameForm.IS_DEV. Side effect: Start Game now redirects to game board with ?dev_mode=true in dev, auto-enabling DEV MODE banner and PlayerSwitcher. Stripped diagnostic log. 1 commit c0eab9e. Build clean. Canary 23/33 pass (10 skip, 0 fail).

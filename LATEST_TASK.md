@@ -2,23 +2,31 @@
 
 ## Summary
 
-Fixed the lobby Fill Lobby button not appearing. Root cause: `LobbyPage` derived `devMode` from `process.env.NODE_ENV !== "production" && searchParams.dev_mode === "true"`. The `?dev_mode=true` URL param is only present when the host entered via the create-page Fill Lobby shortcut (which already pre-fills to 6, making the button redundant). Normal game creation (`CreateGameForm.handleSubmit`) redirects to `/lobby` without the param. Fixed by changing `LobbyPage.devMode` to `process.env.NODE_ENV !== "production"` — matching `CreateGameForm`'s `IS_DEV` constant. Also stripped the diagnostic `console.log` added during diagnosis.
-
-Side effect (intentional): `LobbyPhase.gameUrl` is now `/game/${id}?dev_mode=true` in dev environments, so when the host clicks Start Game the whole session lands on the game board with dev mode active (DEV MODE banner + PlayerSwitcher visible).
+Fixed dev mode for multi-user games. Two issues from manual testing: (1) Real incognito players saw the DEV MODE banner because `GameBoard` rendered `<DevModeOverlay>` on `devMode` alone with no host check. (2) Host got "Dev override denied" when selecting a mission because `resolvePlayer` in all 11 edge functions rejected any override attempt if _any_ player in the game had a different `user_id` — this broke the moment a real second user joined. Fixed by: (a) gating the banner/overlay on `devMode && isHost` in `GameBoard.tsx`; (b) changing `resolvePlayer` in all 11 edge functions to fetch the _target_ player first and reject only if `data.user_id !== userId` (the caller's own-players check). The old "count players with different user_id" gate was too broad and made the override impossible in mixed games. Also fixed `paddingTop` to only apply the 24px banner offset for the host.
 
 ## Files changed
 
-- `app/game/[gameId]/lobby/page.tsx` — `devMode` derivation simplified to `process.env.NODE_ENV !== "production"`; `searchParams` param removed (now unused)
-- `components/game/phases/LobbyPhase.tsx` — stripped diagnostic `console.log` from `PlayerPanel`
+- `components/game/GameBoard.tsx` — `devMode && isHost` gate on `<DevModeOverlay>` and `paddingTop`
+- `supabase/functions/abort-mission/index.ts` — `resolvePlayer` override gate: target-player ownership check
+- `supabase/functions/adjust-resources/index.ts` — same
+- `supabase/functions/allocate-resources/index.ts` — same
+- `supabase/functions/discard-cards/index.ts` — same
+- `supabase/functions/end-play-phase/index.ts` — same
+- `supabase/functions/place-virus/index.ts` — same
+- `supabase/functions/play-card/index.ts` — same
+- `supabase/functions/pull-viruses/index.ts` — same
+- `supabase/functions/reveal-card/index.ts` — same
+- `supabase/functions/secret-target/index.ts` — same
+- `supabase/functions/select-mission/index.ts` — same
 
 ## Test status
 
 - `next build` — clean
-- Canary suite (abort-mission, error-handling, turn-order, multi-mission, mission-rules, lobby, dev-mode): **23 passed / 10 skipped / 0 failed**
-- All lobby.spec.ts (5/5) and dev-mode.spec.ts (7/7) pass
+- Canary suite (abort-mission, error-handling, turn-order, multi-mission, mission-rules, lobby, dev-mode): **24 passed / 9 skipped / 0 failed**
 
 ## Suggested next
 
-1. **Manual verification**: create lobby normally → host sees Fill Lobby button → Incognito joins → Fill Lobby tops up to 6 → Start Game → game board opens with DEV MODE banner active.
-2. **BACKLOG — layout density**: ActionRegion height or PlayerTurn overflow fix for staging zone text clipping.
-3. **Chat Phase 12 polish**: read receipts, timestamps, message count badges.
+1. **Manual verification**: (a) solo dev — Fill Lobby → Start Game → host PlayerSwitcher works, can play all 6 AIs through a mission; (b) multi-user — Incognito player joins → sees clean board with no DEV MODE banner, host still has PlayerSwitcher and can override their own bots only.
+2. **Deploy edge functions**: all 11 updated edge functions need to be redeployed to Supabase. The `resolvePlayer` change is backend-only and won't take effect until deployed.
+3. **BACKLOG — layout density**: ActionRegion height or PlayerTurn overflow fix for staging zone text clipping.
+4. **Chat Phase 12 polish**: read receipts, timestamps, message count badges.
