@@ -44,6 +44,7 @@ interface Props {
   revealSlots?: Record<string, RevealChipConfig>;     // keyed by player.id; set during card_reveal
   targetingChips?: Record<string, TargetingChipConfig>; // keyed by player.id; set during secret_targeting
   contributions?: Record<string, { compute: number; data: number; validation: number }>;
+  showMisBadges?: Record<string, boolean>; // keyed by player.id; true for chips the viewer knows are misaligned
   dimCore?: boolean;
   virusResolvingCard?: VirusResolvingCard | null;
   isGameOver?: boolean;
@@ -181,6 +182,7 @@ function AIChipGroup({
   slotSide = "left",
   isGameOver,
   gameOverRole,
+  showMisBadge = false,
 }: {
   slotLabel: string;
   chipX: number;
@@ -196,6 +198,7 @@ function AIChipGroup({
   slotSide?: "left" | "right";
   isGameOver?: boolean;
   gameOverRole?: string;
+  showMisBadge?: boolean;
 }) {
   const isActive = isActiveRaw && !isGameOver;
   const cpuFilled = Math.min(player?.cpu ?? 1, 4);
@@ -400,8 +403,8 @@ function AIChipGroup({
           </>
         )}
 
-        {/* MIS badge — shown during targeting for misaligned fellow chips */}
-        {targetingChip?.isFellow && !isActive && !isGameOver && (
+        {/* MIS badge — permanent for misaligned viewers; hidden when ACTIVE tag or game_over role badge occupies same space */}
+        {showMisBadge && !isActive && !isGameOver && (
           <text x="155" y="23" fontFamily="monospace" fontSize="8" fill="#a32d2d" textAnchor="end" letterSpacing="1">
             MIS
           </text>
@@ -760,6 +763,7 @@ export function CentralBoard({
   revealSlots,
   targetingChips,
   contributions,
+  showMisBadges,
   dimCore,
   virusResolvingCard,
   isGameOver,
@@ -876,6 +880,7 @@ export function CentralBoard({
             revealSlot={player ? revealSlots?.[player.id] : undefined}
             targetingChip={player ? targetingChips?.[player.id] : undefined}
             contributions={player ? contributions?.[player.id] : undefined}
+            showMisBadge={player ? (showMisBadges?.[player.id] ?? false) : false}
             slotSide={SLOT_SIDES[i]}
             isGameOver={isGameOver}
             gameOverRole={player && gameOverRoles ? gameOverRoles[player.id] : undefined}

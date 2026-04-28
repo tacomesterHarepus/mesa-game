@@ -549,6 +549,10 @@ export function GameBoard({
     }
   }
 
+  const showMisBadges: Record<string, boolean> = isMisalignedViewer
+    ? Object.fromEntries(aiPlayers.map((p) => [p.id, p.role === "misaligned_ai"]))
+    : {};
+
   const targetingChips: Record<string, TargetingChipConfig> | undefined =
     isTargetingPhase && isMisalignedViewer
       ? Object.fromEntries(
@@ -780,6 +784,7 @@ export function GameBoard({
           revealSlots={revealSlots}
           targetingChips={targetingChips}
           contributions={contributionMap}
+          showMisBadges={showMisBadges}
           dimCore={game.phase === "virus_resolution"}
           virusResolvingCard={(virusQueue[0] ?? null) as VirusResolvingCard | null}
           isGameOver={isGameOver}
