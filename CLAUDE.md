@@ -8,17 +8,42 @@
 
 When the user asks a question during a planning or design phase, respond with analysis only. Do not begin implementation until the user explicitly says "approved" or "go."
 
-## Commit and push discipline
+## Task completion ritual
 
-After completing any task that produces commits:
+When completing any task that produces commits:
 
 1. Commit work in logical chunks as you go (not at the end as one mega-commit).
-2. Update SESSION_NOTES.md as the final commit of the task.
-3. Push to origin/master before reporting "DONE" to the user.
+2. Update SESSION_NOTES.md with what was done.
+3. Update LATEST_TASK.md with a structured summary (overwrite previous content). Format:
+   ```
+   # Latest Task
 
-Pushing is part of "done." A task is not complete until it is on origin.
+   ## Summary
+   One paragraph: what was done.
 
-Rationale: the user reviews work from a separate Claude chat that reads the GitHub repo state. Unpushed commits are invisible to that chat, which breaks the review workflow. If a task is committed but not pushed, the user cannot effectively review or plan next steps from a different device.
+   ## Files changed
+   - path/to/file.ts — what changed
+
+   ## Test status
+   - which tests passed, which were skipped, which failed (if any)
+
+   ## Suggested next
+   What should logically come next, with reasoning. Reference UX_DESIGN.md sections or BACKLOG entries when relevant.
+   ```
+4. Commit the docs updates.
+5. Push to origin/master before reporting "DONE" to the user.
+6. Send a NTFY ping. **The body must be 5 lines or fewer**, plain text only, no attachments. NTFY converts long bodies to attachments which the user cannot read on mobile, defeating the notification purpose. Required content within the 5-line limit:
+   - Line 1: task name
+   - Line 2: 1-line summary of what shipped
+   - Line 3: test status (e.g. "build clean, multi-mission 3/3 pass")
+   - Line 4: suggested next step (1 line, reference LATEST_TASK.md for detail)
+   - Line 5 (optional): any blocker or flag the user needs to know immediately
+
+   For full detail, the user reads LATEST_TASK.md via the reviewer chat. The NTFY is a notification, not a report.
+
+Pushing is part of "done." A task is not complete until it is on origin AND the NTFY ping has been sent.
+
+Rationale: the user reviews work from a separate Claude chat that reads the GitHub repo state. LATEST_TASK.md is the rich detail (read by reviewer-Claude on demand), NTFY is the attention signal (read on phone lockscreen). Both must work for the review loop to function when the user is away from the CC machine.
 
 Exception: if the user has explicitly said "don't push yet" for a specific task, hold the push and report ready-to-push status instead.
 
@@ -626,48 +651,37 @@ mesa/
 
 ---
 
-## Test discipline during the UI redesign
+## Test discipline (post-redesign)
 
-While the board redesign is in progress (tracked in `UX_DESIGN.md`), the test suite is in a transitional state. UI tests written against the old layout will fail until the corresponding phase is reimplemented and its tests are updated.
+The board redesign is complete. The test suite returned to a green baseline (65 pass / 14 conditional skip / 1 known flake) on 2026-04-28 — see `BASELINE_2026-04-28.md`.
 
-**Do not run the full Playwright suite as a sanity check during phase tasks. The failures are mostly stale-selector noise, not regressions.**
+**Default discipline: run the full Playwright suite for any task that touches `components/`, `lib/`, `supabase/functions/`, or `supabase/migrations/`.** Full suite runtime is ~11 minutes — small price to confirm no collateral damage.
 
-### Per-phase test discipline
+When implementing any task:
 
-When implementing a phase task:
+1. Run `next build` — must pass cleanly.
+2. Run the full Playwright suite. Compare against the BASELINE doc. Any new failure that's not in the baseline's "known flake" list is a regression and must be addressed before the task ships.
+3. If a test fails as part of a task, the fix is part of the task — don't ship code that breaks tests.
+4. Pre-existing flakes (listed below) can be ignored if they fail in a run; treat them as noise unless they're failing reproducibly.
 
-1. **Always run** `next build` — must pass cleanly.
-2. **Always run** backend / non-UI tests — these don't depend on the redesign and must pass.
-3. **Run UI tests for the specific phase being implemented** — update selectors to match the new DOM as part of the task.
-4. **Mark UI tests for other not-yet-redesigned phases as `.skip`** with a comment like `// SKIPPED: depends on pre-redesign UI; revisit after [phase_name] task`. Don't delete them.
-5. **Don't run the full suite.** It will fail and the failures aren't actionable until the redesign completes.
+### Acceptable shortcuts
 
-### Backend / non-UI tests (always run)
+For trivial documentation-only changes, BACKLOG/SESSION_NOTES updates, or other non-code commits, the full suite is not required. Build clean is sufficient.
 
-- `tests/e2e/error-handling.spec.ts` (cold-start retries)
-- `tests/e2e/turn-order.spec.ts` (seat order rotation)
-- `tests/e2e/multi-mission.spec.ts` (mission 2+ regressions)
-- `tests/e2e/mission-rules.spec.ts` (mission special rules — note: pre-existing flake on test 28)
-- `tests/e2e/abort-mission.spec.ts` (abort-mission edge function)
-
-These don't touch redesigned UI elements. If any of these starts failing during a redesign task, that's a real regression and needs investigation.
+For code changes scoped to a single area (e.g. a one-line CSS fix), the canary subset (error-handling, turn-order, multi-mission, mission-rules, abort-mission) may be acceptable — but the full suite is the safer default and should be the assumed standard.
 
 ### Pre-existing test issues to ignore
 
-- `tests/e2e/mission-rules.spec.ts` test 28 — flaky 15s timeout, passes on isolated re-run
-- `tests/e2e/game-log.spec.ts` test 1 — cold-start flake, clears on re-run
-- Playwright webServer timeout — pre-existing environment issue, fails identically on unmodified code
+- `tests/e2e/game-log.spec.ts:524` — CPU≥2 path race; passes in isolation, can flake in full suite (DIAGNOSIS_2026-04-27 Item 1)
+- `tests/e2e/mission-rules.spec.ts` test 28 — 15s timeout flake, passes on isolated re-run
+- Playwright webServer timeout — environment issue, fails identically on unmodified code
 
-### End of redesign
+### When tests start failing systematically
 
-After the final phase task (per `UX_DESIGN.md` section 11 ordering), do a dedicated test-cleanup pass:
-
-1. Unskip all `.skip`'d UI tests
-2. Run the full Playwright suite
-3. Fix any remaining failures phase-by-phase
-4. Document final passing baseline in SESSION_NOTES.md
-
-This is when the test suite returns to its "all green" baseline.
+If multiple tests start failing across runs, do not mass-fix selectors. STOP and diagnose first — the failure pattern tells you whether it's:
+- A real regression (one or two tests fail for the same root cause) → fix the production code
+- Stale-selector drift after a UI change (many tests fail with the same "element not found" pattern) → fix the selectors as part of the task that caused the drift
+- Infrastructure (cold-start, network) → re-run, don't fix
 
 ---
 
@@ -688,7 +702,7 @@ This is when the test suite returns to its "all green" baseline.
 | 11. Game log | **DONE** | |
 | 12. Chat system | deferred to BACKLOG | |
 | 13. UI polish | deferred to BACKLOG | |
-| Board redesign | **NEXT UP** | |
+| Board redesign | **DONE** | All phase tasks shipped 2026-04-27. End-of-redesign test cleanup pass landed 2026-04-28. Baseline in BASELINE_2026-04-28.md. |
 | 14. Playwright tests | pending | Written alongside each feature, not after |
 | 15. Email (Resend) | pending | |
 
