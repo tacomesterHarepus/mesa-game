@@ -269,14 +269,15 @@ Each phase below is locked. Mockup files referenced are in `/docs/mockups/` (or 
 
 ### 7.1 player_turn
 
-**Mockup**: `mockup_player_turn.html` (was `mesa_board_redesign_v7.html`)
+**Mockup**: `mockup_player_turn_density_pass.html` (density pass v8; original v7: `mockup_player_turn.html`)
 
-The active AI takes their turn. Hand visible at the bottom inside the action region. Four action buttons stacked: Play card, Place virus, Discard, End turn.
+The active AI takes their turn. Hand visible at the bottom inside the action region. Four action buttons stacked: Play card, Stage for Pool, Discard, End turn.
 
 Key elements:
-- Hand at bottom-left of action region: stacked cards (3-4 stacks visible if hand is large)
+- Hand at bottom-left of action region: stacked card groups (120×150px), each group showing card name + large icon
 - Cards in hand are clickable; selected card lifts and gets amber border + `SELECTED ×N` tag
-- Action buttons enabled/disabled based on selection state (e.g. Play card disabled until a card is selected)
+- Action buttons enabled/disabled based on selection state (e.g. Play card disabled until a progress card is selected)
+- **Staging hint** (inline, below Stage for Pool button): renders only when `stagedCards.length > 0`; format `staged ×N · M more` or `staged ×N · ready`; monospace 9pt amber (`#a87a17`). Replaces the old staging banner block.
 - Active AI's chip has full active styling (see 5.4)
 - Other AIs' chips are normal (no active border)
 

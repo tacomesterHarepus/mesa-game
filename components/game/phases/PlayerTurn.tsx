@@ -333,14 +333,6 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
     setSelectedCardKey(null);
   }
 
-  function handleUnstageCard(id: string) {
-    setStagedCardIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-  }
-
   async function handleAbortMission() {
     setAbortError(null);
     setAbortLoading(true);
@@ -461,49 +453,6 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
               </div>
             </div>
 
-            {/* Staging zone */}
-            {hasDiscarded && virusCount > 0 && (
-              <div>
-                <p style={{ fontFamily: "monospace", fontSize: 9, color: "#555", letterSpacing: 1, margin: "0 0 4px 0" }}>
-                  STAGING — {stagedCards.length} / {virusCount}
-                  {stagingNeeded > 0 && !handExhausted && (
-                    <span style={{ color: "#a32d2d", marginLeft: 8 }}>STAGE {stagingNeeded} MORE</span>
-                  )}
-                </p>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {stagedCards.map((c) => {
-                    const def = CARD_MAP[c.card_key];
-                    const visual = getCardVisual(c.card_type, c.card_key);
-                    return (
-                      <button
-                        key={c.id}
-                        onClick={() => handleUnstageCard(c.id)}
-                        title="Click to unstage"
-                        style={{
-                          padding: "4px 8px",
-                          background: "#0c0c0c",
-                          border: `1px solid ${visual.border}`,
-                          borderRadius: 2,
-                          fontFamily: "monospace",
-                          fontSize: 9,
-                          color: visual.color,
-                          cursor: "pointer",
-                          letterSpacing: 1,
-                        }}
-                      >
-                        {def?.name ?? c.card_key} ×
-                      </button>
-                    );
-                  })}
-                  {stagedCards.length === 0 && !handExhausted && (
-                    <span style={{ fontFamily: "monospace", fontSize: 9, color: "#555" }}>
-                      Select a card and click Stage for Pool.
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* Errors */}
             {(error || discardError) && (
               <p style={{ fontFamily: "monospace", fontSize: 10, color: "#a32d2d", margin: 0 }}>
@@ -527,6 +476,11 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
               onClick={handleStageCard}
               title={canStage ? undefined : !hasDiscarded ? "Discard first" : virusCount === 0 ? "No viruses this turn" : stagedCards.length >= virusCount ? "Staging full" : "Select a card"}
             />
+            {stagedCards.length > 0 && (
+              <span style={{ fontFamily: "monospace", fontSize: 9, color: "#a87a17", letterSpacing: 1 }}>
+                {`staged ×${stagedCards.length}${stagingNeeded > 0 ? ` · ${stagingNeeded} more` : " · ready"}`}
+              </span>
+            )}
             <ActionBtn
               label={discardBtnLabel}
               enabled={!hasDiscarded}
