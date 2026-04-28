@@ -543,9 +543,9 @@ export function GameBoard({
       if (!contributionMap[c.player_id]) {
         contributionMap[c.player_id] = { compute: 0, data: 0, validation: 0 };
       }
-      if (c.card_type === "compute") contributionMap[c.player_id].compute++;
-      else if (c.card_type === "data") contributionMap[c.player_id].data++;
-      else if (c.card_type === "validation") contributionMap[c.player_id].validation++;
+      if (c.card_key === "compute") contributionMap[c.player_id].compute++;
+      else if (c.card_key === "data") contributionMap[c.player_id].data++;
+      else if (c.card_key === "validation") contributionMap[c.player_id].validation++;
     }
   }
 
