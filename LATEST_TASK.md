@@ -2,24 +2,24 @@
 
 ## Summary
 
-Fixed Realtime delivery for chat unread badges. Both `PublicChat.tsx` and `MisalignedPrivateChat.tsx` were subscribing to Supabase Realtime without first awaiting `supabase.auth.getSession()`. Because Mesa uses anonymous auth, the JWT is loaded lazily — the channel JOIN fired before the token was ready, so Realtime evaluated `chat_messages` RLS policies with `auth.uid() = null`, `is_player_in_game()` returned false, and all INSERT events were silently dropped. `game_log` Realtime worked because it shares the `game-${gameId}` channel created in GameBoard.tsx which already awaited the session (lines 167-170). Applied the identical async IIFE pattern with `cancelled` guard and outer-scope `channel` ref for safe cleanup. Stripped four diagnostic logs added during diagnosis.
+Added a "Fill Lobby" button to the lobby waiting screen. Visible only when `devMode=true` and the viewer is the host; hidden from non-hosts and in production. When clicked, inserts Bot2–Bot10 (skipping any names already taken by real players) until the player count reaches the 6-player minimum. Uses the same direct Supabase-insert pattern as the create-game page's existing Fill Lobby button — no edge function, all bots share the host's `user_id`. The button disappears once 6+ players are in the lobby.
+
+Intended workflow: create lobby in normal Chrome → share invite link to Incognito → Incognito joins as player 2 → host clicks Fill Lobby in normal Chrome → tops up to 6 → Start Game enables.
 
 ## Files changed
 
-- `components/chat/PublicChat.tsx` — Realtime `useEffect` wrapped in async `setup()` function; `await supabase.auth.getSession()` before `channel.subscribe()`; `let cancelled`/`let channel` pattern for safe cleanup; diagnostic logs stripped
-- `components/chat/MisalignedPrivateChat.tsx` — identical fix
+- `components/game/phases/LobbyPhase.tsx` — added `fillLoading` state, `handleFillLobby()` async function, and Fill Lobby button in `PlayerPanel` (gated: `devMode && playerCount < MIN_PLAYERS`)
 
 ## Test status
 
 - `next build` — clean
-- Full Playwright suite: **65 passed, 14 skipped, 1 failed**
-- 1 failure: `game-log.spec.ts:524` — pre-existing CPU≥2 path race (known flake, passes in isolation)
-- No regressions from this change
+- Canary suite (abort-mission, error-handling, turn-order, multi-mission, mission-rules, lobby): **17 passed / 9 skipped / 0 failed**
+- 9 skips are all random-card conditionals in mission-rules — correct baseline behavior
 
 ## Suggested next
 
-1. **Manual browser verification**: open dev game in two tabs as different players; on LOG tab, have another player post a public message — CHAT badge should increment. For private badge: misaligned player on LOG tab, another misaligned player posts to private channel — PRIVATE badge increments. This is the first time Realtime actually delivers these events, so confirming it live is worth the 2 minutes.
+1. **Manual verification**: open dev lobby, confirm host sees Fill Lobby button, non-host (Incognito tab) does not; click Fill Lobby, confirm 5 bots appear, Start Game enables and works.
 
-2. **Chat Phase 12 send functionality** (BACKLOG): backend send is already implemented (direct Supabase insert from client); what's "deferred" in BACKLOG is the full Phase 12 polish pass (read receipts, timestamps, etc.). The basic send/receive loop is functional.
+2. **Chat badge manual verification**: while here, test the Realtime fix — be on LOG tab, have another player post to public chat, confirm CHAT badge increments without a page reload.
 
-3. **Layout density fix** (BACKLOG): ActionRegion 200px → 240px or PlayerTurn left column `overflow: auto` to fix staging zone text clipping.
+3. **BACKLOG — UI/UX polish**: ActionRegion height or PlayerTurn overflow fix for staging zone text clipping.

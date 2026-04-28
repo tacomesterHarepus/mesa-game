@@ -1,9 +1,10 @@
 # Session Notes
 
 ## Current Phase
-**Chat Realtime fix shipped (commit b23e533). Badges now work via Realtime delivery. Next: manual browser verification of badge behavior, then BACKLOG — UI/UX polish or chat Phase 12 send functionality.**
+**Lobby Fill Lobby button shipped (commit 2965b6d). Next: manual browser verification (host sees button, non-host doesn't, fills to 6, game starts). Then BACKLOG — UI/UX polish or chat Phase 12.**
 
 Recent completed work:
+- **Lobby Fill Lobby button** — Dev-mode host-only "Fill Lobby" button in the lobby waiting screen. Inserts Bot2–Bot10 (skipping existing names) until player count reaches 6. Same Supabase-insert pattern as create-game page. 1 commit 2965b6d. Build clean. Canary 17/26 pass (9 skip = random-card conditionals, 0 fail).
 - **Chat Realtime delivery fix** — Both PublicChat and MisalignedPrivateChat were subscribing without `await supabase.auth.getSession()`, causing Realtime to evaluate RLS with `auth.uid()=null` and silently drop all INSERT events. Applied the same async setup pattern already present in GameBoard.tsx (lines 167-170). 1 commit b23e533. Build clean. Suite: 65 pass / 14 skip / 1 fail (known flake, no regressions).
 - **Three bug fixes + CLAUDE.md update** — BUG A: contributionMap used `card_type` ("progress") instead of `card_key` ("compute"/"data"/"validation") — fixed 3 lines in GameBoard.tsx. BUG B: poll fired `onNewMsgRef.current?.()` inside `setMessages` functional updater — moved outside, added `messagesRef` dedup. BUG C: MIS badge gated to `secret_targeting` phase via `targetingChip.isFellow`; added `showMisBadge` prop derived from viewer role, always visible to misaligned viewers. CLAUDE.md test discipline section updated. 4 commits 97af9f0–a6faae4. Suite: 65/14/1 (no regressions).
 
