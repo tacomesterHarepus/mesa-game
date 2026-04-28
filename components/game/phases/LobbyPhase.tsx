@@ -51,6 +51,7 @@ export function LobbyPhase({
   const [joinMode, setJoinMode] = useState<"player" | "spectator" | null>(null);
   const [joinLoading, setJoinLoading] = useState(false);
   const [startLoading, setStartLoading] = useState(false);
+  const [fillLoading, setFillLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -228,6 +229,29 @@ export function LobbyPhase({
     }
   }
 
+  async function handleFillLobby() {
+    if (!devMode || !isHost) return;
+    setError(null);
+    setFillLoading(true);
+    try {
+      const uid = await ensureSession();
+      const supabase = createClient();
+      const needed = Math.max(MIN_PLAYERS, players.length) - players.length;
+      if (needed > 0) {
+        const existingNames = new Set(players.map((p) => p.display_name));
+        const pool = ["Bot2", "Bot3", "Bot4", "Bot5", "Bot6", "Bot7", "Bot8", "Bot9", "Bot10"];
+        const toAdd = pool.filter((n) => !existingNames.has(n)).slice(0, needed);
+        const { error: insertError } = await supabase.from("players").insert(
+          toAdd.map((name) => ({ game_id: gameId, user_id: uid, display_name: name }))
+        );
+        if (insertError) setError(insertError.message);
+      }
+    } catch {
+      setError("Failed to fill lobby.");
+    }
+    setFillLoading(false);
+  }
+
   async function copyLink() {
     await navigator.clipboard.writeText(window.location.href);
     setCopied(true);
@@ -314,8 +338,11 @@ export function LobbyPhase({
               playerCount={players.length}
               canStart={canStart}
               loading={startLoading}
+              fillLoading={fillLoading}
+              devMode={devMode}
               error={error}
               onStart={handleStart}
+              onFillLobby={handleFillLobby}
             />
           )}
         </div>
@@ -393,15 +420,21 @@ function PlayerPanel({
   playerCount,
   canStart,
   loading,
+  fillLoading,
+  devMode,
   error,
   onStart,
+  onFillLobby,
 }: {
   isHost: boolean;
   playerCount: number;
   canStart: boolean;
   loading: boolean;
+  fillLoading: boolean;
+  devMode: boolean;
   error: string | null;
   onStart: () => void;
+  onFillLobby: () => void;
 }) {
   return (
     <div className="space-y-4">
@@ -427,6 +460,16 @@ function PlayerPanel({
           <Button onClick={onStart} loading={loading} disabled={!canStart} className="w-full">
             Start Game
           </Button>
+          {devMode && playerCount < MIN_PLAYERS && (
+            <Button
+              onClick={onFillLobby}
+              loading={fillLoading}
+              variant="secondary"
+              className="w-full opacity-70 border-dashed"
+            >
+              Fill Lobby
+            </Button>
+          )}
         </>
       )}
     </div>
