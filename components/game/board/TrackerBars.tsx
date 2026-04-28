@@ -44,12 +44,12 @@ export function TrackerBars({ coreProgress, escapeTimer }: Props) {
           >
             Core Progress
           </span>
-          <span style={{ fontFamily: "monospace", fontSize: 11, color: "#d4a017" }}>
+          <span style={{ fontFamily: "monospace", fontSize: 14, fontWeight: "bold", color: "#d4a017" }}>
             {coreProgress} / {PROGRESS_MAX}
           </span>
         </div>
-        <div style={{ width: BAR_WIDTH, height: 6, background: "#1a1a1a" }}>
-          <div style={{ width: progressFill, height: 6, background: "#d4a017" }} />
+        <div style={{ width: BAR_WIDTH, height: 8, background: "#1a1a1a" }}>
+          <div style={{ width: progressFill, height: 8, background: "#d4a017" }} />
         </div>
       </div>
 
@@ -80,12 +80,12 @@ export function TrackerBars({ coreProgress, escapeTimer }: Props) {
           >
             Escape Timer · Firewall Integrity
           </span>
-          <span style={{ fontFamily: "monospace", fontSize: 11, color: "#a32d2d" }}>
+          <span style={{ fontFamily: "monospace", fontSize: 14, fontWeight: "bold", color: "#a32d2d" }}>
             {escapeTimer} / {TIMER_MAX}
           </span>
         </div>
-        <div style={{ width: BAR_WIDTH, height: 6, background: "#1a1a1a" }}>
-          <div style={{ width: timerFill, height: 6, background: "#a32d2d" }} />
+        <div style={{ width: BAR_WIDTH, height: 8, background: "#1a1a1a" }}>
+          <div style={{ width: timerFill, height: 8, background: "#a32d2d" }} />
         </div>
       </div>
     </>

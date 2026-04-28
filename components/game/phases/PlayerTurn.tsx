@@ -107,9 +107,11 @@ function CardStackGroup({
   const count = cards.length;
   const shadows = Math.min(count - 1, 2);
 
+  const typeLabel = first.card_type === "progress" ? "PROGRESS" : "VIRUS";
+
   return (
     <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 3, flexShrink: 0 }}>
-      <div style={{ position: "relative", width: 110, height: 120 }}>
+      <div style={{ position: "relative", width: 120, height: 150 }}>
         {/* Shadow cards behind the main card */}
         {Array.from({ length: shadows }, (_, i) => (
           <div
@@ -118,8 +120,8 @@ function CardStackGroup({
               position: "absolute",
               top: (i + 1) * 3,
               left: (i + 1) * 2,
-              width: 110,
-              height: 120,
+              width: 120,
+              height: 150,
               background: visual.bg,
               border: `1px solid ${visual.border}`,
               borderRadius: 3,
@@ -136,8 +138,8 @@ function CardStackGroup({
             top: 0,
             left: 0,
             zIndex: 1,
-            width: 110,
-            height: 120,
+            width: 120,
+            height: 150,
             background: isSelected ? "#241a08" : visual.bg,
             border: `${isSelected ? 2 : 1}px solid ${isSelected ? "#d4a017" : disabled ? "#222" : visual.border}`,
             borderRadius: 3,
@@ -149,29 +151,32 @@ function CardStackGroup({
             opacity: disabled ? 0.3 : 1,
           }}
         >
-          {/* Header strip */}
+          {/* Header strip — type label only */}
           <div
             style={{
-              height: 24,
+              height: 22,
               background: visual.header,
               borderRadius: "3px 3px 0 0",
               display: "flex",
               alignItems: "center",
               paddingLeft: 8,
-              gap: 5,
               flexShrink: 0,
             }}
           >
-            <span style={{ fontFamily: "sans-serif", fontSize: 11, color: visual.color }}>{visual.icon}</span>
-            <span style={{ fontFamily: "monospace", fontSize: 7, color: visual.color, letterSpacing: 1 }}>
-              {(cardDef?.name ?? cardKey).toUpperCase()}
+            <span style={{ fontFamily: "monospace", fontSize: 9, color: visual.color, letterSpacing: 1 }}>
+              {typeLabel}
             </span>
           </div>
-          {/* Card body */}
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontFamily: "sans-serif", fontSize: 30, color: visual.color, opacity: 0.75 }}>
-              {visual.icon}
+          {/* Card body — name + large icon */}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", paddingLeft: 8, paddingTop: 6 }}>
+            <span style={{ fontFamily: "sans-serif", fontSize: 14, color: "#ddd", lineHeight: 1.2 }}>
+              {cardDef?.name ?? cardKey}
             </span>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontFamily: "sans-serif", fontSize: 28, color: visual.color, opacity: 0.8 }}>
+                {visual.icon}
+              </span>
+            </div>
           </div>
         </button>
 
@@ -409,7 +414,7 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
               <h3 style={{ fontFamily: "monospace", fontSize: 10, color: "#666", letterSpacing: 1, margin: "0 0 6px 0", fontWeight: "normal" }}>
                 Your Hand
               </h3>
-              <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4 }}>
+              <div style={{ display: "flex", gap: 24, overflowX: "auto", paddingBottom: 4 }}>
                 {!hasDiscarded ? (
                   discardGroups.length > 0 ? (
                     discardGroups.map(([key, cards]) => {

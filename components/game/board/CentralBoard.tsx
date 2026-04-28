@@ -227,7 +227,6 @@ function AIChipGroup({
   const trackFill    = isActive ? "#d4a017" : "#5dcaa5";
   const trackStroke  = isActive ? "#5a4a1a" : "#3a5a4a";
   const counterText  = isActive ? "#a87a17" : goMisaligned ? "#9a7a7a" : "#7a8a9a";
-  const dotSep       = isActive ? "#5a4a1a" : "#3a4a3a";
 
   // Pending-state visual helpers (§5.2)
   // For each CPU square i (0–3):
@@ -335,14 +334,12 @@ function AIChipGroup({
           </text>
         ) : (
           <>
-            <text x="14" y="14" fontFamily="sans-serif" fontSize="11" fill="#9cb4d4" textAnchor="middle">⚙</text>
-            <text x="26" y="14" fontFamily="monospace" fontSize="11" fill={counterText}>{contributions?.compute ?? 0}</text>
-            <text x="44" y="13" fontFamily="monospace" fontSize="9" fill={dotSep}>·</text>
-            <text x="68" y="14" fontFamily="sans-serif" fontSize="11" fill="#5dcaa5" textAnchor="middle">▣</text>
-            <text x="80" y="14" fontFamily="monospace" fontSize="11" fill={counterText}>{contributions?.data ?? 0}</text>
-            <text x="98" y="13" fontFamily="monospace" fontSize="9" fill={dotSep}>·</text>
-            <text x="122" y="14" fontFamily="sans-serif" fontSize="11" fill="#caa55d" textAnchor="middle">◆</text>
-            <text x="134" y="14" fontFamily="monospace" fontSize="11" fill={counterText}>{contributions?.validation ?? 0}</text>
+            <text x="14" y="14" fontFamily="sans-serif" fontSize="13" fill="#9cb4d4" textAnchor="middle">⚙</text>
+            <text x="28" y="15" fontFamily="monospace" fontSize="13" fontWeight="bold" fill={counterText}>{contributions?.compute ?? 0}</text>
+            <text x="68" y="14" fontFamily="sans-serif" fontSize="13" fill="#5dcaa5" textAnchor="middle">▣</text>
+            <text x="82" y="15" fontFamily="monospace" fontSize="13" fontWeight="bold" fill={counterText}>{contributions?.data ?? 0}</text>
+            <text x="122" y="14" fontFamily="sans-serif" fontSize="13" fill="#caa55d" textAnchor="middle">◆</text>
+            <text x="136" y="15" fontFamily="monospace" fontSize="13" fontWeight="bold" fill={counterText}>{contributions?.validation ?? 0}</text>
           </>
         )}
       </g>
@@ -416,20 +413,20 @@ function AIChipGroup({
         </text>
 
         {/* CPU label */}
-        <text x="15" y="68" fontFamily="monospace" fontSize="10" fill={trackLabel}>
+        <text x="15" y="68" fontFamily="monospace" fontSize="11" fill={trackLabel}>
           CPU
         </text>
 
-        {/* CPU track — 4 squares of 10×10, stride 11 */}
+        {/* CPU track — 4 squares of 11×11, stride 12 */}
         {([0, 1, 2, 3] as const).map((i) => {
           const sq = cpuSquareProps(i);
           return (
             <rect
               key={i}
-              x={40 + i * 11}
+              x={40 + i * 12}
               y={61}
-              width="10"
-              height="10"
+              width="11"
+              height="11"
               fill={sq.fill}
               stroke={sq.stroke}
               strokeWidth={sq.strokeWidth}
@@ -439,11 +436,11 @@ function AIChipGroup({
         })}
 
         {/* RAM label */}
-        <text x="90" y="68" fontFamily="monospace" fontSize="10" fill={trackLabel}>
+        <text x="90" y="68" fontFamily="monospace" fontSize="11" fill={trackLabel}>
           RAM
         </text>
 
-        {/* RAM track — 7 squares of 6×10, stride 7, start x=110 (ends at 158, within 160-wide body) */}
+        {/* RAM track — 7 squares of 7×11, stride 7, start x=110 (ends at 159, within 160-wide body) */}
         {([0, 1, 2, 3, 4, 5, 6] as const).map((i) => {
           const sq = ramSquareProps(i);
           return (
@@ -451,8 +448,8 @@ function AIChipGroup({
               key={i}
               x={110 + i * 7}
               y={61}
-              width="6"
-              height="10"
+              width="7"
+              height="11"
               fill={sq.fill}
               stroke={sq.stroke}
               strokeWidth={sq.strokeWidth}

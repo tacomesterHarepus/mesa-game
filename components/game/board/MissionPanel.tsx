@@ -78,7 +78,7 @@ export function MissionPanel({ mission }: Props) {
             <div
               style={{
                 fontFamily: "sans-serif",
-                fontSize: 16,
+                fontSize: 15,
                 color: "#d4a017",
                 marginBottom: 4,
               }}
@@ -90,7 +90,7 @@ export function MissionPanel({ mission }: Props) {
               <div
                 style={{
                   fontFamily: "sans-serif",
-                  fontSize: 11,
+                  fontSize: 12,
                   color: "#888",
                   fontStyle: "italic",
                   marginBottom: 10,
@@ -118,14 +118,15 @@ export function MissionPanel({ mission }: Props) {
                       }}
                     >
                       <span
-                        style={{ fontFamily: "sans-serif", fontSize: 11, color: "#aaa" }}
+                        style={{ fontFamily: "sans-serif", fontSize: 13, color: "#aaa" }}
                       >
                         {req.label}
                       </span>
                       <span
                         style={{
                           fontFamily: "monospace",
-                          fontSize: 11,
+                          fontSize: 13,
+                          fontWeight: "bold",
                           color: complete ? "#d4a017" : "#aaa",
                         }}
                       >
