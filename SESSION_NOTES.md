@@ -1,7 +1,11 @@
 # Session Notes
 
 ## Current Phase
-**End-of-redesign test cleanup pass DONE. Baseline: 65 passed, 14 skipped, 1 failed (pre-existing). Next: BACKLOG — UI/UX polish (allocation visibility, layout density) or chat system.**
+**Chat Realtime fix shipped (commit b23e533). Badges now work via Realtime delivery. Next: manual browser verification of badge behavior, then BACKLOG — UI/UX polish or chat Phase 12 send functionality.**
+
+Recent completed work:
+- **Chat Realtime delivery fix** — Both PublicChat and MisalignedPrivateChat were subscribing without `await supabase.auth.getSession()`, causing Realtime to evaluate RLS with `auth.uid()=null` and silently drop all INSERT events. Applied the same async setup pattern already present in GameBoard.tsx (lines 167-170). 1 commit b23e533. Build clean. Suite: 65 pass / 14 skip / 1 fail (known flake, no regressions).
+- **Three bug fixes + CLAUDE.md update** — BUG A: contributionMap used `card_type` ("progress") instead of `card_key` ("compute"/"data"/"validation") — fixed 3 lines in GameBoard.tsx. BUG B: poll fired `onNewMsgRef.current?.()` inside `setMessages` functional updater — moved outside, added `messagesRef` dedup. BUG C: MIS badge gated to `secret_targeting` phase via `targetingChip.isFellow`; added `showMisBadge` prop derived from viewer role, always visible to misaligned viewers. CLAUDE.md test discipline section updated. 4 commits 97af9f0–a6faae4. Suite: 65/14/1 (no regressions).
 
 Recent completed work:
 - **End-of-redesign test cleanup pass** — 4 commits (bf3ece8–5da7ca0). Unskipped 5 pending-phase tests, fixed 9 stale selectors/timeouts across dev-mode, game-log-ui, multi-mission, secret-actions, abort-mission, draw-cards, virus-placement. Root causes documented in BASELINE_2026-04-28.md. Final baseline: 65 pass / 14 skip / 1 fail (game-log CPU≥2 path, pre-existing). Key findings: staging zone text clipped by overflow:hidden; "STAGE N MORE" visible before hasDiscarded=true; virus_pull phase missing from allowlists.
