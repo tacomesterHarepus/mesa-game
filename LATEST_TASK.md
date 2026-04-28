@@ -2,24 +2,23 @@
 
 ## Summary
 
-Added a "Fill Lobby" button to the lobby waiting screen. Visible only when `devMode=true` and the viewer is the host; hidden from non-hosts and in production. When clicked, inserts Bot2–Bot10 (skipping any names already taken by real players) until the player count reaches the 6-player minimum. Uses the same direct Supabase-insert pattern as the create-game page's existing Fill Lobby button — no edge function, all bots share the host's `user_id`. The button disappears once 6+ players are in the lobby.
+Fixed the lobby Fill Lobby button not appearing. Root cause: `LobbyPage` derived `devMode` from `process.env.NODE_ENV !== "production" && searchParams.dev_mode === "true"`. The `?dev_mode=true` URL param is only present when the host entered via the create-page Fill Lobby shortcut (which already pre-fills to 6, making the button redundant). Normal game creation (`CreateGameForm.handleSubmit`) redirects to `/lobby` without the param. Fixed by changing `LobbyPage.devMode` to `process.env.NODE_ENV !== "production"` — matching `CreateGameForm`'s `IS_DEV` constant. Also stripped the diagnostic `console.log` added during diagnosis.
 
-Intended workflow: create lobby in normal Chrome → share invite link to Incognito → Incognito joins as player 2 → host clicks Fill Lobby in normal Chrome → tops up to 6 → Start Game enables.
+Side effect (intentional): `LobbyPhase.gameUrl` is now `/game/${id}?dev_mode=true` in dev environments, so when the host clicks Start Game the whole session lands on the game board with dev mode active (DEV MODE banner + PlayerSwitcher visible).
 
 ## Files changed
 
-- `components/game/phases/LobbyPhase.tsx` — added `fillLoading` state, `handleFillLobby()` async function, and Fill Lobby button in `PlayerPanel` (gated: `devMode && playerCount < MIN_PLAYERS`)
+- `app/game/[gameId]/lobby/page.tsx` — `devMode` derivation simplified to `process.env.NODE_ENV !== "production"`; `searchParams` param removed (now unused)
+- `components/game/phases/LobbyPhase.tsx` — stripped diagnostic `console.log` from `PlayerPanel`
 
 ## Test status
 
 - `next build` — clean
-- Canary suite (abort-mission, error-handling, turn-order, multi-mission, mission-rules, lobby): **17 passed / 9 skipped / 0 failed**
-- 9 skips are all random-card conditionals in mission-rules — correct baseline behavior
+- Canary suite (abort-mission, error-handling, turn-order, multi-mission, mission-rules, lobby, dev-mode): **23 passed / 10 skipped / 0 failed**
+- All lobby.spec.ts (5/5) and dev-mode.spec.ts (7/7) pass
 
 ## Suggested next
 
-1. **Manual verification**: open dev lobby, confirm host sees Fill Lobby button, non-host (Incognito tab) does not; click Fill Lobby, confirm 5 bots appear, Start Game enables and works.
-
-2. **Chat badge manual verification**: while here, test the Realtime fix — be on LOG tab, have another player post to public chat, confirm CHAT badge increments without a page reload.
-
-3. **BACKLOG — UI/UX polish**: ActionRegion height or PlayerTurn overflow fix for staging zone text clipping.
+1. **Manual verification**: create lobby normally → host sees Fill Lobby button → Incognito joins → Fill Lobby tops up to 6 → Start Game → game board opens with DEV MODE banner active.
+2. **BACKLOG — layout density**: ActionRegion height or PlayerTurn overflow fix for staging zone text clipping.
+3. **Chat Phase 12 polish**: read receipts, timestamps, message count badges.
