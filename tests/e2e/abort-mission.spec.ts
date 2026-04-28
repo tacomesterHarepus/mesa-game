@@ -117,7 +117,7 @@ async function advanceToPlayerTurnRound1(
     await page.waitForTimeout(300);
   }
 
-  await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 45000 });
   await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

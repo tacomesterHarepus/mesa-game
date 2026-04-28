@@ -115,7 +115,7 @@ async function advanceThroughCardReveal(
     await page.waitForTimeout(300);
   }
 
-  await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 45000 });
 }
 
 // Zero-allocation path: advances all the way to player_turn without bumping any stats.

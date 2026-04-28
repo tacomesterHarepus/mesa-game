@@ -228,8 +228,8 @@ test.describe("virus placement", () => {
       const skipDiscardBtn = page.getByRole("button", { name: "Skip Discard" });
       if (await skipDiscardBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
         await skipDiscardBtn.click();
-        // Wait for play phase to appear (End Turn = play phase rendered)
-        await page.getByRole("button", { name: "End Turn" }).waitFor({ state: "visible", timeout: 10000 });
+        // Wait for play phase to appear (button shows END TURN or STAGE N MORE depending on CPU)
+        await page.getByRole("button", { name: /end turn|stage \d+ more/i }).waitFor({ state: "visible", timeout: 10000 });
       }
 
       // Select and stage the known card: click by display name, then "Stage for Pool"

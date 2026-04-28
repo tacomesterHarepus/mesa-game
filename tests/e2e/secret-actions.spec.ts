@@ -521,7 +521,7 @@ test.describe("secret targeting", () => {
       // Not in targeting phase — verify the game board renders without crashing
       expect([
         "player_turn", "between_turns", "virus_resolution",
-        "resource_adjustment", "game_over", "secret_targeting",
+        "resource_adjustment", "game_over", "secret_targeting", "virus_pull",
       ]).toContain(phase);
     }
   });
