@@ -56,7 +56,7 @@ export function MissionSummaryPanel({ gameId }: { gameId: string }) {
       style={{
         position: "absolute",
         left: 32,
-        top: 180,
+        top: 100,
         width: 348,
         height: 500,
         background: "#0c0c0c",

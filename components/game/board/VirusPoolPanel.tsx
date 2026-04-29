@@ -16,7 +16,7 @@ export function VirusPoolPanel({ poolCount, pendingPullCount, phase }: Props) {
       style={{
         position: "absolute",
         left: 32,
-        top: 395,
+        top: 310,
         width: 348,
         height: 170,
         background: "#0c0c0c",

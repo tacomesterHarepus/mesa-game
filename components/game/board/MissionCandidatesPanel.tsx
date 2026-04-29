@@ -13,7 +13,7 @@ export function MissionCandidatesPanel({ pendingOptions, selected, onSelect, isH
       style={{
         position: "absolute",
         left: 32,
-        top: 180,
+        top: 100,
         width: 348,
         height: 385,
         background: "#0c0c0c",

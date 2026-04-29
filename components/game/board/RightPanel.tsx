@@ -123,9 +123,9 @@ export function RightPanel({
       style={{
         position: "absolute",
         left: 1100,
-        top: 75,
+        top: 95,
         width: 308,
-        height: 815,
+        height: 795,
         display: "flex",
         flexDirection: "column",
       }}

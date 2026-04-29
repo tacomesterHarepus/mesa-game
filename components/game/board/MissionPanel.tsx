@@ -37,9 +37,9 @@ export function MissionPanel({ mission }: Props) {
       style={{
         position: "absolute",
         left: 32,
-        top: 180,
+        top: 100,
         width: 348,
-        height: 200,
+        height: 195,
         background: "#0c0c0c",
         border: "1px solid #222",
         borderRadius: 2,

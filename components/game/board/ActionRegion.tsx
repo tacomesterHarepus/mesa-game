@@ -67,9 +67,9 @@ export function ActionRegion({ children, phase, isActivePlayer, currentTurnPlaye
       style={{
         position: "absolute",
         left: 20,
-        top: 658,
+        top: 618,
         width: 1064,
-        height: 230,
+        height: 270,
         background,
         border,
         borderRadius: 2,
