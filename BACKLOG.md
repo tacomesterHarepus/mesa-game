@@ -40,7 +40,9 @@ Items to revisit after the final board-redesign phase task (game_over) ships.
 
 - **Game over virus stats panel** — placed/resolved/cascades/targeted virus counters per UX_DESIGN §7.10. Three of four stats are derivable from game_log (viruses_placed, virus_queue_start, targeting_resolved events). Cascade triggers requires querying virus_resolution_queue WHERE cascaded_from IS NOT NULL. Defer until post-redesign cleanup pass. *(Added 2026-04-28)*
 
-- **Role reveal modal at game start** — UX_DESIGN §11 step 8 / §7.11. Game-start modal showing the player their alignment. Misaligned variant mocked (mockup_role_reveal_game_start.html, includes fellow misaligned partners). Aligned and human variants are §12 open questions — need design decisions before build. Persistent MIS/ALI tags on chips already shipped during secret_targeting work. *(Added 2026-04-29)*
+- ~~**Role reveal modal at game start**~~ — ✅ Shipped 2026-04-29. Migration 016 (role_revealed column), acknowledge-role edge function, RoleRevealModal component (three theme variants), GameBoard wiring. Screenshots verified.
+
+- **RoleRevealModal multi-partner layout for 9-10 player games (v0.2+)** — Current implementation renders `partners[0]` only. 9-player games (3M) have 2 partners; the fixed 540px modal height does not accommodate a second chip. Defer until 9-10 player support is scoped. *(Added 2026-04-29)*
 
 ---
 

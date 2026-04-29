@@ -1,32 +1,24 @@
 # Latest Task
 
 ## Summary
-
-Density pass for the player_turn view. Three ordered commits:
-
-**Commit 1 (ac72949):** Removed the staging zone banner (orphaned text that was clipped by overflow:hidden in ActionRegion). Added a compact inline hint below the "Stage for Pool" button: `staged ×N · M more` or `staged ×N · ready`, 9pt amber monospace. Updated UX_DESIGN §7.1 to reference the new mockup.
-
-**Commit 2 (fabaa06):** CentralBoard SVG height 500→470 (shrank internal coordinate space to reclaim vertical room). ActionRegion top 688→658, height 200→230 — gives the hand 30px more vertical room and matches the shortened SVG.
-
-**Commit 3 (7329767):** Visual bumps throughout — cards 110×120→120×150 with restructured body (type label 9pt header, name 14pt + icon 28pt in body), flex gap 10→24 (stride 144px). CPU track 10×10→11×11 stride 12, RAM 6×10→7×11, chip labels 10→11pt. Contribution row 11→13pt bold, separator dots removed. TrackerBars values 11→14pt bold, bars 6→8px height. MissionPanel: name 16→15pt, description 11→12pt, req labels+values 11→13pt (values bold). Fixed unused `dotSep` variable that caused build error.
+Implemented the game-start role reveal modal (UX_DESIGN §7.11). When a player first enters the game board after roles are assigned, they see a full-screen modal showing their alignment (MISALIGNED / ALIGNED / HUMAN), their win condition, and — for misaligned players — a chip card identifying their partner. Three colour themes: red (misaligned), teal (aligned), gold (human). Dismissing the modal calls the new `acknowledge-role` edge function, which sets `role_revealed=true` in the DB. In dev mode, the PlayerSwitcher remains accessible above the dim wash (z-index: 40 vs DevModeOverlay z-50); switching to an unacknowledged player re-shows that player's modal. All three variants verified via headed Playwright screenshots.
 
 ## Files changed
-
-- `components/game/phases/PlayerTurn.tsx` — staging banner removed, inline hint added; card 120×150 + body restructure + gap 24
-- `components/game/board/CentralBoard.tsx` — SVG height 470, corner traces updated, ellipse ry adjusted; chip tracks bumped; contribution row fontSize 13 bold no dots; dotSep removed
-- `components/game/board/ActionRegion.tsx` — top 658, height 230
-- `components/game/board/TrackerBars.tsx` — value fontSize 14 bold, bars height 8
-- `components/game/board/MissionPanel.tsx` — name 15, description 12, req labels+values 13 (values bold)
-- `UX_DESIGN.md` — §7.1 staging hint + mockup reference updated
-- `mesa_mockups/mockups/mockup_player_turn_density_pass.html` — committed as visual reference (453749d)
+- `supabase/migrations/016_role_revealed.sql` — adds `role_revealed boolean NOT NULL DEFAULT false` to `players`
+- `types/supabase.ts` — `role_revealed: boolean` added to players Row and Insert types
+- `types/game.ts` — `role_revealed: boolean` added to Player interface
+- `components/game/phases/LobbyPhase.tsx` — player literal updated to include `role_revealed: false`
+- `supabase/functions/acknowledge-role/index.ts` — new edge function (v1); sets `role_revealed=true`; supports `override_player_id` in non-production
+- `components/game/RoleRevealModal.tsx` — new component; three theme variants; layout matches mockup; partner chip for misaligned; button position adjusts when partner section absent
+- `components/game/GameBoard.tsx` — imports RoleRevealModal + invokeWithRetry; computes `showRoleReveal`, `modalPartners`, `handleAcknowledge`; renders modal at end of 1440×900 board div
+- `UX_DESIGN.md` — §7.11: added aligned/human variant specs; removed phantom 1-misaligned-game copy. §12: struck resolved questions (aligned variant + aligned-know-each-other)
+- `BACKLOG.md` — role-reveal entry marked done; added multi-partner v0.2+ backlog item
+- `SESSION_NOTES.md` — current phase updated; Build Status table row added
 
 ## Test status
-
-- `next build` — clean (3 commits, each verified)
-- Canary + hand-stability + abort-mission: pending (running at time of this write)
+- `next build` clean after each commit (5/5 commits clean)
+- No Playwright suite run (per task spec — non-functional flow, does not affect game progression)
+- Headed screenshots taken and verified for all three modal variants
 
 ## Suggested next
-
-1. **Right-side whitespace** — RightPanel could be wider, or the board left+central region could shift. Currently both density BACKLOG items are PARTIAL (player_turn done); other phases and the right-side real estate issue remain.
-2. **Text size in other phases** — game log entries still small; other phase component text not bumped.
-3. **Manual playtest** — verify hand cards render correctly at 1440×900, no overflow clipping, staging hint visible.
+Continue the density pass: right-side whitespace tightening, text size bumps in other phase components (resource phases, log entries). See BACKLOG "Layout density" and "Text size" entries (both PARTIAL). Alternatively, tackle the ResourceAllocation pool-distribution visibility issue (BACKLOG "UI / UX Polish") which has concrete gameplay impact.

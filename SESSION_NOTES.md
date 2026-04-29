@@ -1,7 +1,7 @@
 # Session Notes
 
 ## Current Phase
-**Density pass for player_turn fully shipped and pushed (commits 453749d–0f3fa57). Canary 12 pass / 11 skip / 0 fail. BACKLOG density items marked PARTIAL. Next: right-side whitespace + text bumps in other phases, or role reveal modal (needs design decisions for aligned/human variants before build — see BACKLOG).**
+**Role reveal modal shipped 2026-04-29 (commits 24fc3cc–e10e935 + docs commit). Migration 016, acknowledge-role edge function, RoleRevealModal (3 variants), GameBoard wiring. Screenshots verified — all three themes confirmed. Next: continue density pass (right-side whitespace + text bumps in other phases) or other BACKLOG items.**
 
 Recent completed work:
 - **Density pass — player_turn (commits 453749d, ac72949, fabaa06, 7329767)** — mockup committed; staging banner removed (inline hint added); ActionRegion 200→230 / top 688→658; CentralBoard SVG 500→470; cards 110×120→120×150 (body restructured: type label 9pt, name 14pt, icon 28pt); chip CPU/RAM tracks bumped (11×11, 7×11, labels 11pt); contribution row 13pt bold no dots; TrackerBars 14pt bold bars 8px; MissionPanel req text 13pt bold. Build clean. Canary 12/23 pass, 11 skip, 0 fail. See LATEST_TASK.md for full details.
@@ -71,6 +71,7 @@ Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2
 | Board redesign — virus_pull | **DONE** | Migration 015, end-play-phase v14, pull-viruses v1, VirusPull.tsx, ActionRegion + GameBoard wired. virus-system.spec.ts endCurrentPlayerTurn chains pull-viruses. build clean. 8/8 canary pass. |
 | Board redesign — virus_resolution | **DONE** | VirusCardOverlay SVG component in CentralBoard (dark-red theme, pacing bar, lookup tables); dimCore prop; QueueCard + virusQueue + subscription in GameBoard; VirusResolution full rewrite (auto-resolve loop, CSS pacing bar, error fallback). ActionRegion muted-red header. virus-system.spec.ts rewired (no manual button tests; phase-polling assertions). build clean. 3/3 + canary 8/8 pass. |
 | Board redesign — secret_targeting + secret_chat | **DONE** | RightPanel 3-tab (LOG/CHAT/PRIV), chat components redesigned as tab content, TargetingChipConfig, chip targeting affordances, SecretTargeting full rewrite, GameBoard wiring, UX_DESIGN §8.4 update, secret-actions test 5 unskipped. 4 commits. build clean. |
+| Role reveal modal | **DONE** | Migration 016 (role_revealed), acknowledge-role edge function v1, RoleRevealModal (misaligned/aligned/human themes), GameBoard wiring (optimistic acknowledge). UX_DESIGN §7.11 + §12 updated. Build clean. Screenshots verified. |
 
 **Test suite: ~71/80 passing (est.), 12 skip, 0 genuine fail** (card-reveal.spec.ts unskipped: +1 test. mission-flow.spec.ts test 6 fixed. mission-rules.spec.ts has a pre-existing flaky timeout on test 28 in full-suite runs — passes in isolation. game-log.spec.ts cold-start flake on test 1 clears on re-run.)
 

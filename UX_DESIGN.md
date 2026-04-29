@@ -511,11 +511,9 @@ Modal content (misaligned example):
 - Acknowledge button: `Acknowledge · enter the system`
 - Footer: `SHOWN ONCE · ROLE REMINDER ALWAYS ON YOUR CHIP`
 
-For 1-misaligned games, the YOUR PARTNER section reads: `You are alone. The misaligned faction has only you this game.`
+For aligned AIs, no partner section (aligned don't know each other in v0.1 — confirmed). Teal theme: `#06120c` bg, `#5dcaa5` border, `#103a1c` header. Descriptor: `// AI · ALIGNED OPERATIVE`. Acknowledge button: `Acknowledge · enter the system`.
 
-For aligned AIs, no partner section (aligned don't know each other in v0.1 — confirm with team if needed).
-
-For humans, no partner section (humans aren't on a team in the same sense).
+For humans, no partner section. Gold theme: `#120c06` bg, `#d4a017` border, `#3a2010` header. Descriptor: `// HUMAN · OPERATOR`. Acknowledge button: `Acknowledge · begin operation`. Footer: `SHOWN ONCE` (no chip reminder — humans have no chip).
 
 #### Persistent role tag (in-game)
 
@@ -678,8 +676,8 @@ Each phase should be a separate CC implementation prompt. Don't dump everything 
 
 These need product/design decisions before implementation:
 
-- **What does aligned AI's role reveal look like?** — sketched but not mocked. Likely teal version of misaligned modal, no partner section.
-- **Do aligned AIs know each other?** — currently treating as no (in line with most hidden-role games). Confirm.
+- ~~**What does aligned AI's role reveal look like?**~~ — ✅ Resolved: teal theme, no partner section. See §7.11 for full spec.
+- ~~**Do aligned AIs know each other?**~~ — ✅ Resolved: no, aligned AIs do not know each other in v0.1.
 - **Multi-misaligned games (3+ misaligned)** — UI scaling. The current MIS-tag design works for any count, but the `MISALIGNED COLLECTIVE` roster in secret_targeting may need scrolling for 3+ players.
 - **Role indicator for spectators / dead players** — no spec yet. Spectators are out of v0.1 scope.
 - **Mid-mission abort UI** — backlog item.
