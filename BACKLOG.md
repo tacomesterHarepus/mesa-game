@@ -40,7 +40,7 @@ Items to revisit after the final board-redesign phase task (game_over) ships.
 
 - **Game over virus stats panel** — placed/resolved/cascades/targeted virus counters per UX_DESIGN §7.10. Three of four stats are derivable from game_log (viruses_placed, virus_queue_start, targeting_resolved events). Cascade triggers requires querying virus_resolution_queue WHERE cascaded_from IS NOT NULL. Defer until post-redesign cleanup pass. *(Added 2026-04-28)*
 
-- **Role reveal modal + persistent role indicators** — UX_DESIGN §11 step 8 (role_indicators / §7.11) was specced and mocked (mockup_role_reveal_game_start.html) but never implemented during the redesign. Game-start modal shows the player their alignment (misaligned variant: red, with fellow misaligned partners revealed; aligned variant: teal, no partner section; human variant: gold, watcher framing). Persistent ALI/MIS tag shown to misaligned viewers on fellow misaligned chips outside secret_targeting (currently only shown during secret_targeting). DIAGNOSIS_2026-04-24 Bug A5 partial workaround proposed but not implemented. *(Added 2026-04-29 — discovered during phase audit)*
+- **Role reveal modal at game start** — UX_DESIGN §11 step 8 / §7.11. Game-start modal showing the player their alignment. Misaligned variant mocked (mockup_role_reveal_game_start.html, includes fellow misaligned partners). Aligned and human variants are §12 open questions — need design decisions before build. Persistent MIS/ALI tags on chips already shipped during secret_targeting work. *(Added 2026-04-29)*
 
 ---
 
