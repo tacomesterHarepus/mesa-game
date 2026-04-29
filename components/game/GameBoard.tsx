@@ -13,7 +13,7 @@ import { GameOver } from "./phases/GameOver";
 import { DevModeOverlay } from "./DevModeOverlay";
 import { RoleRevealModal } from "./RoleRevealModal";
 import { TopBar } from "./board/TopBar";
-import { TrackerBars } from "./board/TrackerBars";
+// TrackerBars removed — absorbed into TopBar (wall layout commit 2)
 import { HumanTerminals } from "./board/HumanTerminals";
 import { MissionPanel } from "./board/MissionPanel";
 import { MissionCandidatesPanel } from "./board/MissionCandidatesPanel";
@@ -768,9 +768,9 @@ export function GameBoard({
           overflow: "hidden",
         }}
       >
-        <TopBar phase={game.phase} winner={game.winner} />
-
-        <TrackerBars
+        <TopBar
+          phase={game.phase}
+          winner={game.winner}
           coreProgress={game.core_progress}
           escapeTimer={game.escape_timer}
         />
