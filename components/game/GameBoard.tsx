@@ -11,6 +11,7 @@ import { VirusResolution } from "./phases/VirusResolution";
 import { SecretTargeting } from "./phases/SecretTargeting";
 import { GameOver } from "./phases/GameOver";
 import { DevModeOverlay } from "./DevModeOverlay";
+import { RoleRevealModal } from "./RoleRevealModal";
 import { TopBar } from "./board/TopBar";
 import { TrackerBars } from "./board/TrackerBars";
 import { HumanTerminals } from "./board/HumanTerminals";
@@ -21,6 +22,7 @@ import { VirusPoolPanel } from "./board/VirusPoolPanel";
 import { CentralBoard, type ResourceChipConfig, type RevealChipConfig, type VirusResolvingCard, type TargetingChipConfig } from "./board/CentralBoard";
 import { ActionRegion } from "./board/ActionRegion";
 import { RightPanel } from "./board/RightPanel";
+import { invokeWithRetry } from "@/lib/supabase/invokeWithRetry";
 import { MISSION_MAP } from "@/lib/game/missions";
 import type { Game } from "@/types/game";
 import type { Database } from "@/types/supabase";
@@ -430,6 +432,31 @@ export function GameBoard({
   const humanPlayers = sortedPlayers.filter((p) => p.role === "human");
   const aiPlayers = sortedPlayers.filter((p) => p.role !== "human");
 
+  // ── Role reveal modal ─────────────────────────────────────────────────────
+  const showRoleReveal =
+    effectiveCurrentPlayer !== null &&
+    effectiveCurrentPlayer.role !== null &&
+    !effectiveCurrentPlayer.role_revealed &&
+    game.phase !== "lobby";
+
+  const modalPartners =
+    effectiveCurrentPlayer?.role === "misaligned_ai"
+      ? aiPlayers.filter(
+          (p) => p.role === "misaligned_ai" && p.id !== effectiveCurrentPlayer?.id
+        )
+      : [];
+
+  const handleAcknowledge = async () => {
+    if (!effectiveCurrentPlayer) return;
+    const pid = effectiveCurrentPlayer.id;
+    // Optimistic update — close modal immediately before next poll
+    setPlayers((prev) => prev.map((p) => (p.id === pid ? { ...p, role_revealed: true } : p)));
+    await invokeWithRetry("acknowledge-role", {
+      game_id: gameId,
+      ...(devMode ? { override_player_id: pid } : {}),
+    });
+  };
+
   // In game_over: expose all AI roles for CentralBoard chip reveal
   const gameOverRoles: Record<string, string> | undefined = isGameOver
     ? Object.fromEntries(aiPlayers.map((p) => [p.id, p.role ?? ""]))
@@ -822,6 +849,14 @@ export function GameBoard({
           allPlayers={sortedPlayers}
           phase={game.phase}
         />
+
+        {showRoleReveal && effectiveCurrentPlayer && (
+          <RoleRevealModal
+            player={effectiveCurrentPlayer}
+            partners={modalPartners}
+            onAcknowledge={handleAcknowledge}
+          />
+        )}
       </div>
     </div>
   );
