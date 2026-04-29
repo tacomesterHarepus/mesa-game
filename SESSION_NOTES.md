@@ -1,7 +1,10 @@
 # Session Notes
 
 ## Current Phase
-**Dev mode multi-user fix shipped and deployed (commits c523f4f + a77d41a). All 11 edge functions redeployed to Supabase. Manual verification pending: solo dev flow + multi-user (incognito joins). Then BACKLOG — UI/UX polish or chat Phase 12.**
+**Density pass for player_turn shipped (3 commits + mockup commit). Build clean. Tests pending push to origin. BACKLOG density items marked PARTIAL — right-side whitespace + other phases still open.**
+
+Recent completed work:
+- **Density pass — player_turn (commits 453749d, ac72949, fabaa06, 7329767)** — mockup committed; staging banner removed (inline hint added); ActionRegion 200→230 / top 688→658; CentralBoard SVG 500→470; cards 110×120→120×150 (body restructured: type label 9pt, name 14pt, icon 28pt); chip CPU/RAM tracks bumped (11×11, 7×11, labels 11pt); contribution row 13pt bold no dots; TrackerBars 14pt bold bars 8px; MissionPanel req text 13pt bold. See LATEST_TASK.md for full details.
 
 Recent completed work:
 - **Lobby Fill Lobby button fix** — Gate was `NODE_ENV !== "production" && ?dev_mode=true URL param`. Normal game creation never adds that param, so button never appeared. Changed LobbyPage.devMode to `NODE_ENV !== "production"` only — matching CreateGameForm.IS_DEV. Side effect: Start Game now redirects to game board with ?dev_mode=true in dev, auto-enabling DEV MODE banner and PlayerSwitcher. Stripped diagnostic log. 1 commit c0eab9e. Build clean. Canary 23/33 pass (10 skip, 0 fail).
