@@ -37,7 +37,7 @@ export interface TargetingChipConfig {
 
 interface Props {
   aiPlayers: PlayerRow[]; // sorted by turn_order 0–3; slot A=index 0 (TL), B=1 (TR), C=2 (BR), D=3 (BL)
-  coreProgress: number;
+  humanPlayers?: PlayerRow[];
   currentTurnPlayerId?: string;
   turnOrderIds?: string[];
   resourceChips?: Record<string, ResourceChipConfig>; // keyed by player.id; set during resource phases
@@ -45,25 +45,22 @@ interface Props {
   targetingChips?: Record<string, TargetingChipConfig>; // keyed by player.id; set during secret_targeting
   contributions?: Record<string, { compute: number; data: number; validation: number }>;
   showMisBadges?: Record<string, boolean>; // keyed by player.id; true for chips the viewer knows are misaligned
-  dimCore?: boolean;
   virusResolvingCard?: VirusResolvingCard | null;
   isGameOver?: boolean;
   gameOverWinner?: "humans" | "misaligned" | null;
   gameOverRoles?: Record<string, string>; // player.id → "aligned_ai" | "misaligned_ai"
 }
 
-// Fixed chip slots per UX_DESIGN §13 — do NOT generalise for other player counts
+// Fixed chip slots per UX_DESIGN §13 — wall layout coords (SVG-local, board = SVG + (395,80))
 const CHIP_SLOTS = [
-  { label: "A", x: 110, y: 90, isTop: true },
-  { label: "B", x: 390, y: 90, isTop: true },
-  { label: "C", x: 390, y: 330, isTop: false },
-  { label: "D", x: 110, y: 330, isTop: false },
+  { label: "A", x: 25, y: 80, isTop: true },
+  { label: "B", x: 225, y: 80, isTop: true },
+  { label: "C", x: 225, y: 320, isTop: false },
+  { label: "D", x: 25, y: 320, isTop: false },
 ] as const;
 
 // Pin x-offsets shared by all AI chips (8 pins, 6×4 each)
 const AI_PIN_X = [15, 32, 49, 66, 83, 100, 117, 134] as const;
-// Pin x-offsets for the wider core chip (10 pins, 4×4 each)
-const CORE_PIN_X = [15, 25, 35, 45, 55, 65, 75, 85, 95, 105] as const;
 
 function SVGChipButton({
   x,
@@ -206,8 +203,8 @@ function AIChipGroup({
   const seatNum = isGameOver ? "·" : (missionSeatNum !== null ? String(missionSeatNum) : "?");
   const name = player?.display_name ?? "—";
 
-  // Contribution counter row sits inward (below top chips, above bottom chips)
-  const counterY = isTop ? chipY + 98 : chipY - 28;
+  // Contribution counter row: below top chips, above bottom chips (wall layout offsets)
+  const counterY = isTop ? chipY + 102 : chipY - 22;
 
   // Active-state colors (§5.4)
   // In game_over: isActive is forced false; colors are determined by revealed role instead.
@@ -368,25 +365,43 @@ function AIChipGroup({
           <rect key={`bp${x}`} x={x} y={90} width={6} height={4} fill={pinFill} />
         ))}
 
-        {/* Seat number circle */}
-        <circle cx="18" cy="18" r="11" fill={circleFill} stroke={circleStroke} strokeWidth="1" />
-        <text x="18" y="22" fontFamily="monospace" fontSize="12" fill={seatText} textAnchor="middle">
+        {/* Seat indicator: ABOVE chip body for top chips (cy=-10), inside for bottom chips (cy=15).
+            isTop chips have more vertical space above since contribution counters go below. */}
+        <circle
+          cx="15"
+          cy={isTop ? -10 : 15}
+          r="11"
+          fill={circleFill}
+          stroke={circleStroke}
+          strokeWidth="1"
+        />
+        <text x="15" y={isTop ? -6 : 19} fontFamily="monospace" fontSize="12" fill={seatText} textAnchor="middle">
           {seatNum}
         </text>
 
-        {/* Chip label */}
-        <text x="38" y="23" fontFamily="monospace" fontSize="9" fill={labelText} letterSpacing="1">
+        {/* Chip label — same row as seat indicator */}
+        <text x="33" y={isTop ? -6 : 19} fontFamily="monospace" fontSize="9" fill={labelText} letterSpacing="1">
           AI-CHIP-{slotLabel}
         </text>
 
-        {/* ACTIVE tag — right-aligned at x=155, same y as chip label */}
-        {isActive && (
-          <text x="155" y="23" fontFamily="monospace" fontSize="9" fill="#d4a017" textAnchor="end">
+        {/* ACTIVE pill badge — only for top chips (space above chip body); replaces text-only tag */}
+        {isActive && isTop && !isGameOver && (
+          <g transform="translate(-4, -20)">
+            <rect x="0" y="0" width="44" height="14" fill="#d4a017" rx="2" />
+            <text x="22" y="10" fontFamily="monospace" fontSize="9" fill="#0a0a0a" fontWeight="bold" textAnchor="middle">
+              ACTIVE
+            </text>
+          </g>
+        )}
+
+        {/* ACTIVE text tag — right-aligned, same row as chip label */}
+        {isActive && !isGameOver && (
+          <text x="155" y={isTop ? -6 : 19} fontFamily="monospace" fontSize="9" fill="#d4a017" textAnchor="end">
             ▸ ACTIVE
           </text>
         )}
 
-        {/* Role badge — shown during game_over replacing ACTIVE tag */}
+        {/* Role badge — shown during game_over */}
         {goAligned && (
           <>
             <rect x="90" y="6" width="62" height="14" fill="#1a3a2a" stroke="#5dcaa5" strokeWidth="0.5" rx="2" />
@@ -400,31 +415,29 @@ function AIChipGroup({
           </>
         )}
 
-        {/* MIS badge — permanent for misaligned viewers; hidden when ACTIVE tag or game_over role badge occupies same space */}
+        {/* MIS badge — same row as chip label; hidden when ACTIVE or game_over role badge present */}
         {showMisBadge && !isActive && !isGameOver && (
-          <text x="155" y="23" fontFamily="monospace" fontSize="8" fill="#a32d2d" textAnchor="end" letterSpacing="1">
+          <text x="155" y={isTop ? -6 : 19} fontFamily="monospace" fontSize="8" fill="#a32d2d" textAnchor="end" letterSpacing="1">
             MIS
           </text>
         )}
 
-        {/* Player name */}
-        <text x="15" y="48" fontFamily="sans-serif" fontSize="14" fill={nameColor}>
+        {/* Player name — position depends on whether seat indicator is inside or above chip body */}
+        <text x="10" y={isTop ? 25 : 42} fontFamily="sans-serif" fontSize="14" fill={nameColor}>
           {name}
         </text>
 
-        {/* CPU label */}
-        <text x="15" y="68" fontFamily="monospace" fontSize="11" fill={trackLabel}>
+        {/* CPU label + track */}
+        <text x="10" y={isTop ? 48 : 62} fontFamily="monospace" fontSize="11" fill={trackLabel}>
           CPU
         </text>
-
-        {/* CPU track — 4 squares of 11×11, stride 12 */}
         {([0, 1, 2, 3] as const).map((i) => {
           const sq = cpuSquareProps(i);
           return (
             <rect
               key={i}
               x={40 + i * 12}
-              y={61}
+              y={isTop ? 40 : 54}
               width="11"
               height="11"
               fill={sq.fill}
@@ -435,19 +448,17 @@ function AIChipGroup({
           );
         })}
 
-        {/* RAM label */}
-        <text x="90" y="68" fontFamily="monospace" fontSize="11" fill={trackLabel}>
+        {/* RAM label + track */}
+        <text x="90" y={isTop ? 70 : 84} fontFamily="monospace" fontSize="11" fill={trackLabel}>
           RAM
         </text>
-
-        {/* RAM track — 7 squares of 7×11, stride 7, start x=110 (ends at 159, within 160-wide body) */}
         {([0, 1, 2, 3, 4, 5, 6] as const).map((i) => {
           const sq = ramSquareProps(i);
           return (
             <rect
               key={i}
               x={110 + i * 7}
-              y={61}
+              y={isTop ? 62 : 76}
               width="7"
               height="11"
               fill={sq.fill}
@@ -458,11 +469,15 @@ function AIChipGroup({
           );
         })}
 
-        {/* Hand stack placeholder — 3 overlapping 14×10 cards */}
-        <rect x="4"  y="74" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" strokeWidth="0.5" rx="1" />
-        <rect x="2"  y="76" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" strokeWidth="0.5" rx="1" />
-        <rect x="0"  y="78" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" strokeWidth="0.5" rx="1" />
-        <text x="22" y="86" fontFamily="monospace" fontSize="9" fill="#9cb4a4">×? cards</text>
+        {/* Hand stack — only fits in top chips (bottom chips' RAM track reaches y=87/90) */}
+        {isTop && (
+          <>
+            <rect x="4"  y="74" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" strokeWidth="0.5" rx="1" />
+            <rect x="2"  y="76" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" strokeWidth="0.5" rx="1" />
+            <rect x="0"  y="78" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" strokeWidth="0.5" rx="1" />
+            <text x="22" y="86" fontFamily="monospace" fontSize="9" fill="#9cb4a4">×? cards</text>
+          </>
+        )}
 
         {/* Resource [-]/[+] buttons — rendered outside chip body to the right */}
         {showButtons && resourceChip && (
@@ -675,85 +690,11 @@ function WinnerBanner({ winner }: { winner: "humans" | "misaligned" | null }) {
   );
 }
 
-function CoreChipGroup({ coreProgress }: { coreProgress: number }) {
-  // Core chip at panel coords (270, 200) — size 120×100
-  const cx = 270;
-  const cy = 200;
-
-  return (
-    <g transform={`translate(${cx}, ${cy})`}>
-      {/* Top pins */}
-      {CORE_PIN_X.map((x) => (
-        <rect key={`ct${x}`} x={x} y={-4} width={4} height={4} fill="#3a4a5a" />
-      ))}
-
-      {/* Chip body */}
-      <rect
-        x="0"
-        y="0"
-        width="120"
-        height="100"
-        fill="#101820"
-        stroke="#4a6a8a"
-        strokeWidth="1.5"
-        rx="3"
-      />
-
-      {/* Bottom pins */}
-      {CORE_PIN_X.map((x) => (
-        <rect key={`cb${x}`} x={x} y={100} width={4} height={4} fill="#3a4a5a" />
-      ))}
-
-      {/* Labels */}
-      <text
-        x="60"
-        y="17"
-        fontFamily="monospace"
-        fontSize="9"
-        fill="#5a7a9a"
-        letterSpacing="2"
-        textAnchor="middle"
-      >
-        {"// CORE SYSTEM"}
-      </text>
-      <text
-        x="60"
-        y="35"
-        fontFamily="monospace"
-        fontSize="10"
-        fill="#888"
-        textAnchor="middle"
-      >
-        RESEARCH
-      </text>
-
-      {/* 5×2 grid of progress squares, origin at (10, 45), each 14×14, stride 18 */}
-      {Array.from({ length: 10 }, (_, i) => {
-        const col = i % 5;
-        const row = Math.floor(i / 5);
-        const filled = i < coreProgress;
-        return (
-          <rect
-            key={i}
-            x={10 + col * 18}
-            y={45 + row * 18}
-            width="14"
-            height="14"
-            fill={filled ? "#d4a017" : "#1a1a1a"}
-            stroke={filled ? "#5a4a1a" : "#3a3a3a"}
-            strokeWidth="0.5"
-            rx="1"
-          />
-        );
-      })}
-      {/* No numeric label — progress is communicated visually; the tracker bar shows the number */}
-    </g>
-  );
-}
+// CoreChipGroup removed — Core System box eliminated in wall layout redesign
 
 export function CentralBoard({
   aiPlayers,
-  coreProgress,
+  humanPlayers = [],
   currentTurnPlayerId,
   turnOrderIds = [],
   resourceChips,
@@ -761,7 +702,6 @@ export function CentralBoard({
   targetingChips,
   contributions,
   showMisBadges,
-  dimCore,
   virusResolvingCard,
   isGameOver,
   gameOverWinner,
@@ -770,26 +710,21 @@ export function CentralBoard({
   const goMisalignedWin = isGameOver && gameOverWinner === "misaligned";
   const boardFill    = goMisalignedWin ? "#180606" : "#0c1410";
   const boardStroke  = goMisalignedWin ? "#5a2a2a" : "#1a3020";
-  const ellipseColor = goMisalignedWin ? "#5a2a2a" : "#2a4a3a";
-  const ellipseDash  = goMisalignedWin ? "2 8" : "6 4";
-  const glowColor    = goMisalignedWin ? "#3a1a1a" : "#1a3020";
-  const labelColor   = goMisalignedWin ? "#5a2a2a" : "#3a6a4a";
-  const labelText    = goMisalignedWin ? "FIREWALL · BREACHED · CONTAINMENT FAILED" : "FIREWALL · CONTAINMENT";
 
   return (
-    // Panel: x=430, y=180 in board coords → 660×470
+    // Panel: x=395, y=80 in board coords → 695×520
     <svg
-      width="660"
-      height="470"
-      viewBox="0 0 660 470"
-      style={{ position: "absolute", left: 430, top: 180 }}
+      width="695"
+      height="520"
+      viewBox="0 0 695 520"
+      style={{ position: "absolute", left: 395, top: 80 }}
     >
       {/* Circuit board background */}
       <rect
         x="0"
         y="0"
-        width="660"
-        height="500"
+        width="695"
+        height="520"
         fill={boardFill}
         stroke={boardStroke}
         strokeWidth="1"
@@ -799,63 +734,27 @@ export function CentralBoard({
       {/* Corner circuit trace decorations */}
       <g stroke={boardStroke} strokeWidth="0.5" fill="none" opacity="0.6">
         <path d="M 30 40 L 70 40 L 70 70" />
-        <path d="M 630 40 L 590 40 L 590 70" />
-        <path d="M 30 430 L 70 430 L 70 400" />
-        <path d="M 630 430 L 590 430 L 590 400" />
+        <path d="M 665 40 L 625 40 L 625 70" />
+        <path d="M 30 490 L 70 490 L 70 460" />
+        <path d="M 665 490 L 625 490 L 625 460" />
         <path d="M 30 260 L 50 260" />
-        <path d="M 630 260 L 610 260" />
+        <path d="M 665 260 L 645 260" />
       </g>
       <g fill={boardStroke}>
         <circle cx="30"  cy="40"  r="2" />
-        <circle cx="630" cy="40"  r="2" />
-        <circle cx="30"  cy="430" r="2" />
-        <circle cx="630" cy="430" r="2" />
+        <circle cx="665" cy="40"  r="2" />
+        <circle cx="30"  cy="490" r="2" />
+        <circle cx="665" cy="490" r="2" />
         <circle cx="30"  cy="260" r="2" />
-        <circle cx="630" cy="260" r="2" />
+        <circle cx="665" cy="260" r="2" />
       </g>
 
-      {/* Board label */}
-      <text
-        x="330"
-        y="22"
-        fontFamily="monospace"
-        fontSize="10"
-        fill={labelColor}
-        textAnchor="middle"
-        letterSpacing="3"
-      >
-        {labelText}
-      </text>
+      {/* Section labels */}
+      <text x="205" y="25" fontFamily="monospace" fontSize="10" fill="#5a7a9a" textAnchor="middle" letterSpacing="3">{"// AI SANDBOX · INSIDE FIREWALL"}</text>
+      <text x="580" y="25" fontFamily="monospace" fontSize="10" fill="#5a7a9a" textAnchor="middle" letterSpacing="3">{"// OPERATORS · OUTSIDE"}</text>
 
-      {/* Outer glow ring */}
-      <ellipse
-        cx="330"
-        cy="240"
-        rx="296"
-        ry="210"
-        fill="none"
-        stroke={glowColor}
-        strokeWidth="0.5"
-      />
-
-      {/* Main firewall ellipse */}
-      <ellipse
-        cx="330"
-        cy="240"
-        rx="290"
-        ry="220"
-        fill="none"
-        stroke={ellipseColor}
-        strokeWidth="2"
-        strokeDasharray={ellipseDash}
-      />
-
-      {/* Central core chip — dimmed during virus_resolution */}
-      {dimCore ? (
-        <g opacity={0.3}><CoreChipGroup coreProgress={coreProgress} /></g>
-      ) : (
-        <CoreChipGroup coreProgress={coreProgress} />
-      )}
+      {/* AI cluster ambient glow */}
+      <rect x="0" y="40" width="420" height="470" fill="#0a0e1a" opacity="0.3" rx="6" />
 
       {/* AI chip cluster — 4 fixed positions */}
       {CHIP_SLOTS.map((slot, i) => {
@@ -884,10 +783,78 @@ export function CentralBoard({
           />
         );
       })}
+      {/* Connector dashes — wall right edge to hologram column */}
+      <line x1="445" y1="145" x2="475" y2="145" stroke="#2a4a6a" strokeWidth="0.5" strokeDasharray="2 4" opacity="0.4" />
+      <line x1="445" y1="395" x2="475" y2="395" stroke="#2a4a6a" strokeWidth="0.5" strokeDasharray="2 4" opacity="0.4" />
+
+      {/* Firewall wall — vertical barrier at SVG x=421–449 */}
+      <g>
+        <rect x="421" y="38" width="28" height="6" fill="#1a2a3a" stroke="#3a5a7a" strokeWidth="0.5" />
+        <rect x="421" y="506" width="28" height="6" fill="#1a2a3a" stroke="#3a5a7a" strokeWidth="0.5" />
+        <rect x="425" y="40" width="20" height="470" fill="#0a0e14" stroke="#2a3a5a" strokeWidth="1.5" />
+        <rect x="427" y="42" width="16" height="466" fill="#0c1018" />
+        <line x1="431" y1="45" x2="431" y2="505" stroke="#1a3a5a" strokeWidth="0.5" strokeDasharray="40 6" />
+        <line x1="435" y1="45" x2="435" y2="505" stroke="#2a4a6a" strokeWidth="0.5" />
+        <line x1="439" y1="45" x2="439" y2="505" stroke="#1a3a5a" strokeWidth="0.5" strokeDasharray="40 6" />
+        {[80,120,160,200,240,280,320,360,400,440,480].map((y) => (
+          <line key={y} x1="427" y1={y} x2="443" y2={y} stroke="#3a5a7a" strokeWidth="0.5" />
+        ))}
+        {[120,240,360].map((cy) => (
+          <circle key={cy} cx="435" cy={cy} r="1.5" fill="#5dcaa5" />
+        ))}
+        {[200,440].map((cy) => (
+          <circle key={cy} cx="435" cy={cy} r="1.5" fill="#a32d2d" />
+        ))}
+      </g>
+
       {/* Virus card overlay — renders over board during virus_resolution */}
       {virusResolvingCard && (
         <VirusCardOverlay key={virusResolvingCard.id} card={virusResolvingCard} />
       )}
+      {/* Human holograms — outside the firewall */}
+      {[0, 1].map((idx) => {
+        const hp = humanPlayers[idx];
+        const ty = idx === 0 ? 65 : 315;
+        const glitchY = idx === 0 ? 60 : 92;
+        return (
+          <g key={idx} transform={`translate(475, ${ty})`}>
+            {/* Projection base */}
+            <ellipse cx="105" cy="120" rx="48" ry="7" fill="#0a2a3a" opacity="0.8" />
+            <ellipse cx="105" cy="120" rx="42" ry="5" fill="#1a3a5a" opacity="0.6" />
+            <ellipse cx="105" cy="120" rx="34" ry="3" fill="#2a4a6a" opacity="0.5" />
+            {/* Projection beam */}
+            <path d="M 65 120 L 90 28 L 120 28 L 145 120 Z" fill="#1a3a5a" opacity="0.15" />
+            {/* Holographic figure */}
+            <g opacity="0.85" stroke="#5dcaa5" strokeWidth="1.3">
+              <circle cx="105" cy="48" r="14" fill="#5dcaa5" fillOpacity="0.15" />
+              <path d="M 86 72 L 124 72 L 130 115 L 80 115 Z" fill="#5dcaa5" fillOpacity="0.15" stroke="none" />
+              <line x1="86" y1="82" x2="76" y2="108" />
+              <line x1="124" y1="82" x2="134" y2="108" />
+            </g>
+            {/* Scan lines */}
+            <g stroke="#5dcaa5" strokeWidth="0.4" opacity="0.5">
+              {[40,48,56,64,72,80,88,96,104,112].map((sy) => (
+                <line key={sy} x1="74" y1={sy} x2="136" y2={sy} />
+              ))}
+            </g>
+            {/* Glitch line */}
+            <line x1="72" y1={glitchY} x2="138" y2={glitchY} stroke="#5dcaa5" strokeWidth="0.6" opacity="0.8" />
+            {/* Online indicator */}
+            <circle cx="148" cy="120" r="2.5" fill="#5dcaa5" />
+            {/* Name + status */}
+            <text x="105" y="148" fontFamily="sans-serif" fontSize="14" fill="#cce0f4" textAnchor="middle">
+              {hp?.display_name ?? "—"}
+            </text>
+            <text x="105" y="166" fontFamily="monospace" fontSize="9" fill="#5a7a9a" textAnchor="middle">
+              {`TERM-0${idx + 1} · ONLINE`}
+            </text>
+            <text x="105" y="181" fontFamily="monospace" fontSize="9" fill="#5a7a9a" textAnchor="middle">
+              watching...
+            </text>
+          </g>
+        );
+      })}
+
       {/* Winner banner — renders over board during game_over */}
       {isGameOver && (
         <WinnerBanner winner={gameOverWinner ?? null} />

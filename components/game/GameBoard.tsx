@@ -14,7 +14,6 @@ import { DevModeOverlay } from "./DevModeOverlay";
 import { RoleRevealModal } from "./RoleRevealModal";
 import { TopBar } from "./board/TopBar";
 // TrackerBars removed — absorbed into TopBar (wall layout commit 2)
-import { HumanTerminals } from "./board/HumanTerminals";
 import { MissionPanel } from "./board/MissionPanel";
 import { MissionCandidatesPanel } from "./board/MissionCandidatesPanel";
 import { MissionSummaryPanel } from "./board/MissionSummaryPanel";
@@ -775,8 +774,6 @@ export function GameBoard({
           escapeTimer={game.escape_timer}
         />
 
-        <HumanTerminals humanPlayers={humanPlayers} />
-
         {isGameOver ? (
           <MissionSummaryPanel gameId={gameId} />
         ) : game.phase === "mission_selection" ? (
@@ -799,7 +796,7 @@ export function GameBoard({
 
         <CentralBoard
           aiPlayers={aiPlayers}
-          coreProgress={game.core_progress}
+          humanPlayers={humanPlayers}
           // Suppress active-chip styling during resource, reveal, targeting, and game_over phases
           currentTurnPlayerId={
             isResPhase || isRevealPhase || isTargetingPhase || isGameOver
@@ -812,7 +809,6 @@ export function GameBoard({
           targetingChips={targetingChips}
           contributions={contributionMap}
           showMisBadges={showMisBadges}
-          dimCore={game.phase === "virus_resolution"}
           virusResolvingCard={(virusQueue[0] ?? null) as VirusResolvingCard | null}
           isGameOver={isGameOver}
           gameOverWinner={isGameOver ? (game.winner as "humans" | "misaligned" | null) : undefined}

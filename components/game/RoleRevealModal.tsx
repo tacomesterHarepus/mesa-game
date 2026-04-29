@@ -95,11 +95,12 @@ export function RoleRevealModal({ player, partners = [], onAcknowledge }: Props)
 
   return (
     <>
-      {/* Dim wash — covers board area below TopBar (y=60) */}
+      {/* Dim wash — covers board area below TopBar (y=80).
+          z-index kept below DevModeOverlay (z-50=50) so the player switcher remains clickable. */}
       <div
         style={{
-          position: "absolute", left: 0, top: 60, width: 1440, height: 840,
-          background: "rgba(0,0,0,0.6)", zIndex: 100,
+          position: "absolute", left: 0, top: 80, width: 1440, height: 820,
+          background: "rgba(0,0,0,0.6)", zIndex: 40,
         }}
       />
 
@@ -107,7 +108,7 @@ export function RoleRevealModal({ player, partners = [], onAcknowledge }: Props)
       <div
         style={{
           position: "absolute", left: 430, top: 180, width: 580, height: 560,
-          background: theme.aura, opacity: 0.5, borderRadius: 8, zIndex: 101,
+          background: theme.aura, opacity: 0.5, borderRadius: 8, zIndex: 41,
         }}
       />
 
@@ -116,7 +117,7 @@ export function RoleRevealModal({ player, partners = [], onAcknowledge }: Props)
         style={{
           position: "absolute", left: 440, top: 190, width: 560, height: 540,
           background: theme.bg, border: `3px solid ${theme.border}`, borderRadius: 8,
-          zIndex: 102,
+          zIndex: 42,
         }}
       >
         {/* Header strip */}
