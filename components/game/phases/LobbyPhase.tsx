@@ -180,6 +180,7 @@ export function LobbyPhase({
           has_revealed_card: false,
           revealed_card_key: null,
           has_discarded_this_turn: false,
+          role_revealed: false,
         };
 
         setCurrentPlayer(player);

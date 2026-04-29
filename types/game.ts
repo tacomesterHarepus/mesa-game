@@ -48,4 +48,5 @@ export interface Player {
   has_revealed_card: boolean
   revealed_card_key: string | null
   has_discarded_this_turn: boolean
+  role_revealed: boolean
 }

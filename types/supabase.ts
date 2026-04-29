@@ -57,6 +57,7 @@ export type Database = {
           has_revealed_card: boolean
           revealed_card_key: string | null
           has_discarded_this_turn: boolean
+          role_revealed: boolean
         }
         Insert: {
           id?: string
@@ -71,6 +72,7 @@ export type Database = {
           has_revealed_card?: boolean
           revealed_card_key?: string | null
           has_discarded_this_turn?: boolean
+          role_revealed?: boolean
         }
         Update: Partial<Database["public"]["Tables"]["players"]["Row"]>
         Relationships: []
