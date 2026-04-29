@@ -1,10 +1,11 @@
 # Session Notes
 
 ## Current Phase
-**Density pass for player_turn shipped (3 commits + mockup commit). Build clean. Tests pending push to origin. BACKLOG density items marked PARTIAL — right-side whitespace + other phases still open.**
+**Density pass for player_turn fully shipped and pushed (commits 453749d–0f3fa57). Canary 12 pass / 11 skip / 0 fail. BACKLOG density items marked PARTIAL. Next: right-side whitespace + text bumps in other phases, or role reveal modal (needs design decisions for aligned/human variants before build — see BACKLOG).**
 
 Recent completed work:
-- **Density pass — player_turn (commits 453749d, ac72949, fabaa06, 7329767)** — mockup committed; staging banner removed (inline hint added); ActionRegion 200→230 / top 688→658; CentralBoard SVG 500→470; cards 110×120→120×150 (body restructured: type label 9pt, name 14pt, icon 28pt); chip CPU/RAM tracks bumped (11×11, 7×11, labels 11pt); contribution row 13pt bold no dots; TrackerBars 14pt bold bars 8px; MissionPanel req text 13pt bold. See LATEST_TASK.md for full details.
+- **Density pass — player_turn (commits 453749d, ac72949, fabaa06, 7329767)** — mockup committed; staging banner removed (inline hint added); ActionRegion 200→230 / top 688→658; CentralBoard SVG 500→470; cards 110×120→120×150 (body restructured: type label 9pt, name 14pt, icon 28pt); chip CPU/RAM tracks bumped (11×11, 7×11, labels 11pt); contribution row 13pt bold no dots; TrackerBars 14pt bold bars 8px; MissionPanel req text 13pt bold. Build clean. Canary 12/23 pass, 11 skip, 0 fail. See LATEST_TASK.md for full details.
+- **BACKLOG additions (commits c0764f0, 54ce997)** — Role reveal modal entry added (misaligned variant mocked, aligned/human variants are §12 open questions). Density pass items marked PARTIAL.
 
 Recent completed work:
 - **Lobby Fill Lobby button fix** — Gate was `NODE_ENV !== "production" && ?dev_mode=true URL param`. Normal game creation never adds that param, so button never appeared. Changed LobbyPage.devMode to `NODE_ENV !== "production"` only — matching CreateGameForm.IS_DEV. Side effect: Start Game now redirects to game board with ?dev_mode=true in dev, auto-enabling DEV MODE banner and PlayerSwitcher. Stripped diagnostic log. 1 commit c0eab9e. Build clean. Canary 23/33 pass (10 skip, 0 fail).
