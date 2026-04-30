@@ -13,7 +13,6 @@ import { GameOver } from "./phases/GameOver";
 import { DevModeOverlay } from "./DevModeOverlay";
 import { RoleRevealModal } from "./RoleRevealModal";
 import { TopBar } from "./board/TopBar";
-// TrackerBars removed — absorbed into TopBar (wall layout commit 2)
 import { MissionPanel } from "./board/MissionPanel";
 import { MissionCandidatesPanel } from "./board/MissionCandidatesPanel";
 import { MissionSummaryPanel } from "./board/MissionSummaryPanel";

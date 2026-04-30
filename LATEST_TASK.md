@@ -1,24 +1,20 @@
 # Latest Task
 
 ## Summary
-Implemented the game-start role reveal modal (UX_DESIGN §7.11). When a player first enters the game board after roles are assigned, they see a full-screen modal showing their alignment (MISALIGNED / ALIGNED / HUMAN), their win condition, and — for misaligned players — a chip card identifying their partner. Three colour themes: red (misaligned), teal (aligned), gold (human). Dismissing the modal calls the new `acknowledge-role` edge function, which sets `role_revealed=true` in the DB. In dev mode, the PlayerSwitcher remains accessible above the dim wash (z-index: 40 vs DevModeOverlay z-50); switching to an unacknowledged player re-shows that player's modal. All three variants verified via headed Playwright screenshots.
+Completed the wall layout migration for the MESA game board (5 commits). The SVG firewall wall is now a rendered element at x=421–449 (h=520) inside the 695×520 CentralBoard SVG, with the AI chip cluster strictly confined to x=0–420. The action region was extended to 240px tall (top=648). All chip overlays, slot anchors, and tracker bars were relocated to stay within the cluster area left of the wall. Three CentralBoard adjustments shipped in commit 4: SLOT_SIDES all changed to "right" (card-reveal slot icons appear at chip right edge, slotX=+165), VirusCardOverlay translate shifted from x=220 to x=95 (stays inside cluster), WinnerBanner x coords shifted +27 (re-centered for 695px SVG). Orphaned TrackerBar.tsx and board/TrackerBars.tsx deleted in commit 5 (both absorbed into TopBar in wall commit 2). Test selector drift from the wall commits fixed across 19 spec files: phase headings now use getByRole("heading"), Player Turn uses a p-filter, and a dismissModal helper was added to 5 spec files to handle the RoleRevealModal blocking clicks after DevMode player switches. V2 visual verification confirmed +/- buttons (right edge SVG x=422) do not clip into wall (left edge SVG x=425) — 3px gap visible.
 
 ## Files changed
-- `supabase/migrations/016_role_revealed.sql` — adds `role_revealed boolean NOT NULL DEFAULT false` to `players`
-- `types/supabase.ts` — `role_revealed: boolean` added to players Row and Insert types
-- `types/game.ts` — `role_revealed: boolean` added to Player interface
-- `components/game/phases/LobbyPhase.tsx` — player literal updated to include `role_revealed: false`
-- `supabase/functions/acknowledge-role/index.ts` — new edge function (v1); sets `role_revealed=true`; supports `override_player_id` in non-production
-- `components/game/RoleRevealModal.tsx` — new component; three theme variants; layout matches mockup; partner chip for misaligned; button position adjusts when partner section absent
-- `components/game/GameBoard.tsx` — imports RoleRevealModal + invokeWithRetry; computes `showRoleReveal`, `modalPartners`, `handleAcknowledge`; renders modal at end of 1440×900 board div
-- `UX_DESIGN.md` — §7.11: added aligned/human variant specs; removed phantom 1-misaligned-game copy. §12: struck resolved questions (aligned variant + aligned-know-each-other)
-- `BACKLOG.md` — role-reveal entry marked done; added multi-partner v0.2+ backlog item
-- `SESSION_NOTES.md` — current phase updated; Build Status table row added
+- `components/game/board/CentralBoard.tsx` — SLOT_SIDES all "right"; VirusCardOverlay translate x 220→95; WinnerBanner x coords +27 shift
+- `components/game/GameBoard.tsx` — dead TrackerBars comment removed
+- `components/game/TrackerBar.tsx` — DELETED (orphaned; absorbed into TopBar in wall commit 2)
+- `components/game/board/TrackerBars.tsx` — DELETED (orphaned; absorbed into TopBar in wall commit 2)
+- `tests/e2e/*.spec.ts` (19 files) — phase heading selectors → getByRole("heading"); Player Turn → p-filter; dismissModal helper added to 5 files (turn-order, abort-mission, multi-mission, error-handling, mission-rules)
+- `tests/e2e/screenshot-wall-verify.spec.ts` — temporary V2 verification spec (Fill Lobby approach)
 
 ## Test status
-- `next build` clean after each commit (5/5 commits clean)
-- No Playwright suite run (per task spec — non-functional flow, does not affect game progression)
-- Headed screenshots taken and verified for all three modal variants
+- `next build` clean (commit 4)
+- Canary suite: **11 pass / 10 conditional skip / 0 fail** (turn-order, abort-mission, multi-mission, mission-rules, error-handling)
+- No full-suite run; canary confirms no regression from wall layout migration
 
 ## Suggested next
-Continue the density pass: right-side whitespace tightening, text size bumps in other phase components (resource phases, log entries). See BACKLOG "Layout density" and "Text size" entries (both PARTIAL). Alternatively, tackle the ResourceAllocation pool-distribution visibility issue (BACKLOG "UI / UX Polish") which has concrete gameplay impact.
+Density pass revisit: the action region is now 240px (top=648), 10px taller than the player_turn density pass assumed. Other phase components (resource phases, card reveal, game log entries) still have PARTIAL density work outstanding. Before picking up BACKLOG "Layout density" or "Text size" items, verify current measurements against the wall-layout baseline — the 2026-04-28 pass numbers (ActionRegion 230/top=658) are stale. See BACKLOG for specific open items.

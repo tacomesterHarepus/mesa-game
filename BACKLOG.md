@@ -28,9 +28,11 @@ Items to revisit after the final board-redesign phase task (game_over) ships.
 
 - **Resource allocation — make pool distribution more obvious** — It is currently easy for a human to press "Start Mission" without distributing any pool CPU/RAM, since there is no enforcement or visual prompt. Possible approaches: (a) pulsing or highlighted pool counter when pool > 0; (b) disabled "Start Mission" button until pool is 0 or an explicit "skip" is confirmed; (c) amber callout on the ActionRegion header when pool is non-zero. Decide during the post-redesign UI polish pass. *(Added 2026-04-27)*
 
-- **Layout density — cards too large, action area cramped** — **PARTIAL (2026-04-28):** player_turn done — ActionRegion 200→230 tall (top 688→658), cards 110×120→120×150, staging banner removed. Open: right-side whitespace, RightPanel resize, other phase components unchanged. *(Reported: 2026-04-28 dev playtest)*
+- **Layout density — cards too large, action area cramped** — **PARTIAL (2026-04-28, needs fresh look 2026-04-30):** player_turn done — ActionRegion 200→230 tall (top 688→658), cards 110×120→120×150, staging banner removed. Open: right-side whitespace, RightPanel resize, other phase components unchanged. ⚠️ Wall layout migration (2026-04-30) changed ActionRegion height to 240px and top to 648px — numbers above are stale. Any density work on other phases should use current wall-layout measurements as baseline. *(Reported: 2026-04-28 dev playtest)*
 
-- **Text size — too small relative to visual real estate** — **PARTIAL (2026-04-28):** player_turn done — chip CPU/RAM track 10→11pt, contribution counters 11→13pt bold, TrackerBars values 11→14pt bold + bars 6→8px, MissionPanel req labels+values 11→13pt (values bold). Open: game log entries, other phase components. *(Reported: 2026-04-28 dev playtest)*
+- **Text size — too small relative to visual real estate** — **PARTIAL (2026-04-28, needs fresh look 2026-04-30):** player_turn done — chip CPU/RAM track 10→11pt, contribution counters 11→13pt bold, TrackerBars values 11→14pt bold + bars 6→8px, MissionPanel req labels+values 11→13pt (values bold). Open: game log entries, other phase components. ⚠️ Wall layout migration shifted overlay anchors (VirusCardOverlay x 220→95, WinnerBanner +27 shift) — verify overlay text sizes still read well before this pass. *(Reported: 2026-04-28 dev playtest)*
+
+- **Wall layout shipped 2026-04-30** — SVG firewall wall (x=421–449), chip cluster (x=0–420), action region extended to 240px (top=648). SLOT_SIDES all "right" — card-reveal slot icons appear at chip right edge. VirusCardOverlay translate 220→95 (left of wall). WinnerBanner +27 x-shift. TrackerBars absorbed into TopBar (orphaned files deleted). ✅ Shipped.
 
 - **Mockup re-render — RAM track** — `mockup_resource_phases_human.html` (and any other mockup showing AI chip RAM tracks) needs re-rendering with 7-square RAM (currently shows 5). The spec was corrected as part of the RAM track width fix (2026-04-27). *(Added 2026-04-27)*
 
@@ -73,6 +75,19 @@ Items to revisit after the final board-redesign phase task (game_over) ships.
 ## Workflow / Process
 
 - **CLAUDE.md NTFY rule needs strengthening** — NTFY must fire when CC is idle and waiting for user, regardless of whether manual user verification is pending. NTFY is the trigger for user to come to the PC — it is wrong to send it AFTER asking the user to test something. The trigger condition is "CC has no more autonomous work to do," not "user has confirmed work is correct." All docs commits and SESSION_NOTES updates land before NTFY; NTFY is the final step. *(Added 2026-04-28)*
+
+- **dismissModal helper required in any test that switches players via DevMode** — The RoleRevealModal (added 2026-04-29) appears whenever a player's `role_revealed=false`. Any E2E test helper that switches to a player via the DevMode PlayerSwitcher must call `dismissModal()` immediately after switching; otherwise the modal z-index 40 backdrop blocks all subsequent clicks on game UI elements. Reusable pattern (copy from `tests/e2e/turn-order.spec.ts` or `screenshot-wall-verify.spec.ts`):
+  ```typescript
+  async function dismissModal(page: Page): Promise<void> {
+    try {
+      const btn = page.getByRole("button", { name: /Acknowledge/i });
+      await btn.waitFor({ state: "visible", timeout: 4_000 });
+      await btn.click();
+      await btn.waitFor({ state: "hidden", timeout: 3_000 });
+    } catch { /* no modal */ }
+  }
+  ```
+  This helper is now present in: turn-order.spec.ts, abort-mission.spec.ts, multi-mission.spec.ts, error-handling.spec.ts, mission-rules.spec.ts, screenshot-wall-verify.spec.ts. Any new test helper that does devMode switching must include it. *(Confirmed fix 2026-04-30)*
 
 ---
 
