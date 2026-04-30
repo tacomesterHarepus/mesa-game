@@ -104,7 +104,7 @@ async function advanceToPlayerTurn(page: Page, gameId: string): Promise<void> {
   const playerButtons = switcherPanel.getByRole("button");
   const count = await playerButtons.count();
 
-  await page.getByText("Mission Selection").waitFor({ state: "visible", timeout: 30000 });
+  await page.getByRole("heading", { name: "Mission Selection" }).waitFor({ state: "visible", timeout: 30000 });
 
   // Switch to human
   for (let i = 0; i < count; i++) {
@@ -116,7 +116,7 @@ async function advanceToPlayerTurn(page: Page, gameId: string): Promise<void> {
   await page.locator("button:not([name])").filter({ hasText: /Compute|Data|Validation/ }).first().click();
   await page.getByRole("button", { name: "Select Mission" }).click();
 
-  await page.getByText("Card Reveal").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByRole("heading", { name: "Card Reveal" }).waitFor({ state: "visible", timeout: 15000 });
   const token = await extractAuthToken(page);
   if (!token) throw new Error("Could not extract auth token");
 
@@ -137,7 +137,7 @@ async function advanceToPlayerTurn(page: Page, gameId: string): Promise<void> {
     await page.waitForTimeout(300);
   }
 
-  await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByRole("heading", { name: "Resource Allocation" }).waitFor({ state: "visible", timeout: 15000 });
   if (humanId && aiIds.length >= 1) {
     // Grant +1 CPU to first AI (CPU=2 ensures virus generation)
     const allocations = [{ player_id: aiIds[0], cpu_delta: 1, ram_delta: 0 }];
@@ -148,7 +148,7 @@ async function advanceToPlayerTurn(page: Page, gameId: string): Promise<void> {
     });
   }
 
-  await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
+  await page.locator("p").filter({ hasText: /Player Turn/ }).first().waitFor({ state: "visible", timeout: 15000 });
 }
 
 // Directly sets up a secret_targeting phase via direct DB manipulation via edge functions.

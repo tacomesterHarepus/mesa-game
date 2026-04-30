@@ -5,6 +5,15 @@ const ANON_KEY = "sb_publishable_Kz82SiJlbKrdJ0ZtAQPEkg_mm-0aapD";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+async function dismissModal(page: Page): Promise<void> {
+  try {
+    const btn = page.getByRole("button", { name: /Acknowledge/i });
+    await btn.waitFor({ state: "visible", timeout: 4_000 });
+    await btn.click();
+    await btn.waitFor({ state: "hidden", timeout: 3_000 });
+  } catch { /* no modal */ }
+}
+
 async function fillLobby(ctx: BrowserContext): Promise<{ page: Page; gameId: string }> {
   const page = await ctx.newPage();
   await page.goto("/game/create");
@@ -81,7 +90,7 @@ async function completeMission1ByFailing(
   aiIds: string[],
 ): Promise<{ mission1TurnOrder: string[] }> {
   // ── Mission Selection: switch to human, pick any card ──────────────────────
-  await page.getByText("Mission Selection").waitFor({ state: "visible", timeout: 30000 });
+  await page.getByRole("heading", { name: "Mission Selection" }).waitFor({ state: "visible", timeout: 30000 });
   const switcherPanel = page.locator(".fixed.top-7");
   const playerButtons = switcherPanel.getByRole("button");
   const btnCount = await playerButtons.count();
@@ -91,11 +100,12 @@ async function completeMission1ByFailing(
     const label = await playerButtons.nth(i).textContent();
     if (label?.includes("H")) break;
   }
+  await dismissModal(page);
   await page.locator("button:not([name])").filter({ hasText: /Compute|Data|Validation/ }).first().click();
   await page.getByRole("button", { name: "Select Mission" }).click();
 
   // ── Card Reveal: each AI reveals one card via REST ─────────────────────────
-  await page.getByText("Card Reveal").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByRole("heading", { name: "Card Reveal" }).waitFor({ state: "visible", timeout: 15000 });
   for (const playerId of aiIds) {
     const handResp = await fetch(
       `${SUPABASE_URL}/rest/v1/hands?player_id=eq.${playerId}&game_id=eq.${gameId}&select=card_key`,
@@ -113,13 +123,13 @@ async function completeMission1ByFailing(
   }
 
   // ── Resource Allocation: submit empty allocations ──────────────────────────
-  await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 45000 });
+  await page.getByRole("heading", { name: "Resource Allocation" }).waitFor({ state: "visible", timeout: 45000 });
   await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ game_id: gameId, allocations: [], override_player_id: humanId }),
   });
-  await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
+  await page.locator("p").filter({ hasText: /Player Turn/ }).first().waitFor({ state: "visible", timeout: 15000 });
 
   // Read turn order established for mission 1
   const gameResp = await fetch(
@@ -143,7 +153,7 @@ async function completeMission1ByFailing(
     await page.waitForTimeout(400);
   }
 
-  await page.getByText("Resource Adjustment").waitFor({ state: "visible", timeout: 20000 });
+  await page.getByRole("heading", { name: "Resource Adjustment" }).waitFor({ state: "visible", timeout: 20000 });
   return { mission1TurnOrder };
 }
 
@@ -308,7 +318,7 @@ test.describe("multi-mission flow", () => {
       const token = await extractAuthToken(page);
       expect(token).not.toBeNull();
 
-      await page.getByText("Mission Selection").waitFor({ state: "visible", timeout: 30000 });
+      await page.getByRole("heading", { name: "Mission Selection" }).waitFor({ state: "visible", timeout: 30000 });
 
       // Switch to human so the mission cards are interactive and visible
       const switcherPanel = page.locator(".fixed.top-7");
@@ -320,6 +330,7 @@ test.describe("multi-mission flow", () => {
         const label = await playerButtons.nth(i).textContent();
         if (label?.includes("H")) break;
       }
+      await dismissModal(page);
 
       // Fetch the actual pending mission options to verify displayed allocation values
       const optionsResp = await fetch(

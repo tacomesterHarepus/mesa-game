@@ -81,7 +81,7 @@ async function advanceToPlayerTurn(
   aiIds: string[],
   humanId: string,
 ): Promise<string> {
-  await page.getByText("Mission Selection").waitFor({ state: "visible", timeout: 30000 });
+  await page.getByRole("heading", { name: "Mission Selection" }).waitFor({ state: "visible", timeout: 30000 });
   const switcherPanel = page.locator(".fixed.top-7");
   const playerButtons = switcherPanel.getByRole("button");
   const count = await playerButtons.count();
@@ -94,7 +94,7 @@ async function advanceToPlayerTurn(
   await page.locator("button:not([name])").filter({ hasText: /Compute|Data|Validation/ }).first().click();
   await page.getByRole("button", { name: "Select Mission" }).click();
 
-  await page.getByText("Card Reveal").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByRole("heading", { name: "Card Reveal" }).waitFor({ state: "visible", timeout: 15000 });
   for (const playerId of aiIds) {
     const handResp = await fetch(
       `${SUPABASE_URL}/rest/v1/hands?player_id=eq.${playerId}&game_id=eq.${gameId}&select=card_key`,
@@ -111,14 +111,14 @@ async function advanceToPlayerTurn(
     await page.waitForTimeout(300);
   }
 
-  await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByRole("heading", { name: "Resource Allocation" }).waitFor({ state: "visible", timeout: 15000 });
   await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ game_id: gameId, allocations: [], override_player_id: humanId }),
   });
 
-  await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
+  await page.locator("p").filter({ hasText: /Player Turn/ }).first().waitFor({ state: "visible", timeout: 15000 });
 
   const gameResp = await fetch(
     `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=current_turn_player_id`,

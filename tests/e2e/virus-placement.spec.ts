@@ -102,7 +102,7 @@ async function advanceThroughCardReveal(
   aiIds: string[],
   humanId: string,
 ): Promise<void> {
-  await page.getByText("Mission Selection").waitFor({ state: "visible", timeout: 30000 });
+  await page.getByRole("heading", { name: "Mission Selection" }).waitFor({ state: "visible", timeout: 30000 });
   const switcherPanel = page.locator(".fixed.top-7");
   const playerButtons = switcherPanel.getByRole("button");
   const count = await playerButtons.count();
@@ -115,7 +115,7 @@ async function advanceThroughCardReveal(
   await page.locator("button:not([name])").filter({ hasText: /Compute|Data|Validation/ }).first().click();
   await page.getByRole("button", { name: "Select Mission" }).click();
 
-  await page.getByText("Card Reveal").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByRole("heading", { name: "Card Reveal" }).waitFor({ state: "visible", timeout: 15000 });
   for (const playerId of aiIds) {
     const handResp = await fetch(
       `${SUPABASE_URL}/rest/v1/hands?player_id=eq.${playerId}&game_id=eq.${gameId}&select=card_key`,
@@ -132,7 +132,7 @@ async function advanceThroughCardReveal(
     await page.waitForTimeout(300);
   }
 
-  await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByRole("heading", { name: "Resource Allocation" }).waitFor({ state: "visible", timeout: 15000 });
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -177,7 +177,7 @@ test.describe("virus placement", () => {
         return;
       }
 
-      await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
+      await page.locator("p").filter({ hasText: /Player Turn/ }).first().waitFor({ state: "visible", timeout: 15000 });
 
       // Read first player's hand — need card_key to verify pool membership after End Turn
       const handResp = await fetch(
@@ -222,7 +222,7 @@ test.describe("virus placement", () => {
       }
       await page.waitForTimeout(500);
 
-      await expect(page.getByText("Player Turn")).toBeVisible({ timeout: 10000 });
+      await expect(page.locator("p").filter({ hasText: /Player Turn/ }).first()).toBeVisible({ timeout: 10000 });
 
       // Complete the discard step before staging is available.
       // "STAGE N MORE" appears even before hasDiscarded=true (endTurnBlocked doesn't gate on hasDiscarded),

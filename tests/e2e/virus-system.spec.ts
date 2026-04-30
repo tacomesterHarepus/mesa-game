@@ -96,7 +96,7 @@ async function advanceToPlayerTurnWithCpu2(page: Page, gameId: string): Promise<
   const count = await playerButtons.count();
 
   // ── Mission Selection: switch to human, pick a mission card, then submit ──
-  await page.getByText("Mission Selection").waitFor({ state: "visible", timeout: 30000 });
+  await page.getByRole("heading", { name: "Mission Selection" }).waitFor({ state: "visible", timeout: 30000 });
   for (let i = 0; i < count; i++) {
     await playerButtons.nth(i).click();
     await page.waitForTimeout(200);
@@ -108,7 +108,7 @@ async function advanceToPlayerTurnWithCpu2(page: Page, gameId: string): Promise<
 
   // ── Card Reveal: call reveal-card edge function via Node.js fetch for each AI ──
   // Avoids the GameBoard async-hand-fetch race condition — hand state may lag the player switch.
-  await page.getByText("Card Reveal").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByRole("heading", { name: "Card Reveal" }).waitFor({ state: "visible", timeout: 15000 });
 
   const token = await extractAuthToken(page);
   if (!token) throw new Error("Could not extract auth token from Supabase SSR cookies");
@@ -135,7 +135,7 @@ async function advanceToPlayerTurnWithCpu2(page: Page, gameId: string): Promise<
 
   // ── Resource Allocation: grant +1 CPU to first 2 AIs via direct API call ──
   // This ensures at least 2 AIs have CPU=2, which is required to trigger virus_resolution.
-  await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByRole("heading", { name: "Resource Allocation" }).waitFor({ state: "visible", timeout: 15000 });
 
   if (humanId && aiIds.length >= 2) {
     const allocations = [
@@ -149,7 +149,7 @@ async function advanceToPlayerTurnWithCpu2(page: Page, gameId: string): Promise<
     });
   }
 
-  await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
+  await page.locator("p").filter({ hasText: /Player Turn/ }).first().waitFor({ state: "visible", timeout: 15000 });
 }
 
 // Calls end-play-phase for the current turn player via REST, then chains pull-viruses

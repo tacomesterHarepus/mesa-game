@@ -95,7 +95,7 @@ test.describe("card reveal", () => {
       expect(aiIds.length).toBeGreaterThanOrEqual(2);
 
       // Advance to card_reveal: select any mission as human via direct API
-      await page.getByText("Mission Selection").waitFor({ state: "visible", timeout: 30000 });
+      await page.getByRole("heading", { name: "Mission Selection" }).waitFor({ state: "visible", timeout: 30000 });
       const gResp = await fetch(
         `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=pending_mission_options`,
         { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
@@ -111,7 +111,7 @@ test.describe("card reveal", () => {
         }),
       });
 
-      await page.getByText("Card Reveal").waitFor({ state: "visible", timeout: 15000 });
+      await page.getByRole("heading", { name: "Card Reveal" }).waitFor({ state: "visible", timeout: 15000 });
 
       // Switch to AI 1 in PlayerSwitcher
       const switcher = page.locator(".fixed.top-7");

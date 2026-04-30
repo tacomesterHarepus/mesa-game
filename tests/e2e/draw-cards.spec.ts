@@ -85,7 +85,7 @@ async function advanceThroughCardReveal(
   aiIds: string[],
   humanId: string,
 ): Promise<void> {
-  await page.getByText("Mission Selection").waitFor({ state: "visible", timeout: 30000 });
+  await page.getByRole("heading", { name: "Mission Selection" }).waitFor({ state: "visible", timeout: 30000 });
   const switcherPanel = page.locator(".fixed.top-7");
   const playerButtons = switcherPanel.getByRole("button");
   const count = await playerButtons.count();
@@ -98,7 +98,7 @@ async function advanceThroughCardReveal(
   await page.locator("button:not([name])").filter({ hasText: /Compute|Data|Validation/ }).first().click();
   await page.getByRole("button", { name: "Select Mission" }).click();
 
-  await page.getByText("Card Reveal").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByRole("heading", { name: "Card Reveal" }).waitFor({ state: "visible", timeout: 15000 });
   for (const playerId of aiIds) {
     const handResp = await fetch(
       `${SUPABASE_URL}/rest/v1/hands?player_id=eq.${playerId}&game_id=eq.${gameId}&select=card_key`,
@@ -115,7 +115,7 @@ async function advanceThroughCardReveal(
     await page.waitForTimeout(300);
   }
 
-  await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 45000 });
+  await page.getByRole("heading", { name: "Resource Allocation" }).waitFor({ state: "visible", timeout: 45000 });
 }
 
 // Zero-allocation path: advances all the way to player_turn without bumping any stats.
@@ -132,7 +132,7 @@ async function advanceToPlayerTurnNoBump(
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ game_id: gameId, allocations: [], override_player_id: humanId }),
   });
-  await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
+  await page.locator("p").filter({ hasText: /Player Turn/ }).first().waitFor({ state: "visible", timeout: 15000 });
 }
 
 async function discardCards(gameId: string, playerId: string, token: string): Promise<void> {
@@ -273,7 +273,7 @@ test.describe("draw cards", () => {
         return;
       }
 
-      await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
+      await page.locator("p").filter({ hasText: /Player Turn/ }).first().waitFor({ state: "visible", timeout: 15000 });
       await page.waitForTimeout(500);
 
       // Verify post-allocation RAM and hand size both reflect the bump
@@ -329,7 +329,7 @@ test.describe("draw cards", () => {
         }),
       });
 
-      await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
+      await page.locator("p").filter({ hasText: /Player Turn/ }).first().waitFor({ state: "visible", timeout: 15000 });
 
       // Find a progress card in the first player's hand to play
       const handResp = await fetch(

@@ -161,8 +161,8 @@ function RevealSlotGroup({
   );
 }
 
-// Slot sides by chip index: A(TL)=left, B(TR)=right, C(BR)=right, D(BL)=left
-const SLOT_SIDES: ("left" | "right")[] = ["left", "right", "right", "left"];
+// All chips reveal to the right — slots appear to the right of the chip body
+const SLOT_SIDES: ("left" | "right")[] = ["right", "right", "right", "right"];
 
 function AIChipGroup({
   slotLabel,
@@ -603,7 +603,7 @@ function VirusCardOverlay({ card }: { card: VirusResolvingCard }) {
   const isCascaded = !!card.cascaded_from;
 
   return (
-    <g transform="translate(220, 170)">
+    <g transform="translate(95, 170)">
       {/* Shadow */}
       <rect x="-10" y="-5" width="240" height="200" fill="#1a0606" opacity="0.6" rx="6" />
       {/* Main card body */}
@@ -668,22 +668,22 @@ function WinnerBanner({ winner }: { winner: "humans" | "misaligned" | null }) {
   return (
     <g>
       {/* Shadow */}
-      <rect x="80" y="215" width="500" height="100" fill={shadowFill} rx="6" opacity="0.8" />
+      <rect x="107" y="215" width="500" height="100" fill={shadowFill} rx="6" opacity="0.8" />
       {/* Banner body */}
-      <rect x="90" y="225" width="480" height="80" fill={bodyFill} stroke={bodyStroke} strokeWidth="3" rx="6" />
+      <rect x="117" y="225" width="480" height="80" fill={bodyFill} stroke={bodyStroke} strokeWidth="3" rx="6" />
       {/* Header strip */}
-      <rect x="90" y="225" width="480" height="22" fill={headerFill} rx="6" />
-      <rect x="90" y="236" width="480" height="11" fill={headerFill} />
+      <rect x="117" y="225" width="480" height="22" fill={headerFill} rx="6" />
+      <rect x="117" y="236" width="480" height="11" fill={headerFill} />
       {/* Type label */}
-      <text x="330" y="241" fontFamily="monospace" fontSize="10" fill={typeColor} textAnchor="middle" letterSpacing="2">
+      <text x="357" y="241" fontFamily="monospace" fontSize="10" fill={typeColor} textAnchor="middle" letterSpacing="2">
         {typeText}
       </text>
       {/* Main title */}
-      <text x="330" y="272" fontFamily="sans-serif" fontSize="21" fill={titleFill} textAnchor="middle" letterSpacing="1">
+      <text x="357" y="272" fontFamily="sans-serif" fontSize="21" fill={titleFill} textAnchor="middle" letterSpacing="1">
         {titleText}
       </text>
       {/* Subtitle */}
-      <text x="330" y="293" fontFamily="sans-serif" fontSize="12" fill={subFill} textAnchor="middle">
+      <text x="357" y="293" fontFamily="sans-serif" fontSize="12" fill={subFill} textAnchor="middle">
         {subText}
       </text>
     </g>

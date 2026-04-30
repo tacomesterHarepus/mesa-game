@@ -84,7 +84,7 @@ async function advanceThroughCardReveal(
   aiIds: string[],
   humanId: string,
 ): Promise<void> {
-  await page.getByText("Mission Selection").waitFor({ state: "visible", timeout: 30000 });
+  await page.getByRole("heading", { name: "Mission Selection" }).waitFor({ state: "visible", timeout: 30000 });
   const switcherPanel = page.locator(".fixed.top-7");
   const playerButtons = switcherPanel.getByRole("button");
   const count = await playerButtons.count();
@@ -97,7 +97,7 @@ async function advanceThroughCardReveal(
   await page.locator("button:not([name])").filter({ hasText: /Compute|Data|Validation/ }).first().click();
   await page.getByRole("button", { name: "Select Mission" }).click();
 
-  await page.getByText("Card Reveal").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByRole("heading", { name: "Card Reveal" }).waitFor({ state: "visible", timeout: 15000 });
   for (const playerId of aiIds) {
     const handResp = await fetch(
       `${SUPABASE_URL}/rest/v1/hands?player_id=eq.${playerId}&game_id=eq.${gameId}&select=card_key`,
@@ -114,7 +114,7 @@ async function advanceThroughCardReveal(
     await page.waitForTimeout(300);
   }
 
-  await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByRole("heading", { name: "Resource Allocation" }).waitFor({ state: "visible", timeout: 15000 });
 }
 
 // Polls until the game reaches player_turn for a specific player. Returns false on timeout or game_over.
@@ -221,7 +221,7 @@ test.describe("hand stability", () => {
       });
       if (!allocResp.ok) { test.skip(); return; }
 
-      await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
+      await page.locator("p").filter({ hasText: /Player Turn/ }).first().waitFor({ state: "visible", timeout: 15000 });
 
       // Read first player's hand and stats before their turn
       const [handResp, p1Resp] = await Promise.all([
@@ -328,7 +328,7 @@ test.describe("hand stability", () => {
         body: JSON.stringify({ game_id: gameId, allocations: [], override_player_id: humanId }),
       });
 
-      await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
+      await page.locator("p").filter({ hasText: /Player Turn/ }).first().waitFor({ state: "visible", timeout: 15000 });
 
       // Identify first AI in turn order and switch to them in DevModeOverlay
       const gameResp = await fetch(

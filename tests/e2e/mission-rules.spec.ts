@@ -5,6 +5,15 @@ const ANON_KEY = "sb_publishable_Kz82SiJlbKrdJ0ZtAQPEkg_mm-0aapD";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+async function dismissModal(page: Page): Promise<void> {
+  try {
+    const btn = page.getByRole("button", { name: /Acknowledge/i });
+    await btn.waitFor({ state: "visible", timeout: 4_000 });
+    await btn.click();
+    await btn.waitFor({ state: "hidden", timeout: 3_000 });
+  } catch { /* no modal */ }
+}
+
 async function fillLobby(ctx: BrowserContext, hostName = "Bot1"): Promise<{ page: Page; gameId: string }> {
   const page = await ctx.newPage();
   await page.goto("/game/create");
@@ -142,7 +151,7 @@ async function advanceToPlayerTurnForMission(
   const playerButtons = switcherPanel.getByRole("button");
   const count = await playerButtons.count();
 
-  await page.getByText("Mission Selection").waitFor({ state: "visible", timeout: 30000 });
+  await page.getByRole("heading", { name: "Mission Selection" }).waitFor({ state: "visible", timeout: 30000 });
 
   // Switch to human
   for (let i = 0; i < count; i++) {
@@ -151,6 +160,7 @@ async function advanceToPlayerTurnForMission(
     const label = await playerButtons.nth(i).textContent();
     if (label?.includes("H")) break;
   }
+  await dismissModal(page);
 
   // Get pending mission options from game row
   const gameState = await fetchGame(gameId, token);
@@ -176,7 +186,7 @@ async function advanceToPlayerTurnForMission(
   await page.getByRole("button", { name: "Select Mission" }).click();
 
   // Card Reveal via direct API
-  await page.getByText("Card Reveal").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByRole("heading", { name: "Card Reveal" }).waitFor({ state: "visible", timeout: 15000 });
   const { humanId, aiIds } = await collectPlayerIds(page);
 
   for (const playerId of aiIds) {
@@ -191,7 +201,7 @@ async function advanceToPlayerTurnForMission(
   }
 
   // Resource Allocation via direct API (no extra CPU/RAM — default stats for clean rule testing)
-  await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByRole("heading", { name: "Resource Allocation" }).waitFor({ state: "visible", timeout: 15000 });
   if (humanId) {
     await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
       method: "POST",
@@ -200,7 +210,7 @@ async function advanceToPlayerTurnForMission(
     });
   }
 
-  await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
+  await page.locator("p").filter({ hasText: /Player Turn/ }).first().waitFor({ state: "visible", timeout: 15000 });
 
   // Discard for the first active player so tests can call play-card immediately
   const freshGame = await fetchGame(gameId, token);

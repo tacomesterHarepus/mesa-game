@@ -128,7 +128,7 @@ test.describe("game phase flow", () => {
     // All pages should land on mission_selection immediately after start-game.
     let sawMissionSelection = false;
     for (const page of pages) {
-      if (await page.getByText("Mission Selection").isVisible({ timeout: 15_000 }).catch(() => false)) {
+      if (await page.getByRole("heading", { name: "Mission Selection" }).isVisible({ timeout: 15_000 }).catch(() => false)) {
         sawMissionSelection = true;
         break;
       }
@@ -136,7 +136,7 @@ test.describe("game phase flow", () => {
     expect(sawMissionSelection).toBe(true);
     // Resource Adjustment must NOT appear on any page at this point
     for (const page of pages) {
-      await expect(page.getByText("Resource Adjustment")).not.toBeVisible();
+      await expect(page.getByRole("heading", { name: "Resource Adjustment" })).not.toBeVisible();
     }
   });
 
@@ -145,7 +145,7 @@ test.describe("game phase flow", () => {
     let humanPage: Page | null = null;
     for (const page of pages) {
       try {
-        await expect(page.getByText("Mission Selection")).toBeVisible({ timeout: 5_000 });
+        await expect(page.getByRole("heading", { name: "Mission Selection" })).toBeVisible({ timeout: 5_000 });
         if (await page.getByRole("button", { name: /Select Mission/i }).isVisible().catch(() => false)) {
           humanPage = page;
           break;
@@ -179,7 +179,7 @@ test.describe("game phase flow", () => {
 
     let sawCardReveal = false;
     for (const page of pages) {
-      if (await page.getByText("Card Reveal").isVisible({ timeout: 15_000 }).catch(() => false)) {
+      if (await page.getByRole("heading", { name: "Card Reveal" }).isVisible({ timeout: 15_000 }).catch(() => false)) {
         sawCardReveal = true;
         break;
       }
@@ -191,7 +191,7 @@ test.describe("game phase flow", () => {
     let sawRevealButton = false;
     for (const page of pages) {
       try {
-        await expect(page.getByText("Card Reveal")).toBeVisible({ timeout: 5_000 });
+        await expect(page.getByRole("heading", { name: "Card Reveal" })).toBeVisible({ timeout: 5_000 });
       } catch {
         continue;
       }
@@ -227,7 +227,7 @@ test.describe("game phase flow", () => {
     let sawResourceAllocation = false;
     for (const page of pages) {
       try {
-        await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 15_000 });
+        await page.getByRole("heading", { name: "Resource Allocation" }).waitFor({ state: "visible", timeout: 15_000 });
         sawResourceAllocation = true;
         break;
       } catch {
@@ -262,7 +262,7 @@ test.describe("game phase flow", () => {
 
     let sawPlayerTurn = false;
     for (const page of pages) {
-      if (await page.getByText("Player Turn").isVisible({ timeout: 15_000 }).catch(() => false)) {
+      if (await page.locator("p").filter({ hasText: /Player Turn/ }).first().isVisible({ timeout: 15_000 }).catch(() => false)) {
         sawPlayerTurn = true;
         break;
       }

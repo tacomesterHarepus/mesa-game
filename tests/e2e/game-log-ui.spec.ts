@@ -125,7 +125,7 @@ test.describe("GameLog UI rendering", () => {
     expect(aiIds.length).toBeGreaterThan(0);
 
     // Mission Selection
-    await page.getByText("Mission Selection").waitFor({ state: "visible", timeout: 30000 });
+    await page.getByRole("heading", { name: "Mission Selection" }).waitFor({ state: "visible", timeout: 30000 });
     const switcherPanel = page.locator(".fixed.top-7");
     const playerButtons = switcherPanel.getByRole("button");
     const btnCount = await playerButtons.count();
@@ -139,7 +139,7 @@ test.describe("GameLog UI rendering", () => {
     await page.getByRole("button", { name: "Select Mission" }).click();
 
     // Card Reveal
-    await page.getByText("Card Reveal").waitFor({ state: "visible", timeout: 30000 });
+    await page.getByRole("heading", { name: "Card Reveal" }).waitFor({ state: "visible", timeout: 30000 });
     for (const playerId of aiIds) {
       const handResp = await fetch(
         `${SUPABASE_URL}/rest/v1/hands?player_id=eq.${playerId}&game_id=eq.${gameId}&select=id,card_key,card_type`,
@@ -156,13 +156,13 @@ test.describe("GameLog UI rendering", () => {
     }
 
     // Resource Allocation (empty)
-    await page.getByText("Resource Allocation").waitFor({ state: "visible", timeout: 30000 });
+    await page.getByRole("heading", { name: "Resource Allocation" }).waitFor({ state: "visible", timeout: 30000 });
     await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, allocations: [], override_player_id: humanId }),
     });
-    await page.getByText("Player Turn").waitFor({ state: "visible", timeout: 15000 });
+    await page.locator("p").filter({ hasText: /Player Turn/ }).first().waitFor({ state: "visible", timeout: 15000 });
 
     // Get turn order
     const gameResp = await fetch(
@@ -229,7 +229,7 @@ test.describe("GameLog UI rendering", () => {
     }
 
     // Wait for mission to resolve and UI to update
-    await page.getByText("Resource Adjustment").waitFor({ state: "visible", timeout: 40000 });
+    await page.getByRole("heading", { name: "Resource Adjustment" }).waitFor({ state: "visible", timeout: 40000 });
     // Give Realtime a moment to deliver the final log entries to the browser
     await page.waitForTimeout(1000);
   });

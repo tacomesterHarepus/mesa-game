@@ -116,7 +116,7 @@ test.describe("dev mode shared game — phase content and chat", () => {
     // Wait for game board to land on the first game phase (mission_selection).
     // The page might briefly redirect to lobby if server-renders before start-game commits;
     // if that happens, LobbyPhase will re-navigate to the game board within its 2s poll.
-    await sharedPage.getByText("Mission Selection").waitFor({ state: "visible", timeout: 30000 });
+    await sharedPage.getByRole("heading", { name: "Mission Selection" }).waitFor({ state: "visible", timeout: 30000 });
   });
 
   test.afterAll(async () => {
