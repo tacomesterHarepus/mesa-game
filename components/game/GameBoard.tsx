@@ -671,6 +671,7 @@ export function GameBoard({
             hand={hand}
             round={mission?.round ?? 1}
             overridePlayerId={overridePlayerId}
+            activeMission={mission}
           />
         );
       case "virus_pull":

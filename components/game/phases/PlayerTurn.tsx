@@ -11,6 +11,12 @@ interface HandCard {
   card_type: string;
 }
 
+interface ActiveMissionState {
+  mission_key: string;
+  compute_contributed: number;
+  data_contributed: number;
+}
+
 interface Props {
   gameId: string;
   currentTurnPlayer: Player | null;
@@ -18,6 +24,7 @@ interface Props {
   hand: HandCard[];
   round: number;
   overridePlayerId?: string;
+  activeMission?: ActiveMissionState | null;
 }
 
 const CARD_VISUAL: Record<string, { bg: string; border: string; header: string; icon: string; color: string }> = {
@@ -216,7 +223,7 @@ function CardStackGroup({
   );
 }
 
-export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, round, overridePlayerId }: Props) {
+export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, round, overridePlayerId, activeMission }: Props) {
   const isMyTurn = currentPlayer?.id === currentTurnPlayer?.id;
   const isAI = currentPlayer?.role !== "human" && currentPlayer !== null;
   const isHuman = currentPlayer?.role === "human";
@@ -273,6 +280,10 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
     virusCount === 0
       ? Array.from(new Set(unstagedCards.filter((c) => c.card_type === "virus").map((c) => c.card_key)))
       : [];
+
+  const computeBlocked =
+    activeMission?.mission_key === "dataset_integration" &&
+    (activeMission.compute_contributed ?? 0) >= (activeMission.data_contributed ?? 0) * 2;
 
   // Click-to-increment: each click adds one more card from the stack to discard selection,
   // wrapping back to 0 when at max (stack size or total-discard limit of 3).
@@ -438,7 +449,7 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
                   playGroups.length > 0 ? (
                     playGroups.map(([key, cards]) => {
                       const isSelected = selectedCardKey === key;
-                      const isDisabled = virusDisabledKeys.includes(key);
+                      const isDisabled = virusDisabledKeys.includes(key) || (computeBlocked && key === "compute");
                       return (
                         <CardStackGroup
                           key={key}
@@ -457,6 +468,13 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
                 )}
               </div>
             </div>
+
+            {/* Dataset Integration compute-slot hint */}
+            {hasDiscarded && computeBlocked && (
+              <span style={{ fontFamily: "monospace", fontSize: 9, color: "#666", letterSpacing: 1 }}>
+                Play Data to unlock Compute slots.
+              </span>
+            )}
 
             {/* Errors */}
             {(error || discardError) && (
