@@ -55,6 +55,14 @@ async function findPageWithButton(pages: Page[], name: RegExp | string, timeout 
 // Running tests serially on a single game means only 6 anonymous sign-ins per
 // suite run instead of 7×6=42, staying well within Supabase free-tier limits.
 
+async function dismissModal(page: Page): Promise<void> {
+  const acknowledgeBtn = page.getByRole("button", { name: "Acknowledge" });
+  if (await acknowledgeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await acknowledgeBtn.click();
+    await page.waitForTimeout(200);
+  }
+}
+
 test.describe("game phase flow", () => {
   test.describe.configure({ mode: "serial" });
 
@@ -102,6 +110,7 @@ test.describe("game phase flow", () => {
       }
       throw e;
     }
+    for (const p of pages) { await dismissModal(p); }
   });
 
   test.afterAll(async () => {

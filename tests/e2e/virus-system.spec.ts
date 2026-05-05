@@ -86,6 +86,14 @@ async function collectPlayerIds(page: Page): Promise<{ humanId: string | null; a
   return { humanId, aiIds };
 }
 
+async function dismissModal(page: Page): Promise<void> {
+  const acknowledgeBtn = page.getByRole("button", { name: "Acknowledge" });
+  if (await acknowledgeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await acknowledgeBtn.click();
+    await page.waitForTimeout(200);
+  }
+}
+
 // Advances a dev-mode game from mission_selection → card_reveal → resource_allocation → player_turn.
 // Grants +1 CPU to the first two AIs so that at least 2 have CPU=2, triggering virus generation.
 // Card reveal and resource allocation use direct Supabase API calls (no UI interactions) to avoid
@@ -103,6 +111,7 @@ async function advanceToPlayerTurnWithCpu2(page: Page, gameId: string): Promise<
     const label = await playerButtons.nth(i).textContent();
     if (label?.includes("H")) break;
   }
+  await dismissModal(page);
   await page.locator("button:not([name])").filter({ hasText: /Compute|Data|Validation/ }).first().click();
   await page.getByRole("button", { name: "Select Mission" }).click();
 

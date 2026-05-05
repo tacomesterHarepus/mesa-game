@@ -132,6 +132,14 @@ async function drainVirusQueue(gameId: string, token: string, overridePlayerId?:
 // game_log with the widest possible set of event types.
 // Card_played and related metadata are tested if player 1 has a progress card.
 
+async function dismissModal(page: Page): Promise<void> {
+  const acknowledgeBtn = page.getByRole("button", { name: "Acknowledge" });
+  if (await acknowledgeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await acknowledgeBtn.click();
+    await page.waitForTimeout(200);
+  }
+}
+
 test.describe("game_log metadata coverage", () => {
   test.describe.configure({ mode: "serial" });
 
@@ -168,6 +176,7 @@ test.describe("game_log metadata coverage", () => {
       const label = await playerButtons.nth(i).textContent();
       if (label?.includes("H")) break;
     }
+    await dismissModal(page);
     await page.locator("button:not([name])").filter({ hasText: /Compute|Data|Validation/ }).first().click();
     await page.getByRole("button", { name: "Select Mission" }).click();
 
@@ -445,6 +454,7 @@ test.describe("game_log mission_transition ordering (CPU≥2 virus path)", () =>
       const label = await playerButtons2.nth(i).textContent();
       if (label?.includes("H")) break;
     }
+    await dismissModal(page2);
     await page2.locator("button:not([name])").filter({ hasText: /Compute|Data|Validation/ }).first().click();
     await page2.getByRole("button", { name: "Select Mission" }).click();
 

@@ -95,6 +95,14 @@ async function collectPlayerIds(page: Page): Promise<{ humanId: string | null; a
   return { humanId, aiIds };
 }
 
+async function dismissModal(page: Page): Promise<void> {
+  const acknowledgeBtn = page.getByRole("button", { name: "Acknowledge" });
+  if (await acknowledgeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await acknowledgeBtn.click();
+    await page.waitForTimeout(200);
+  }
+}
+
 async function advanceThroughCardReveal(
   page: Page,
   gameId: string,
@@ -112,6 +120,7 @@ async function advanceThroughCardReveal(
     const label = await playerButtons.nth(i).textContent();
     if (label?.includes("H")) break;
   }
+  await dismissModal(page);
   await page.locator("button:not([name])").filter({ hasText: /Compute|Data|Validation/ }).first().click();
   await page.getByRole("button", { name: "Select Mission" }).click();
 
@@ -221,6 +230,7 @@ test.describe("virus placement", () => {
         }
       }
       await page.waitForTimeout(500);
+      await dismissModal(page);
 
       await expect(page.locator("p").filter({ hasText: /Player Turn/ }).first()).toBeVisible({ timeout: 10000 });
 

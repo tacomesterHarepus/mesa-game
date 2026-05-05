@@ -77,6 +77,14 @@ async function collectPlayerIds(page: Page): Promise<{ humanId: string | null; a
   return { humanId, aiIds };
 }
 
+async function dismissModal(page: Page): Promise<void> {
+  const acknowledgeBtn = page.getByRole("button", { name: "Acknowledge" });
+  if (await acknowledgeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await acknowledgeBtn.click();
+    await page.waitForTimeout(200);
+  }
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 test.describe("card reveal", () => {
@@ -117,6 +125,7 @@ test.describe("card reveal", () => {
       const switcher = page.locator(".fixed.top-7");
       await switcher.locator(`[data-player-id="${aiIds[0]}"]`).click();
       await page.waitForTimeout(500);
+      await dismissModal(page);
 
       // Select a card from AI 1's hand. Hand card buttons carry a title attribute
       // (populated from CARD_MAP card description) which distinguishes them from

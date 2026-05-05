@@ -99,6 +99,14 @@ async function drainVirusQueue(gameId: string, token: string, overridePlayerId?:
 
 // ── Suite ─────────────────────────────────────────────────────────────────────
 
+async function dismissModal(page: Page): Promise<void> {
+  const acknowledgeBtn = page.getByRole("button", { name: "Acknowledge" });
+  if (await acknowledgeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await acknowledgeBtn.click();
+    await page.waitForTimeout(200);
+  }
+}
+
 test.describe("GameLog UI rendering", () => {
   test.describe.configure({ mode: "serial" });
 
@@ -135,6 +143,7 @@ test.describe("GameLog UI rendering", () => {
       const label = await playerButtons.nth(i).textContent();
       if (label?.includes("H")) break;
     }
+    await dismissModal(page);
     await page.locator("button:not([name])").filter({ hasText: /Compute|Data|Validation/ }).first().click();
     await page.getByRole("button", { name: "Select Mission" }).click();
 

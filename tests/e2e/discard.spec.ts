@@ -74,6 +74,14 @@ async function collectPlayerIds(page: Page): Promise<{ humanId: string | null; a
   return { humanId, aiIds };
 }
 
+async function dismissModal(page: Page): Promise<void> {
+  const acknowledgeBtn = page.getByRole("button", { name: "Acknowledge" });
+  if (await acknowledgeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await acknowledgeBtn.click();
+    await page.waitForTimeout(200);
+  }
+}
+
 async function advanceToPlayerTurn(
   page: Page,
   gameId: string,
@@ -91,6 +99,7 @@ async function advanceToPlayerTurn(
     const label = await playerButtons.nth(i).textContent();
     if (label?.includes("H")) break;
   }
+  await dismissModal(page);
   await page.locator("button:not([name])").filter({ hasText: /Compute|Data|Validation/ }).first().click();
   await page.getByRole("button", { name: "Select Mission" }).click();
 

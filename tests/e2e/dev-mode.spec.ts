@@ -100,6 +100,14 @@ test("DEV MODE banner is full-width and prominently visible", async ({
 
 // Tests 6-7 share one game setup to avoid hitting Supabase anonymous-auth rate limits.
 // All 5 independent tests above already consumed 5 sessions; a shared describe uses 1 more.
+async function dismissModal(page: Page): Promise<void> {
+  const acknowledgeBtn = page.getByRole("button", { name: "Acknowledge" });
+  if (await acknowledgeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await acknowledgeBtn.click();
+    await page.waitForTimeout(200);
+  }
+}
+
 test.describe("dev mode shared game — phase content and chat", () => {
   test.describe.configure({ mode: "serial" });
 
@@ -117,6 +125,7 @@ test.describe("dev mode shared game — phase content and chat", () => {
     // The page might briefly redirect to lobby if server-renders before start-game commits;
     // if that happens, LobbyPhase will re-navigate to the game board within its 2s poll.
     await sharedPage.getByRole("heading", { name: "Mission Selection" }).waitFor({ state: "visible", timeout: 30000 });
+    await dismissModal(sharedPage);
   });
 
   test.afterAll(async () => {
@@ -128,6 +137,7 @@ test.describe("dev mode shared game — phase content and chat", () => {
     const bot3 = switcherPanel.getByRole("button", { name: /Bot3/ });
     await expect(bot3).toBeVisible();
     await bot3.click();
+    await dismissModal(sharedPage);
     await expect(bot3).toHaveClass(/border-amber/);
   });
 
@@ -146,6 +156,7 @@ test.describe("dev mode shared game — phase content and chat", () => {
     }
     // Roles are randomly assigned; skip gracefully if no human appears in this run.
     if (!humanFound) { test.skip(); return; }
+    await dismissModal(sharedPage);
 
     // Open the CHAT tab so the input is in the active view.
     await sharedPage.getByRole("button", { name: "CHAT" }).click();
