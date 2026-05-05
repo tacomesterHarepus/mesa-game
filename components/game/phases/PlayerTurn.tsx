@@ -179,6 +179,11 @@ function CardStackGroup({
             <span style={{ fontFamily: "sans-serif", fontSize: 14, color: "#ddd", lineHeight: 1.2 }}>
               {cardDef?.name ?? cardKey}
             </span>
+            {first.card_type === "virus" && cardDef?.description && (
+              <span style={{ fontFamily: "sans-serif", fontSize: 8, color: "#cca0a0", lineHeight: 1.3, paddingRight: 6, marginTop: 3 }}>
+                {cardDef.description}
+              </span>
+            )}
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <span style={{ fontFamily: "sans-serif", fontSize: 28, color: visual.color, opacity: 0.8 }}>
                 {visual.icon}
