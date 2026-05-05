@@ -164,14 +164,22 @@ async function applyVirusEffect(admin: any, game: any, card: any): Promise<boole
         await admin.from("active_mission").update({
           compute_contributed: Math.max(0, mission.compute_contributed - 1),
         }).eq("id", mission.id);
+        const corruptLog: GameLogInsert<"virus_effect"> = {
+          game_id,
+          event_type: "virus_effect",
+          public_description: "Model Corruption! −1 Compute from mission.",
+          metadata: { card_key: card.card_key, effect_type: "model_corruption" },
+        };
+        await admin.from("game_log").insert(corruptLog);
+      } else {
+        const corruptLog: GameLogInsert<"virus_effect"> = {
+          game_id,
+          event_type: "virus_effect",
+          public_description: "Model Corruption — no active mission; no effect.",
+          metadata: { card_key: card.card_key, effect_type: "model_corruption" },
+        };
+        await admin.from("game_log").insert(corruptLog);
       }
-      const corruptLog: GameLogInsert<"virus_effect"> = {
-        game_id,
-        event_type: "virus_effect",
-        public_description: "Model Corruption! −1 Compute from mission.",
-        metadata: { card_key: card.card_key, effect_type: "model_corruption" },
-      };
-      await admin.from("game_log").insert(corruptLog);
       return false;
     }
 
@@ -182,14 +190,22 @@ async function applyVirusEffect(admin: any, game: any, card: any): Promise<boole
         await admin.from("active_mission").update({
           data_contributed: Math.max(0, mission.data_contributed - 1),
         }).eq("id", mission.id);
+        const driftLog: GameLogInsert<"virus_effect"> = {
+          game_id,
+          event_type: "virus_effect",
+          public_description: "Data Drift! −1 Data from mission.",
+          metadata: { card_key: card.card_key, effect_type: "data_drift" },
+        };
+        await admin.from("game_log").insert(driftLog);
+      } else {
+        const driftLog: GameLogInsert<"virus_effect"> = {
+          game_id,
+          event_type: "virus_effect",
+          public_description: "Data Drift — no active mission; no effect.",
+          metadata: { card_key: card.card_key, effect_type: "data_drift" },
+        };
+        await admin.from("game_log").insert(driftLog);
       }
-      const driftLog: GameLogInsert<"virus_effect"> = {
-        game_id,
-        event_type: "virus_effect",
-        public_description: "Data Drift! −1 Data from mission.",
-        metadata: { card_key: card.card_key, effect_type: "data_drift" },
-      };
-      await admin.from("game_log").insert(driftLog);
       return false;
     }
 
@@ -200,14 +216,22 @@ async function applyVirusEffect(admin: any, game: any, card: any): Promise<boole
         await admin.from("active_mission").update({
           validation_contributed: Math.max(0, mission.validation_contributed - 1),
         }).eq("id", mission.id);
+        const valFailLog: GameLogInsert<"virus_effect"> = {
+          game_id,
+          event_type: "virus_effect",
+          public_description: "Validation Failure! −1 Validation from mission.",
+          metadata: { card_key: card.card_key, effect_type: "validation_failure" },
+        };
+        await admin.from("game_log").insert(valFailLog);
+      } else {
+        const valFailLog: GameLogInsert<"virus_effect"> = {
+          game_id,
+          event_type: "virus_effect",
+          public_description: "Validation Failure — no active mission; no effect.",
+          metadata: { card_key: card.card_key, effect_type: "validation_failure" },
+        };
+        await admin.from("game_log").insert(valFailLog);
       }
-      const valFailLog: GameLogInsert<"virus_effect"> = {
-        game_id,
-        event_type: "virus_effect",
-        public_description: "Validation Failure! −1 Validation from mission.",
-        metadata: { card_key: card.card_key, effect_type: "validation_failure" },
-      };
-      await admin.from("game_log").insert(valFailLog);
       return false;
     }
 
@@ -299,7 +323,20 @@ function cardDisplayName(key: string): string {
 async function refillVirusPool(admin: any, game_id: string) {
   const { count: poolCount } = await admin.from("virus_pool")
     .select("*", { count: "exact", head: true }).eq("game_id", game_id);
-  const needed = 4 - (poolCount ?? 0);
+  const currentCount = poolCount ?? 0;
+
+  // Trim excess if pool somehow exceeded 4
+  if (currentCount > 4) {
+    const { data: excess } = await admin.from("virus_pool")
+      .select("id").eq("game_id", game_id)
+      .order("position", { ascending: false }).limit(currentCount - 4);
+    if (excess && excess.length > 0) {
+      await admin.from("virus_pool").delete().in("id", excess.map((r: any) => r.id));
+    }
+    return;
+  }
+
+  const needed = 4 - currentCount;
   if (needed <= 0) return;
 
   let drawCards = await drawFromDeck(admin, game_id, needed);
