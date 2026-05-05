@@ -8,8 +8,7 @@ const corsHeaders = {
 
 // Marks the player's role_revealed=true after they dismiss the game-start role reveal modal.
 // Body: { game_id, override_player_id?: string }
-// override_player_id is only honoured in non-production environments when the
-// caller owns every player in the game (dev mode single-user testing).
+// override_player_id is only honoured in non-production environments (dev mode).
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -58,7 +57,6 @@ async function resolvePlayer(
       .from("players").select("*")
       .eq("id", override_player_id).eq("game_id", game_id).single();
     if (!data) throw new Error("Override player not found in game");
-    if (data.user_id !== userId) throw new Error("Dev override denied");
     return data;
   }
 
