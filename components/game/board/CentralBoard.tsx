@@ -428,7 +428,7 @@ function AIChipGroup({
         </text>
 
         {/* CPU label + track */}
-        <text x="10" y={isTop ? 48 : 62} fontFamily="monospace" fontSize="11" fill={trackLabel}>
+        <text x="10" y={isTop ? 50 : 62} fontFamily="monospace" fontSize="11" fill={trackLabel}>
           CPU
         </text>
         {([0, 1, 2, 3] as const).map((i) => {
@@ -437,7 +437,7 @@ function AIChipGroup({
             <rect
               key={i}
               x={40 + i * 12}
-              y={isTop ? 40 : 54}
+              y={isTop ? 42 : 54}
               width="11"
               height="11"
               fill={sq.fill}
@@ -448,8 +448,8 @@ function AIChipGroup({
           );
         })}
 
-        {/* RAM label + track */}
-        <text x="90" y={isTop ? 70 : 84} fontFamily="monospace" fontSize="11" fill={trackLabel}>
+        {/* RAM label + track — stacked below CPU in left column */}
+        <text x="10" y={isTop ? 69 : 80} fontFamily="monospace" fontSize="11" fill={trackLabel}>
           RAM
         </text>
         {([0, 1, 2, 3, 4, 5, 6] as const).map((i) => {
@@ -457,8 +457,8 @@ function AIChipGroup({
           return (
             <rect
               key={i}
-              x={110 + i * 7}
-              y={isTop ? 62 : 76}
+              x={40 + i * 7}
+              y={isTop ? 61 : 72}
               width="7"
               height="11"
               fill={sq.fill}
@@ -483,12 +483,12 @@ function AIChipGroup({
         {showButtons && resourceChip && (
           <g>
             {/* CPU row label */}
-            <text x="163" y="69" fontFamily="monospace" fontSize="7" fill="#7a9a8a">C</text>
+            <text x="163" y={isTop ? 53 : 63} fontFamily="monospace" fontSize="7" fill="#7a9a8a">C</text>
             {/* CPU [-] */}
             {resourceChip.cpuMinus && (
               <SVGChipButton
                 x={171}
-                y={61}
+                y={isTop ? 43 : 55}
                 label="−"
                 enabled={resourceChip.cpuMinus.enabled}
                 onClick={resourceChip.cpuMinus.onClick}
@@ -498,19 +498,19 @@ function AIChipGroup({
             {resourceChip.cpuPlus && (
               <SVGChipButton
                 x={185}
-                y={61}
+                y={isTop ? 43 : 55}
                 label="+"
                 enabled={resourceChip.cpuPlus.enabled}
                 onClick={resourceChip.cpuPlus.onClick}
               />
             )}
             {/* RAM row label */}
-            <text x="163" y="82" fontFamily="monospace" fontSize="7" fill="#7a9a8a">R</text>
+            <text x="163" y={isTop ? 72 : 81} fontFamily="monospace" fontSize="7" fill="#7a9a8a">R</text>
             {/* RAM [-] */}
             {resourceChip.ramMinus && (
               <SVGChipButton
                 x={171}
-                y={74}
+                y={isTop ? 62 : 73}
                 label="−"
                 enabled={resourceChip.ramMinus.enabled}
                 onClick={resourceChip.ramMinus.onClick}
@@ -520,7 +520,7 @@ function AIChipGroup({
             {resourceChip.ramPlus && (
               <SVGChipButton
                 x={185}
-                y={74}
+                y={isTop ? 62 : 73}
                 label="+"
                 enabled={resourceChip.ramPlus.enabled}
                 onClick={resourceChip.ramPlus.onClick}
