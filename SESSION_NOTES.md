@@ -76,7 +76,7 @@ Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2
 | Role reveal modal | **DONE** | Migration 016 (role_revealed), acknowledge-role edge function v1, RoleRevealModal (misaligned/aligned/human themes), GameBoard wiring (optimistic acknowledge). UX_DESIGN §7.11 + §12 updated. Build clean. Screenshots verified. |
 | Wall layout migration | **DONE** | SVG firewall wall x=421–449, chip cluster x=0–420, action region extended. SLOT_SIDES all "right". VirusCardOverlay 220→95. WinnerBanner +27 shift. TrackerBar/TrackerBars deleted. Test selector drift fixed (phase headings, Player Turn p-filter, dismissModal in 5 specs). 5 commits 525cb26–commit5. Canary 11/10/0. |
 
-**Test suite — full suite 2026-04-30: 24 pass / 10 skip / 19 fail / 29 did not run. All 18 new failures are the RoleRevealModal `dismissModal` gap — not a game logic regression. 11 spec files still need `dismissModal` added to their DevMode-switch helpers: card-reveal, dev-mode, discard, draw-cards, game-log, game-log-ui, hand-stability, mission-flow, secret-actions, virus-placement, virus-system. Pre-existing flake: game-log:524 appeared as expected. screenshot-wall-commit3.spec.ts is a temp visual spec not suitable for automated runs.**
+**Test suite — full suite 2026-05-05: 65 pass / 15 skip / 1 fail. The 1 fail is the pre-existing game-log:527 CPU≥2 path flake (shifted from :524 by 3-line dismissModal insertion; same root cause, passes in isolation). 15 skips vs baseline 14: one extra conditional skip from random card-type gate in game-log-ui. All dismissModal gaps closed — suite is back at baseline. screenshot-wall-commit3.spec.ts deleted (marked for deletion in its own header; no regression value).**
 
 ---
 

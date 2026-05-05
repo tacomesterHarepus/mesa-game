@@ -1,20 +1,27 @@
 # Latest Task
 
 ## Summary
-Completed the wall layout migration for the MESA game board (5 commits). The SVG firewall wall is now a rendered element at x=421–449 (h=520) inside the 695×520 CentralBoard SVG, with the AI chip cluster strictly confined to x=0–420. The action region was extended to 240px tall (top=648). All chip overlays, slot anchors, and tracker bars were relocated to stay within the cluster area left of the wall. Three CentralBoard adjustments shipped in commit 4: SLOT_SIDES all changed to "right" (card-reveal slot icons appear at chip right edge, slotX=+165), VirusCardOverlay translate shifted from x=220 to x=95 (stays inside cluster), WinnerBanner x coords shifted +27 (re-centered for 695px SVG). Orphaned TrackerBar.tsx and board/TrackerBars.tsx deleted in commit 5 (both absorbed into TopBar in wall commit 2). Test selector drift from the wall commits fixed across 19 spec files: phase headings now use getByRole("heading"), Player Turn uses a p-filter, and a dismissModal helper was added to 5 spec files to handle the RoleRevealModal blocking clicks after DevMode player switches. V2 visual verification confirmed +/- buttons (right edge SVG x=422) do not clip into wall (left edge SVG x=425) — 3px gap visible.
+Added `dismissModal` helper + call sites to all 11 remaining E2E spec files that switch DevMode players without dismissing the RoleRevealModal. The modal (added in migration 016) is z-index 40 and intercepts all pointer events, causing click failures and strict-mode selector violations in any test that switches players via the PlayerSwitcher. Also deleted `screenshot-wall-commit3.spec.ts`, which was a one-shot visual spec marked for deletion in its own file header. Full suite went from 24/10/19/29-dnr (pre-fix) to 65/15/1 (post-fix), restoring the baseline.
 
 ## Files changed
-- `components/game/board/CentralBoard.tsx` — SLOT_SIDES all "right"; VirusCardOverlay translate x 220→95; WinnerBanner x coords +27 shift
-- `components/game/GameBoard.tsx` — dead TrackerBars comment removed
-- `components/game/TrackerBar.tsx` — DELETED (orphaned; absorbed into TopBar in wall commit 2)
-- `components/game/board/TrackerBars.tsx` — DELETED (orphaned; absorbed into TopBar in wall commit 2)
-- `tests/e2e/*.spec.ts` (19 files) — phase heading selectors → getByRole("heading"); Player Turn → p-filter; dismissModal helper added to 5 files (turn-order, abort-mission, multi-mission, error-handling, mission-rules)
-- `tests/e2e/screenshot-wall-verify.spec.ts` — temporary V2 verification spec (Fill Lobby approach)
+- `tests/e2e/card-reveal.spec.ts` — added dismissModal function + call after AI1 player switch
+- `tests/e2e/dev-mode.spec.ts` — added dismissModal function + 3 call sites (beforeAll, Bot3 test, human-chat test)
+- `tests/e2e/discard.spec.ts` — added dismissModal function + call in advanceToPlayerTurn after human switch loop
+- `tests/e2e/draw-cards.spec.ts` — added dismissModal function + call in advanceThroughCardReveal after human switch loop
+- `tests/e2e/game-log-ui.spec.ts` — added dismissModal function + call in beforeAll after human switch loop
+- `tests/e2e/game-log.spec.ts` — added dismissModal function + call in FIRST beforeAll + call in SECOND beforeAll (page2)
+- `tests/e2e/hand-stability.spec.ts` — added dismissModal function + call in advanceThroughCardReveal
+- `tests/e2e/mission-flow.spec.ts` — added dismissModal function + loop across all 6 pages in beforeAll after navigation
+- `tests/e2e/secret-actions.spec.ts` — added dismissModal function + call in advanceToPlayerTurn after human switch loop
+- `tests/e2e/virus-placement.spec.ts` — added dismissModal function + call in advanceThroughCardReveal + call in test body after active AI player switch
+- `tests/e2e/virus-system.spec.ts` — added dismissModal function + call in advanceToPlayerTurnWithCpu2 after human switch loop
+- `tests/e2e/screenshot-wall-commit3.spec.ts` — DELETED (one-shot visual spec, no regression value)
 
 ## Test status
-- `next build` clean (commit 4)
-- Canary suite: **11 pass / 10 conditional skip / 0 fail** (turn-order, abort-mission, multi-mission, mission-rules, error-handling)
-- No full-suite run; canary confirms no regression from wall layout migration
+- Full suite 2026-05-05: **65 passed / 15 skipped / 1 failed**
+- 1 failure: game-log.spec.ts:527 — pre-existing CPU≥2 virus path race flake (shifted from :524 by insertion; passes in isolation per CLAUDE.md baseline)
+- 15 skips vs baseline 14: one extra conditional skip from random card-type gate in game-log-ui
+- Within ±3 of 65/14/1 baseline — task complete
 
 ## Suggested next
-Density pass revisit: the action region is now 240px (top=648), 10px taller than the player_turn density pass assumed. Other phase components (resource phases, card reveal, game log entries) still have PARTIAL density work outstanding. Before picking up BACKLOG "Layout density" or "Text size" items, verify current measurements against the wall-layout baseline — the 2026-04-28 pass numbers (ActionRegion 230/top=658) are stale. See BACKLOG for specific open items.
+Role reveal modal UX polish (BACKLOG): the "aligned" and "human" modal variants are open questions per §12 of UX_DESIGN. The misaligned variant shipped; the other two show placeholder text. This is the natural follow-on now that the test suite is healthy and the modal is battle-tested in E2E runs.
