@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { devFetch } from "./_helpers";
 
 const SUPABASE_URL = "https://qpoakdiwmpaxvvzpqqdh.supabase.co";
 const ANON_KEY = "sb_publishable_Kz82SiJlbKrdJ0ZtAQPEkg_mm-0aapD";
@@ -109,7 +110,7 @@ test.describe("card reveal", () => {
         { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
       );
       const [gRow] = (await gResp.json()) as Array<{ pending_mission_options: string[] }>;
-      await fetch(`${SUPABASE_URL}/functions/v1/select-mission`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/select-mission`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({

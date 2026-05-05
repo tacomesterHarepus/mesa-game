@@ -1,4 +1,5 @@
 import { test, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { devFetch } from "./_helpers";
 
 const SUPABASE_URL = "https://qpoakdiwmpaxvvzpqqdh.supabase.co";
 const ANON_KEY = "sb_publishable_Kz82SiJlbKrdJ0ZtAQPEkg_mm-0aapD";
@@ -133,7 +134,7 @@ async function advanceToPlayerTurnWithCpu2(page: Page, gameId: string): Promise<
     const hand = (await handResp.json()) as Array<{ card_key: string }>;
     if (!hand.length) continue;
 
-    await fetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, card_key: hand[0].card_key, override_player_id: playerId }),
@@ -151,7 +152,7 @@ async function advanceToPlayerTurnWithCpu2(page: Page, gameId: string): Promise<
       { player_id: aiIds[0], cpu_delta: 1, ram_delta: 0 },
       { player_id: aiIds[1], cpu_delta: 1, ram_delta: 0 },
     ];
-    await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, allocations, override_player_id: humanId }),
@@ -174,7 +175,7 @@ async function endCurrentPlayerTurn(gameId: string, token: string): Promise<bool
   const [gameRow] = (await gameResp.json()) as Array<{ current_turn_player_id: string; phase: string }>;
   if (gameRow?.phase !== "player_turn" || !gameRow?.current_turn_player_id) return false;
 
-  const resp = await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+  const resp = await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ game_id: gameId, override_player_id: gameRow.current_turn_player_id }),
@@ -189,7 +190,7 @@ async function endCurrentPlayerTurn(gameId: string, token: string): Promise<bool
   );
   const [phaseRow] = (await phaseResp.json()) as Array<{ phase: string; current_turn_player_id: string }>;
   if (phaseRow?.phase === "virus_pull" && phaseRow?.current_turn_player_id) {
-    await fetch(`${SUPABASE_URL}/functions/v1/pull-viruses`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/pull-viruses`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, override_player_id: phaseRow.current_turn_player_id }),

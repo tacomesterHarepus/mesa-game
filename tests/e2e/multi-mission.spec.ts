@@ -1,4 +1,5 @@
 import { test, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { devFetch } from "./_helpers";
 
 const SUPABASE_URL = "https://qpoakdiwmpaxvvzpqqdh.supabase.co";
 const ANON_KEY = "sb_publishable_Kz82SiJlbKrdJ0ZtAQPEkg_mm-0aapD";
@@ -114,7 +115,7 @@ async function completeMission1ByFailing(
     if (!handResp.ok) continue;
     const hand = (await handResp.json()) as Array<{ card_key: string }>;
     if (!hand.length) continue;
-    await fetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, card_key: hand[0].card_key, override_player_id: playerId }),
@@ -124,7 +125,7 @@ async function completeMission1ByFailing(
 
   // ── Resource Allocation: submit empty allocations ──────────────────────────
   await page.getByRole("heading", { name: "Resource Allocation" }).waitFor({ state: "visible", timeout: 45000 });
-  await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+  await devFetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ game_id: gameId, allocations: [], override_player_id: humanId }),
@@ -144,7 +145,7 @@ async function completeMission1ByFailing(
   // After the last player in round 2, mission fails → resource_adjustment.
   const allTurns = [...mission1TurnOrder, ...mission1TurnOrder];
   for (const playerId of allTurns) {
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+    const resp = await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, override_player_id: playerId }),
@@ -179,7 +180,7 @@ test.describe("multi-mission flow", () => {
       await completeMission1ByFailing(page, gameId, token!, humanId!, aiIds);
 
       // Skip resource_adjustment: confirm_ready=true draws mission options and transitions
-      await fetch(`${SUPABASE_URL}/functions/v1/adjust-resources`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/adjust-resources`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, adjustments: [], confirm_ready: true, override_player_id: humanId }),
@@ -194,7 +195,7 @@ test.describe("multi-mission flow", () => {
       const mission2Key = pending_mission_options[0];
 
       // Select mission 2 — inserts a 2nd active_mission row
-      const selectResp = await fetch(`${SUPABASE_URL}/functions/v1/select-mission`, {
+      const selectResp = await devFetch(`${SUPABASE_URL}/functions/v1/select-mission`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, mission_key: mission2Key, override_player_id: humanId }),
@@ -264,7 +265,7 @@ test.describe("multi-mission flow", () => {
       await completeMission1ByFailing(page, gameId, token!, humanId!, aiIds);
 
       // Skip resource_adjustment
-      await fetch(`${SUPABASE_URL}/functions/v1/adjust-resources`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/adjust-resources`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, adjustments: [], confirm_ready: true, override_player_id: humanId }),
@@ -277,7 +278,7 @@ test.describe("multi-mission flow", () => {
       const [{ pending_mission_options }] = (await optionsResp.json()) as Array<{ pending_mission_options: string[] }>;
 
       // Select mission 2 — Bug 2 fix draws cards for all AIs here
-      const selectResp = await fetch(`${SUPABASE_URL}/functions/v1/select-mission`, {
+      const selectResp = await devFetch(`${SUPABASE_URL}/functions/v1/select-mission`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({

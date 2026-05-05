@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { devFetch } from "./_helpers";
 
 const SUPABASE_URL = "https://qpoakdiwmpaxvvzpqqdh.supabase.co";
 const ANON_KEY = "sb_publishable_Kz82SiJlbKrdJ0ZtAQPEkg_mm-0aapD";
@@ -119,7 +120,7 @@ async function advanceToPlayerTurnRound1(
     if (!handResp.ok) continue;
     const hand = (await handResp.json()) as Array<{ card_key: string }>;
     if (!hand.length) continue;
-    await fetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, card_key: hand[0].card_key, override_player_id: playerId }),
@@ -128,7 +129,7 @@ async function advanceToPlayerTurnRound1(
   }
 
   await page.getByRole("heading", { name: "Resource Allocation" }).waitFor({ state: "visible", timeout: 45000 });
-  await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+  await devFetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ game_id: gameId, allocations: [], override_player_id: humanId }),
@@ -157,7 +158,7 @@ async function driveRound(
   turnOrderIds: string[],
 ): Promise<void> {
   for (const playerId of turnOrderIds) {
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+    const resp = await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, override_player_id: playerId }),
@@ -207,7 +208,7 @@ test.describe("abort-mission", () => {
       expect(round2State.phase).toBe("player_turn");
 
       // Call abort-mission as human
-      const abortResp = await fetch(`${SUPABASE_URL}/functions/v1/abort-mission`, {
+      const abortResp = await devFetch(`${SUPABASE_URL}/functions/v1/abort-mission`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, override_player_id: humanId }),
@@ -249,7 +250,7 @@ test.describe("abort-mission", () => {
       await advanceToPlayerTurnRound1(page, gameId, token!, humanId!, aiIds);
 
       // Attempt abort in round 1 — must fail
-      const abortResp = await fetch(`${SUPABASE_URL}/functions/v1/abort-mission`, {
+      const abortResp = await devFetch(`${SUPABASE_URL}/functions/v1/abort-mission`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, override_player_id: humanId }),
@@ -281,7 +282,7 @@ test.describe("abort-mission", () => {
       await driveRound(page, gameId, token!, turnOrderIds);
 
       // Attempt abort as the first AI — must fail
-      const abortResp = await fetch(`${SUPABASE_URL}/functions/v1/abort-mission`, {
+      const abortResp = await devFetch(`${SUPABASE_URL}/functions/v1/abort-mission`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, override_player_id: turnOrderIds[0] }),

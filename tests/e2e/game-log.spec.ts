@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { devFetch } from "./_helpers";
 
 const SUPABASE_URL = "https://qpoakdiwmpaxvvzpqqdh.supabase.co";
 const ANON_KEY = "sb_publishable_Kz82SiJlbKrdJ0ZtAQPEkg_mm-0aapD";
@@ -109,7 +110,7 @@ async function drainVirusQueue(gameId: string, token: string, overridePlayerId?:
     if (row?.phase === "secret_targeting") {
       // secret-target uses .single() to resolve the caller — in dev mode all players
       // share the same user_id, so override_player_id is required to avoid a multi-row error.
-      await fetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, force_resolve: true, override_player_id: overridePlayerId }),
@@ -118,7 +119,7 @@ async function drainVirusQueue(gameId: string, token: string, overridePlayerId?:
       continue;
     }
     if (row?.phase !== "virus_resolution") break;
-    await fetch(`${SUPABASE_URL}/functions/v1/resolve-next-virus`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/resolve-next-virus`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId }),
@@ -189,7 +190,7 @@ test.describe("game_log metadata coverage", () => {
       );
       const hand = (await handResp.json()) as Array<{ id: string; card_key: string; card_type: string }>;
       if (!hand.length) continue;
-      await fetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, card_key: hand[0].card_key, override_player_id: playerId }),
@@ -199,7 +200,7 @@ test.describe("game_log metadata coverage", () => {
 
     // ── Resource Allocation (empty) ────────────────────────────────────────────
     await page.getByRole("heading", { name: "Resource Allocation" }).waitFor({ state: "visible", timeout: 15000 });
-    await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, allocations: [], override_player_id: humanId }),
@@ -219,7 +220,7 @@ test.describe("game_log metadata coverage", () => {
     firstAiId = turnOrderIds[0];
 
     // ── Round 1, player 1: discard → play card → end turn ─────────────────────
-    await fetch(`${SUPABASE_URL}/functions/v1/discard-cards`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/discard-cards`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, card_ids: [], override_player_id: firstAiId }),
@@ -234,7 +235,7 @@ test.describe("game_log metadata coverage", () => {
     const hand = (await handResp.json()) as Array<{ id: string; card_key: string; card_type: string }>;
     const progressCard = hand.find((c) => c.card_type === "progress");
     if (progressCard) {
-      const playResp = await fetch(`${SUPABASE_URL}/functions/v1/play-card`, {
+      const playResp = await devFetch(`${SUPABASE_URL}/functions/v1/play-card`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, card_id: progressCard.id, override_player_id: firstAiId }),
@@ -244,7 +245,7 @@ test.describe("game_log metadata coverage", () => {
     }
 
     // End player 1's turn
-    await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, override_player_id: firstAiId }),
@@ -253,7 +254,7 @@ test.describe("game_log metadata coverage", () => {
 
     // ── Round 1, players 2-N: end-play-phase only ──────────────────────────────
     for (const playerId of turnOrderIds.slice(1)) {
-      await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, override_player_id: playerId }),
@@ -263,7 +264,7 @@ test.describe("game_log metadata coverage", () => {
 
     // ── Round 2: all players end-play-phase — last player triggers mission_failed
     for (const playerId of turnOrderIds) {
-      await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, override_player_id: playerId }),
@@ -467,7 +468,7 @@ test.describe("game_log mission_transition ordering (CPU≥2 virus path)", () =>
       );
       const hand = (await handResp.json()) as Array<{ id: string; card_key: string; card_type: string }>;
       if (!hand.length) continue;
-      await fetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token2}` },
         body: JSON.stringify({ game_id: gameId2, card_key: hand[0].card_key, override_player_id: playerId }),
@@ -486,7 +487,7 @@ test.describe("game_log mission_transition ordering (CPU≥2 virus path)", () =>
     turnOrderIds2 = gameRow.turn_order_ids;
     const lastAiId = turnOrderIds2[turnOrderIds2.length - 1];
 
-    await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token2}` },
       body: JSON.stringify({
@@ -499,7 +500,7 @@ test.describe("game_log mission_transition ordering (CPU≥2 virus path)", () =>
 
     // ── Round 1: all players end-play-phase; drain viruses after each ────────────
     for (const playerId of turnOrderIds2) {
-      await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token2}` },
         body: JSON.stringify({ game_id: gameId2, override_player_id: playerId }),
@@ -512,7 +513,7 @@ test.describe("game_log mission_transition ordering (CPU≥2 virus path)", () =>
 
     // ── Round 2: same; last player triggers mission_failed + virus path ─────────
     for (const playerId of turnOrderIds2) {
-      await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token2}` },
         body: JSON.stringify({ game_id: gameId2, override_player_id: playerId }),

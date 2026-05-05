@@ -10,8 +10,8 @@ const corsHeaders = {
 // AI player reveals one card from their hand (kept in hand; just a public record).
 // When all AIs have revealed, advances to resource_allocation.
 // Body: { game_id, card_key, override_player_id?: string }
-// override_player_id is only honoured in the local Supabase CLI runtime (DENO_DEPLOYMENT_ID absent).
-// DENO_DEPLOYMENT_ID is always set in hosted Supabase, so the override path is never reached in production.
+// override_player_id is only honoured when the request Origin is localhost (dev mode).
+// Browser sends Origin automatically; Node.js test calls use devFetch() which adds it explicitly.
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
     if (!game) throw new Error("Game not found");
     if (game.phase !== "card_reveal") throw new Error("Not in card_reveal phase");
 
-    const callerPlayer = await resolvePlayer(admin, game_id, userId, override_player_id);
+    const callerPlayer = await resolvePlayer(req, admin, game_id, userId, override_player_id);
     if (callerPlayer.role === "human") throw new Error("Only AI players may reveal cards");
     if (callerPlayer.has_revealed_card) throw new Error("Already revealed a card this phase");
 
@@ -100,12 +100,15 @@ Deno.serve(async (req) => {
 });
 
 async function resolvePlayer(
+  req: Request,
   admin: ReturnType<typeof createClient>,
   game_id: string,
   userId: string,
   override_player_id?: string,
 ): Promise<any> {
-  if (override_player_id && !Deno.env.get("DENO_DEPLOYMENT_ID")) {
+  const origin = req.headers.get("origin") ?? "";
+  const isLocalhost = origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1");
+  if (override_player_id && isLocalhost) {
     const { data } = await admin
       .from("players").select("*")
       .eq("id", override_player_id).eq("game_id", game_id).single();

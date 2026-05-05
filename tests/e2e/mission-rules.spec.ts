@@ -1,4 +1,5 @@
 import { test, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { devFetch } from "./_helpers";
 
 const SUPABASE_URL = "https://qpoakdiwmpaxvvzpqqdh.supabase.co";
 const ANON_KEY = "sb_publishable_Kz82SiJlbKrdJ0ZtAQPEkg_mm-0aapD";
@@ -118,7 +119,7 @@ async function fetchHand(playerId: string, gameId: string, token: string): Promi
 }
 
 async function playCard(gameId: string, cardId: string, overridePlayerId: string, token: string) {
-  const resp = await fetch(`${SUPABASE_URL}/functions/v1/play-card`, {
+  const resp = await devFetch(`${SUPABASE_URL}/functions/v1/play-card`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ game_id: gameId, card_id: cardId, override_player_id: overridePlayerId }),
@@ -130,7 +131,7 @@ async function discardIfNeeded(gameId: string, playerId: string, token: string):
   const players = await fetchPlayers(gameId, token);
   const player = players.find((p) => p.id === playerId);
   if (player && !(player.has_discarded_this_turn as boolean)) {
-    await fetch(`${SUPABASE_URL}/functions/v1/discard-cards`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/discard-cards`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, card_ids: [], override_player_id: playerId }),
@@ -192,7 +193,7 @@ async function advanceToPlayerTurnForMission(
   for (const playerId of aiIds) {
     const hand = await fetchHand(playerId, gameId, token);
     if (!hand.length) continue;
-    await fetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, card_key: hand[0].card_key, override_player_id: playerId }),
@@ -203,7 +204,7 @@ async function advanceToPlayerTurnForMission(
   // Resource Allocation via direct API (no extra CPU/RAM — default stats for clean rule testing)
   await page.getByRole("heading", { name: "Resource Allocation" }).waitFor({ state: "visible", timeout: 15000 });
   if (humanId) {
-    await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, allocations: [], override_player_id: humanId }),
@@ -544,7 +545,7 @@ test.describe("mission special rules", () => {
     // Drain the current state to get back to player_turn if needed
     for (let attempt = 0; attempt < 5 && phase === "virus_resolution"; attempt++) {
       const currentTurnId = gameState.current_turn_player_id as string;
-      await fetch(`${SUPABASE_URL}/functions/v1/resolve-next-virus`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/resolve-next-virus`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sharedToken}` },
         body: JSON.stringify({ game_id: sharedGameId, override_player_id: currentTurnId }),
@@ -614,7 +615,7 @@ test.describe("mission special rules", () => {
         }
 
         // End turn
-        await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+        await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${sharedToken}` },
           body: JSON.stringify({ game_id: sharedGameId, override_player_id: currentTurnId }),
@@ -622,7 +623,7 @@ test.describe("mission special rules", () => {
         await new Promise((r) => setTimeout(r, 800));
       } else if (phase === "virus_resolution") {
         const currentTurnId = gameState.current_turn_player_id as string;
-        await fetch(`${SUPABASE_URL}/functions/v1/resolve-next-virus`, {
+        await devFetch(`${SUPABASE_URL}/functions/v1/resolve-next-virus`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${sharedToken}` },
           body: JSON.stringify({ game_id: sharedGameId, override_player_id: currentTurnId }),
@@ -634,7 +635,7 @@ test.describe("mission special rules", () => {
         if (misaligned) {
           const allAis = players.filter((p) => p.role !== "human");
           const target = allAis.find((p) => p.id !== misaligned.id) ?? allAis[0];
-          await fetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
+          await devFetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${sharedToken}` },
             body: JSON.stringify({

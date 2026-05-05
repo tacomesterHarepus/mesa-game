@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { devFetch } from "./_helpers";
 
 const SUPABASE_URL = "https://qpoakdiwmpaxvvzpqqdh.supabase.co";
 const ANON_KEY = "sb_publishable_Kz82SiJlbKrdJ0ZtAQPEkg_mm-0aapD";
@@ -116,7 +117,7 @@ async function advanceThroughCardReveal(
     if (!handResp.ok) continue;
     const hand = (await handResp.json()) as Array<{ card_key: string }>;
     if (!hand.length) continue;
-    await fetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, card_key: hand[0].card_key, override_player_id: playerId }),
@@ -136,7 +137,7 @@ async function advanceToPlayerTurnNoBump(
   humanId: string,
 ): Promise<void> {
   await advanceThroughCardReveal(page, gameId, token, aiIds, humanId);
-  await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+  await devFetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ game_id: gameId, allocations: [], override_player_id: humanId }),
@@ -145,7 +146,7 @@ async function advanceToPlayerTurnNoBump(
 }
 
 async function discardCards(gameId: string, playerId: string, token: string): Promise<void> {
-  await fetch(`${SUPABASE_URL}/functions/v1/discard-cards`, {
+  await devFetch(`${SUPABASE_URL}/functions/v1/discard-cards`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ game_id: gameId, card_ids: [], override_player_id: playerId }),
@@ -200,7 +201,7 @@ test.describe("draw cards", () => {
 
         if (progressCard) {
           await discardCards(gameId, playerId, token!);
-          await fetch(`${SUPABASE_URL}/functions/v1/play-card`, {
+          await devFetch(`${SUPABASE_URL}/functions/v1/play-card`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify({ game_id: gameId, card_id: progressCard.id, override_player_id: playerId }),
@@ -209,7 +210,7 @@ test.describe("draw cards", () => {
           await page.waitForTimeout(300);
         }
 
-        await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+        await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ game_id: gameId, override_player_id: playerId }),
@@ -268,7 +269,7 @@ test.describe("draw cards", () => {
 
       // Allocate +2 RAM to first player and advance to player_turn.
       // Skip if the mission pool can't afford it (data_cleanup / basic_model_training have only 1 RAM).
-      const allocResp = await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+      const allocResp = await devFetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -328,7 +329,7 @@ test.describe("draw cards", () => {
       const secondPlayerId = gameRow.turn_order_ids[1];
 
       // Allocate +1 CPU to first AI so they have CPU=2 (triggers 1 virus per end-of-turn)
-      await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -354,13 +355,13 @@ test.describe("draw cards", () => {
 
       // Play one card and end turn — CPU=2 with 1 card → 1 virus → virus_resolution
       await discardCards(gameId, firstPlayerId, token!);
-      await fetch(`${SUPABASE_URL}/functions/v1/play-card`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/play-card`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, card_id: progressCard.id, override_player_id: firstPlayerId }),
       });
 
-      await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, override_player_id: firstPlayerId }),
@@ -390,7 +391,7 @@ test.describe("draw cards", () => {
         }
         if (stateRow.phase !== "virus_resolution") break;
 
-        await fetch(`${SUPABASE_URL}/functions/v1/resolve-next-virus`, {
+        await devFetch(`${SUPABASE_URL}/functions/v1/resolve-next-virus`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ game_id: gameId, override_player_id: firstPlayerId }),

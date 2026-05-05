@@ -1,4 +1,5 @@
 import { test, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { devFetch } from "./_helpers";
 
 const SUPABASE_URL = "https://qpoakdiwmpaxvvzpqqdh.supabase.co";
 const ANON_KEY = "sb_publishable_Kz82SiJlbKrdJ0ZtAQPEkg_mm-0aapD";
@@ -138,7 +139,7 @@ async function advanceToPlayerTurn(page: Page, gameId: string): Promise<void> {
     );
     const hand = (await handResp.json()) as Array<{ card_key: string }>;
     if (!hand.length) continue;
-    await fetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, card_key: hand[0].card_key, override_player_id: playerId }),
@@ -150,7 +151,7 @@ async function advanceToPlayerTurn(page: Page, gameId: string): Promise<void> {
   if (humanId && aiIds.length >= 1) {
     // Grant +1 CPU to first AI (CPU=2 ensures virus generation)
     const allocations = [{ player_id: aiIds[0], cpu_delta: 1, ram_delta: 0 }];
-    await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, allocations, override_player_id: humanId }),
@@ -175,7 +176,7 @@ async function forceSecretTargetingPhase(
 
   // Step 1: end the play phase for the first AI (no card played, no viruses placed).
   // This transitions to virus_resolution phase with an empty queue.
-  await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+  await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ game_id: gameId, override_player_id: firstAiId }),
@@ -258,7 +259,7 @@ test.describe("secret targeting", () => {
     const firstMisaligned = misalignedIds[0] ?? aiIds[0];
     const targetId = aiIds.find((id) => id !== firstMisaligned) ?? aiIds[0];
 
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
+    const resp = await devFetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sharedToken}` },
       body: JSON.stringify({
@@ -277,7 +278,7 @@ test.describe("secret targeting", () => {
   test("secret-target rejects force_resolve when not in secret_targeting phase", async () => {
     const firstMisaligned = misalignedIds[0] ?? aiIds[0];
 
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
+    const resp = await devFetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sharedToken}` },
       body: JSON.stringify({
@@ -312,7 +313,7 @@ test.describe("secret targeting", () => {
       if (phase === "player_turn" || phase === "between_turns") {
         const currentTurnId = gameState.current_turn_player_id as string;
         // End the play phase for the current player
-        await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+        await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${sharedToken}` },
           body: JSON.stringify({ game_id: sharedGameId, override_player_id: currentTurnId }),
@@ -321,7 +322,7 @@ test.describe("secret targeting", () => {
       } else if (phase === "virus_resolution") {
         // Drain one virus card from the queue
         const currentTurnId = gameState.current_turn_player_id as string;
-        const resp = await fetch(`${SUPABASE_URL}/functions/v1/resolve-next-virus`, {
+        const resp = await devFetch(`${SUPABASE_URL}/functions/v1/resolve-next-virus`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${sharedToken}` },
           body: JSON.stringify({ game_id: sharedGameId, override_player_id: currentTurnId }),
@@ -360,7 +361,7 @@ test.describe("secret targeting", () => {
     const alignedId = aiIds.find((id) => !misalignedIds.includes(id));
     if (alignedId) {
       const targetId = aiIds.find((id) => id !== alignedId) ?? aiIds[0];
-      const badResp = await fetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
+      const badResp = await devFetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sharedToken}` },
         body: JSON.stringify({
@@ -377,7 +378,7 @@ test.describe("secret targeting", () => {
     const voterId = misalignedIds[0];
     const targetId = aiIds.find((id) => id !== voterId) ?? aiIds[0];
 
-    const voteResp = await fetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
+    const voteResp = await devFetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sharedToken}` },
       body: JSON.stringify({
@@ -393,7 +394,7 @@ test.describe("secret targeting", () => {
     // If there are multiple misaligned AIs, submit their votes too.
     for (let i = 1; i < misalignedIds.length; i++) {
       const vid = misalignedIds[i];
-      await fetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sharedToken}` },
         body: JSON.stringify({
@@ -431,7 +432,7 @@ test.describe("secret targeting", () => {
 
         if (phase === "player_turn" || phase === "between_turns") {
           const currentTurnId = gameState.current_turn_player_id as string;
-          await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+          await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${sharedToken}` },
             body: JSON.stringify({ game_id: sharedGameId, override_player_id: currentTurnId }),
@@ -439,7 +440,7 @@ test.describe("secret targeting", () => {
           await new Promise((r) => setTimeout(r, 800));
         } else if (phase === "virus_resolution") {
           const currentTurnId = gameState.current_turn_player_id as string;
-          const resp = await fetch(`${SUPABASE_URL}/functions/v1/resolve-next-virus`, {
+          const resp = await devFetch(`${SUPABASE_URL}/functions/v1/resolve-next-virus`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${sharedToken}` },
             body: JSON.stringify({ game_id: sharedGameId, override_player_id: currentTurnId }),
@@ -464,7 +465,7 @@ test.describe("secret targeting", () => {
 
     // Use any player's override to force-resolve
     const anyPlayerId = misalignedIds[0] ?? aiIds[0];
-    const forceResp = await fetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
+    const forceResp = await devFetch(`${SUPABASE_URL}/functions/v1/secret-target`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sharedToken}` },
       body: JSON.stringify({

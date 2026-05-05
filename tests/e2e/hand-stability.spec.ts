@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { devFetch } from "./_helpers";
 
 const SUPABASE_URL = "https://qpoakdiwmpaxvvzpqqdh.supabase.co";
 const ANON_KEY = "sb_publishable_Kz82SiJlbKrdJ0ZtAQPEkg_mm-0aapD";
@@ -115,7 +116,7 @@ async function advanceThroughCardReveal(
     if (!handResp.ok) continue;
     const hand = (await handResp.json()) as Array<{ card_key: string }>;
     if (!hand.length) continue;
-    await fetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, card_key: hand[0].card_key, override_player_id: playerId }),
@@ -154,7 +155,7 @@ async function advanceSingleAiTurn(
   token: string,
   playerId: string,
 ): Promise<"ok" | "skip"> {
-  await fetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+  await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ game_id: gameId, override_player_id: playerId }),
@@ -172,7 +173,7 @@ async function advanceSingleAiTurn(
     if (state.phase === "game_over") return "skip";
     if (state.phase === "secret_targeting") return "skip";
     if (state.phase === "virus_resolution") {
-      await fetch(`${SUPABASE_URL}/functions/v1/resolve-next-virus`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/resolve-next-virus`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, override_player_id: playerId }),
@@ -183,7 +184,7 @@ async function advanceSingleAiTurn(
 }
 
 async function discardCards(gameId: string, playerId: string, token: string): Promise<void> {
-  await fetch(`${SUPABASE_URL}/functions/v1/discard-cards`, {
+  await devFetch(`${SUPABASE_URL}/functions/v1/discard-cards`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ game_id: gameId, card_ids: [], override_player_id: playerId }),
@@ -219,7 +220,7 @@ test.describe("hand stability", () => {
       const turnOrder = gameRow.turn_order_ids;
       const firstPlayerId = turnOrder[0];
 
-      const allocResp = await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+      const allocResp = await devFetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -258,14 +259,14 @@ test.describe("hand stability", () => {
 
       // Play progress card via API
       await discardCards(gameId, firstPlayerId, token!);
-      await fetch(`${SUPABASE_URL}/functions/v1/play-card`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/play-card`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, card_id: progressCard.id, override_player_id: firstPlayerId }),
       });
 
       // Stage a card via API (place-virus moves it to pending_viruses)
-      await fetch(`${SUPABASE_URL}/functions/v1/place-virus`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/place-virus`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, card_id: stageCard.id, override_player_id: firstPlayerId }),
@@ -331,7 +332,7 @@ test.describe("hand stability", () => {
       await advanceThroughCardReveal(page, gameId, token!, aiIds, humanId!);
 
       // Zero-allocation: advance straight to player_turn without bumping stats
-      await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+      await devFetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ game_id: gameId, allocations: [], override_player_id: humanId }),

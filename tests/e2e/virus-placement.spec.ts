@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { devFetch } from "./_helpers";
 
 const SUPABASE_URL = "https://qpoakdiwmpaxvvzpqqdh.supabase.co";
 const ANON_KEY = "sb_publishable_Kz82SiJlbKrdJ0ZtAQPEkg_mm-0aapD";
@@ -133,7 +134,7 @@ async function advanceThroughCardReveal(
     if (!handResp.ok) continue;
     const hand = (await handResp.json()) as Array<{ card_key: string }>;
     if (!hand.length) continue;
-    await fetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, card_key: hand[0].card_key, override_player_id: playerId }),
@@ -172,7 +173,7 @@ test.describe("virus placement", () => {
       const firstPlayerId = gameRow.turn_order_ids[0];
 
       // Give first AI CPU=2 → 1 virus staging slot per turn
-      const allocResp = await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+      const allocResp = await devFetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({

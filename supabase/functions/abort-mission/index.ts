@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
     if (game.current_round !== 2) throw new Error("Abort only valid in round 2");
     if (!game.current_mission_id) throw new Error("No active mission");
 
-    const callerPlayer = await resolvePlayer(admin, game_id, userId, override_player_id);
+    const callerPlayer = await resolvePlayer(req, admin, game_id, userId, override_player_id);
     if (callerPlayer.role !== "human") throw new Error("Only humans can abort the mission");
 
     const { data: mission } = await admin
@@ -88,12 +88,15 @@ async function resetPlayersForNextMission(admin: any, game_id: string) {
 }
 
 async function resolvePlayer(
+  req: Request,
   admin: ReturnType<typeof createClient>,
   game_id: string,
   userId: string,
   override_player_id?: string,
 ): Promise<any> {
-  if (override_player_id && !Deno.env.get("DENO_DEPLOYMENT_ID")) {
+  const origin = req.headers.get("origin") ?? "";
+  const isLocalhost = origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1");
+  if (override_player_id && isLocalhost) {
     const { data } = await admin
       .from("players").select("*")
       .eq("id", override_player_id).eq("game_id", game_id).single();

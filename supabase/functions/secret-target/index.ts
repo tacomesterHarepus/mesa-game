@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
     if (!game) throw new Error("Game not found");
     if (game.phase !== "secret_targeting") throw new Error("Not in secret_targeting phase");
 
-    const callerPlayer = await resolvePlayer(admin, game_id, userId, override_player_id);
+    const callerPlayer = await resolvePlayer(req, admin, game_id, userId, override_player_id);
     const resolutionId: string = game.current_targeting_resolution_id;
     const cardKey: string = game.current_targeting_card_key;
     if (!resolutionId || !cardKey) throw new Error("No targeting resolution active");
@@ -203,12 +203,15 @@ async function applyTargetingEffect(
 // ── Player resolution (dev mode override) ─────────────────────────────────────
 
 async function resolvePlayer(
+  req: Request,
   admin: any,
   game_id: string,
   userId: string,
   override_player_id?: string,
 ): Promise<any> {
-  if (override_player_id && !Deno.env.get("DENO_DEPLOYMENT_ID")) {
+  const origin = req.headers.get("origin") ?? "";
+  const isLocalhost = origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1");
+  if (override_player_id && isLocalhost) {
     const { data } = await admin
       .from("players").select("*")
       .eq("id", override_player_id).eq("game_id", game_id).single();

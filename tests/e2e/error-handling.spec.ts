@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { devFetch } from "./_helpers";
 
 const SUPABASE_URL = "https://qpoakdiwmpaxvvzpqqdh.supabase.co";
 const ANON_KEY = "sb_publishable_Kz82SiJlbKrdJ0ZtAQPEkg_mm-0aapD";
@@ -116,7 +117,7 @@ async function advanceThroughCardReveal(
     if (!handResp.ok) continue;
     const hand = (await handResp.json()) as Array<{ card_key: string }>;
     if (!hand.length) continue;
-    await fetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
+    await devFetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ game_id: gameId, card_key: hand[0].card_key, override_player_id: playerId }),
@@ -135,7 +136,7 @@ async function advanceToPlayerTurn(
   humanId: string,
 ): Promise<void> {
   await advanceThroughCardReveal(page, gameId, token, aiIds, humanId);
-  await fetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+  await devFetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ game_id: gameId, allocations: [], override_player_id: humanId }),
@@ -185,7 +186,7 @@ test.describe("error handling", () => {
       expect(hand.length).toBeGreaterThan(0);
 
       // Call play-card as a player whose turn it is not — function must reject with 400
-      const resp = await fetch(`${SUPABASE_URL}/functions/v1/play-card`, {
+      const resp = await devFetch(`${SUPABASE_URL}/functions/v1/play-card`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
