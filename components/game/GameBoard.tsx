@@ -449,10 +449,15 @@ export function GameBoard({
     const pid = effectiveCurrentPlayer.id;
     // Optimistic update — close modal immediately before next poll
     setPlayers((prev) => prev.map((p) => (p.id === pid ? { ...p, role_revealed: true } : p)));
-    await invokeWithRetry("acknowledge-role", {
+    const { error } = await invokeWithRetry("acknowledge-role", {
       game_id: gameId,
       ...(devMode ? { override_player_id: pid } : {}),
     });
+    if (error) {
+      // Rollback optimistic update — poll will restore server state and modal will reappear
+      setPlayers((prev) => prev.map((p) => (p.id === pid ? { ...p, role_revealed: false } : p)));
+      console.error("acknowledge-role failed:", error);
+    }
   };
 
   // In game_over: expose all AI roles for CentralBoard chip reveal
