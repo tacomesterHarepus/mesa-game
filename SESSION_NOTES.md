@@ -1,9 +1,10 @@
 # Session Notes
 
 ## Current Phase
-**Wall layout migration shipped 2026-04-30 (5 commits 525cb26–commit5). SVG firewall wall at x=421–449, chip cluster x=0–420, action region bottom row. Canary 11/10/0. Next: density-pass items need fresh look under new layout (action region grew 40px, overlay anchors shifted), or other BACKLOG items.**
+**Role reveal modal loop — Option C fix shipped (3 commits 432c0fd, b58d217, cbd51c1). BLOCKER: MESA_ENVIRONMENT=production must be REMOVED from Supabase Dashboard → Project Settings → Edge Functions → Environment Variables before canary will pass. See below for full explanation.**
 
 Recent completed work:
+- **Role reveal modal loop — Option C fix (3 commits 432c0fd, b58d217, cbd51c1)** — Fix 1 (server): removed redundant `user_id !== userId` check from `acknowledge-role` override path. Fix 2 (client): `handleAcknowledge` now destructures `invokeWithRetry` return value and rolls back optimistic update on error. Fix 3 (gate architecture): switched `acknowledge-role` and `select-mission` from `MESA_ENVIRONMENT !== "production"` to request-origin check (`origin` header starts with `http://localhost`). Root cause of gate change: MESA_ENVIRONMENT=production was set in Supabase Dashboard as part of pre-deploy hygiene, which breaks all edge functions that use Fill Lobby (multiple players share same user_id → `.single()` on non-override path returns PGRST116). The rollback (Fix 2) made this latent 400 error immediately visible. **MANUAL ACTION REQUIRED: Remove MESA_ENVIRONMENT from Supabase Dashboard → Project Settings → Edge Functions → Environment Variables. A single Supabase project cannot distinguish dev vs prod callers via env var — origin header is the correct gate for browser-initiated calls, and Node.js test calls will use the override path once MESA_ENVIRONMENT is unset.** After removal, re-run canary to confirm 11/10/0. Also update the acknowledge-role row in the edge functions table to v3.
 - **Wall layout migration (5 commits 525cb26–commit5)** — SVG firewall wall (x=421–449, h=520) replaces the old CSS right-column layout. Chip cluster constrained to x=0–420. Action region extended 230→270px (top 658→618). All chip buttons, overlay anchors, and tracker bars relocated inside cluster area. SLOT_SIDES all "right" (card-reveal slots appear at chip right). VirusCardOverlay translate 220→95 (stays in cluster). WinnerBanner shifted +27 on all x coords (re-centered for 695px SVG). TrackerBars.tsx + TrackerBar.tsx deleted (orphaned after wall commit 2 absorbed them into TopBar). Test selector drift fixed (phase heading strict-mode → getByRole, Player Turn p-filter, dismissModal helper in 5 spec files). V2 screenshot verified: +/- buttons right edge at SVG x=422, wall left edge x=425, 3px gap, no clipping. Canary 11 pass / 10 conditional skip / 0 fail.
 - **Role reveal modal shipped 2026-04-29 (commits 24fc3cc–e10e935 + docs commit)** — Migration 016, acknowledge-role edge function, RoleRevealModal (3 variants), GameBoard wiring. Screenshots verified — all three themes confirmed.
 - **Density pass — player_turn (commits 453749d, ac72949, fabaa06, 7329767)** — mockup committed; staging banner removed (inline hint added); ActionRegion 200→230 / top 688→658; CentralBoard SVG 500→470; cards 110×120→120×150 (body restructured: type label 9pt, name 14pt, icon 28pt); chip CPU/RAM tracks bumped (11×11, 7×11, labels 11pt); contribution row 13pt bold no dots; TrackerBars 14pt bold bars 8px; MissionPanel req text 13pt bold. Build clean. Canary 12/23 pass, 11 skip, 0 fail. See LATEST_TASK.md for full details.
@@ -39,7 +40,7 @@ Recent completed work:
 - **Phase 10.5 (commits 80c85b8–1c51e00)** — Seat order + turn rotation. Migration 011, start-game v8, advanceTurnOrPhase rotation, GameBoard sort, DevModeOverlay red ring, turn-order.spec.ts. All deployed. ⚠️ Abandon any dev games created before this deploy.
 - **Post-10.5 bugs (commits c760b46, 8edfe02, d2089a2)** — Three Mission 2+ bugs fixed. Bug 3 (c760b46): GameBoard poll now fetches game first then queries active_mission by `current_mission_id` to avoid PGRST116 on mission 2+; CLAUDE.md updated with active_mission history-table clarification. Bug 2 (8edfe02): `select-mission` now refills all AI hands to RAM before transitioning to card_reveal; select-mission deployed as v4. Bug 1 (d2089a2): MissionSelection UI now shows allocation pool and fail timer penalty per card. Regression tests in `tests/e2e/multi-mission.spec.ts`. ⚠️ mission-rules.spec.ts has a pre-existing flaky timeout (test 28, `advanceToPlayerTurnForMission` 15s limit) — passes on isolated re-run, not a regression.
 
-Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2026-04-25.md` (Bug A cold-start, Bug B hand ordering; appendix: Bug A revisit — FunctionsHttpError 5xx path; Phase 10.5 investigation), `DIAGNOSIS_2026-04-26.md` (three post-Phase-10.5 playtest bugs — all pre-existing, all Mission 2+; **appendix: missing discard step — full investigation + implementation plan**), `DIAGNOSIS_2026-04-27.md` (Item 1: mission_transition gap on CPU≥2 virus path — Approach A implemented; **Item 2: board redesign E2E test inventory — 5 pending-phase, 9 non-ui canary, 9 pre-existing; see for skip/unskip plan per phase task**).
+Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2026-04-25.md` (Bug A cold-start, Bug B hand ordering; appendix: Bug A revisit — FunctionsHttpError 5xx path; Phase 10.5 investigation), `DIAGNOSIS_2026-04-26.md` (three post-Phase-10.5 playtest bugs — all pre-existing, all Mission 2+; **appendix: missing discard step — full investigation + implementation plan**), `DIAGNOSIS_2026-04-27.md` (Item 1: mission_transition gap on CPU≥2 virus path — Approach A implemented; **Item 2: board redesign E2E test inventory — 5 pending-phase, 9 non-ui canary, 9 pre-existing; see for skip/unskip plan per phase task**), `DIAGNOSIS_2026-05-05-role-reveal-loop.md` (role reveal modal infinite loop in dev mode — root cause: handleAcknowledge discards invokeWithRetry error; edge function returns 400 "Dev override denied" when switching to a player with a different user_id; fix: Option B = remove redundant user_id check in resolvePlayer override path, OR Option A = handle error in handleAcknowledge).
 
 ## Build Status
 
@@ -88,7 +89,8 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 |----------|---------|-------|
 | start-game | v8 | Removes double shuffle; turn_order null for humans; turnOrderIds = seat order |
 | adjust-resources | v3 | override_player_id support |
-| select-mission | v4 | override_player_id support; refills all AI hands before card_reveal |
+| acknowledge-role | v3 | v2: removed redundant user_id check from override path. v3: switched gate to request origin (localhost only) — MESA_ENVIRONMENT gate broken for single-project setup |
+| select-mission | v5 | v4: override_player_id support + refills AI hands. v5: switched gate to request origin (localhost only) — same MESA_ENVIRONMENT fix |
 | reveal-card | v4 | override_player_id support |
 | allocate-resources | v7 | Draws cards + resets has_discarded_this_turn for first player |
 | discard-cards | v2 | Phase 11: typed `discard` log with metadata |
@@ -102,9 +104,11 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 
 ## Dev Mode
 
-`override_player_id` accepted by all edge functions, gated by `MESA_ENVIRONMENT !== "production"` AND caller owns all players in the game.
+`override_player_id` accepted by all edge functions, gated by:
+- `acknowledge-role` and `select-mission`: request `origin` header starts with `http://localhost` (browser-based, works regardless of MESA_ENVIRONMENT)
+- All other functions: `MESA_ENVIRONMENT !== "production"` (old gate — requires MESA_ENVIRONMENT to be UNSET in Supabase)
 
-**TODO (manual):** Set `MESA_ENVIRONMENT=production` in Supabase Dashboard → Project Settings → Edge Functions → Environment Variables.
+**IMPORTANT — MESA_ENVIRONMENT must NOT be set in Supabase edge function env vars.** A single Supabase project serves both localhost dev and Vercel prod. Setting MESA_ENVIRONMENT=production in Supabase blocks override_player_id for ALL edge functions regardless of caller, breaking Fill Lobby dev tests. If it's currently set: Supabase Dashboard → Project Settings → Edge Functions → Environment Variables → delete MESA_ENVIRONMENT. The production safety for acknowledge-role and select-mission is now handled via request origin. The remaining functions have the same posture as before MESA_ENVIRONMENT was ever set.
 
 ## Key Architecture Notes
 

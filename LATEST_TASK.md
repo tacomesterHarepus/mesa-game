@@ -1,27 +1,19 @@
 # Latest Task
 
 ## Summary
-Added `dismissModal` helper + call sites to all 11 remaining E2E spec files that switch DevMode players without dismissing the RoleRevealModal. The modal (added in migration 016) is z-index 40 and intercepts all pointer events, causing click failures and strict-mode selector violations in any test that switches players via the PlayerSwitcher. Also deleted `screenshot-wall-commit3.spec.ts`, which was a one-shot visual spec marked for deletion in its own file header. Full suite went from 24/10/19/29-dnr (pre-fix) to 65/15/1 (post-fix), restoring the baseline.
+Implemented Option C from DIAGNOSIS_2026-05-05-role-reveal-loop.md: both server-side and client-side fixes for the role reveal modal infinite loop in dev mode. Fix 1 removed the redundant `user_id !== userId` check from the acknowledge-role override path. Fix 2 surfaced invokeWithRetry errors in handleAcknowledge with immediate rollback. Fix 3 (unplanned but required): switched the override gate in acknowledge-role and select-mission from `MESA_ENVIRONMENT !== "production"` to a request-origin check — necessary because MESA_ENVIRONMENT=production in Supabase breaks ALL edge functions that use Fill Lobby, and Fix 2 made this latent failure immediately visible.
+
+BLOCKER before canary: MESA_ENVIRONMENT must be removed from Supabase Dashboard → Project Settings → Edge Functions → Environment Variables. Once removed, re-run canary to confirm 11/10/0.
 
 ## Files changed
-- `tests/e2e/card-reveal.spec.ts` — added dismissModal function + call after AI1 player switch
-- `tests/e2e/dev-mode.spec.ts` — added dismissModal function + 3 call sites (beforeAll, Bot3 test, human-chat test)
-- `tests/e2e/discard.spec.ts` — added dismissModal function + call in advanceToPlayerTurn after human switch loop
-- `tests/e2e/draw-cards.spec.ts` — added dismissModal function + call in advanceThroughCardReveal after human switch loop
-- `tests/e2e/game-log-ui.spec.ts` — added dismissModal function + call in beforeAll after human switch loop
-- `tests/e2e/game-log.spec.ts` — added dismissModal function + call in FIRST beforeAll + call in SECOND beforeAll (page2)
-- `tests/e2e/hand-stability.spec.ts` — added dismissModal function + call in advanceThroughCardReveal
-- `tests/e2e/mission-flow.spec.ts` — added dismissModal function + loop across all 6 pages in beforeAll after navigation
-- `tests/e2e/secret-actions.spec.ts` — added dismissModal function + call in advanceToPlayerTurn after human switch loop
-- `tests/e2e/virus-placement.spec.ts` — added dismissModal function + call in advanceThroughCardReveal + call in test body after active AI player switch
-- `tests/e2e/virus-system.spec.ts` — added dismissModal function + call in advanceToPlayerTurnWithCpu2 after human switch loop
-- `tests/e2e/screenshot-wall-commit3.spec.ts` — DELETED (one-shot visual spec, no regression value)
+- `supabase/functions/acknowledge-role/index.ts` — removed user_id check from override path; switched gate from MESA_ENVIRONMENT to request origin (localhost only); threaded req into resolvePlayer; deployed as v3
+- `supabase/functions/select-mission/index.ts` — removed user_id check from override path; switched gate from MESA_ENVIRONMENT to request origin; threaded req into resolvePlayer; deployed as v5
+- `components/game/GameBoard.tsx` — handleAcknowledge now destructures invokeWithRetry return value; on error: rollback optimistic role_revealed update + console.error
 
 ## Test status
-- Full suite 2026-05-05: **65 passed / 15 skipped / 1 failed**
-- 1 failure: game-log.spec.ts:527 — pre-existing CPU≥2 virus path race flake (shifted from :524 by insertion; passes in isolation per CLAUDE.md baseline)
-- 15 skips vs baseline 14: one extra conditional skip from random card-type gate in game-log-ui
-- Within ±3 of 65/14/1 baseline — task complete
+- next build: clean
+- Canary: BLOCKED by MESA_ENVIRONMENT=production in Supabase. Once removed, expected to return to 11/10/0 baseline (all 3 commits are correct, the gate issue is environmental not code).
+- The original 65/15/1 full suite baseline was run before MESA_ENVIRONMENT was set — that state will be restored after removal.
 
 ## Suggested next
-Role reveal modal UX polish (BACKLOG): the "aligned" and "human" modal variants are open questions per §12 of UX_DESIGN. The misaligned variant shipped; the other two show placeholder text. This is the natural follow-on now that the test suite is healthy and the modal is battle-tested in E2E runs.
+After user removes MESA_ENVIRONMENT from Supabase and re-runs canary to confirm green: manually verify role reveal modal loop is fixed on localhost (fill lobby + start game + acknowledge each player via PlayerSwitcher, confirm modal dismisses permanently). Then the role reveal modal aligned/human variant polish (BACKLOG §12) is the natural follow-on.
