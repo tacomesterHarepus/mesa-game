@@ -10,8 +10,8 @@ const corsHeaders = {
 // AI player reveals one card from their hand (kept in hand; just a public record).
 // When all AIs have revealed, advances to resource_allocation.
 // Body: { game_id, card_key, override_player_id?: string }
-// override_player_id is only honoured in non-production environments when the
-// caller owns every player in the game (dev mode single-user testing).
+// override_player_id is only honoured in the local Supabase CLI runtime (DENO_DEPLOYMENT_ID absent).
+// DENO_DEPLOYMENT_ID is always set in hosted Supabase, so the override path is never reached in production.
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -105,12 +105,11 @@ async function resolvePlayer(
   userId: string,
   override_player_id?: string,
 ): Promise<any> {
-  if (override_player_id && Deno.env.get("MESA_ENVIRONMENT") !== "production") {
+  if (override_player_id && !Deno.env.get("DENO_DEPLOYMENT_ID")) {
     const { data } = await admin
       .from("players").select("*")
       .eq("id", override_player_id).eq("game_id", game_id).single();
     if (!data) throw new Error("Override player not found in game");
-    if (data.user_id !== userId) throw new Error("Dev override denied");
     return data;
   }
 

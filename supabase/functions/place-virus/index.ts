@@ -73,12 +73,11 @@ async function resolvePlayer(
   userId: string,
   override_player_id?: string,
 ): Promise<any> {
-  if (override_player_id && Deno.env.get("MESA_ENVIRONMENT") !== "production") {
+  if (override_player_id && !Deno.env.get("DENO_DEPLOYMENT_ID")) {
     const { data } = await admin
       .from("players").select("*")
       .eq("id", override_player_id).eq("game_id", game_id).single();
     if (!data) throw new Error("Override player not found in game");
-    if (data.user_id !== userId) throw new Error("Dev override denied");
     return data;
   }
 
