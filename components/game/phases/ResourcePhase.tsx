@@ -43,40 +43,37 @@ export function ResourcePhase({
   async function doSubmit() {
     setError(null);
     setLoading(true);
-
-    if (mode === "adjustment") {
-      const adjustments = aiPlayers
-        .filter((p) => (pendingCpu[p.id] ?? 0) !== 0 || (pendingRam[p.id] ?? 0) !== 0)
-        .map((p) => ({
+    try {
+      if (mode === "adjustment") {
+        const adjustments = aiPlayers
+          .filter((p) => (pendingCpu[p.id] ?? 0) !== 0 || (pendingRam[p.id] ?? 0) !== 0)
+          .map((p) => ({
+            player_id: p.id,
+            cpu: p.cpu - (pendingCpu[p.id] ?? 0),
+            ram: p.ram - (pendingRam[p.id] ?? 0),
+          }));
+        const { error: fnError } = await invokeWithRetry("adjust-resources", {
+          game_id: gameId,
+          adjustments,
+          confirm_ready: true,
+          override_player_id: overridePlayerId,
+        });
+        if (fnError) setError(fnError.message);
+      } else {
+        const allocations = aiPlayers.map((p) => ({
           player_id: p.id,
-          cpu: p.cpu - (pendingCpu[p.id] ?? 0),
-          ram: p.ram - (pendingRam[p.id] ?? 0),
+          cpu_delta: pendingCpu[p.id] ?? 0,
+          ram_delta: pendingRam[p.id] ?? 0,
         }));
-      const { error: fnError } = await invokeWithRetry("adjust-resources", {
-        game_id: gameId,
-        adjustments,
-        confirm_ready: true,
-        override_player_id: overridePlayerId,
-      });
-      if (fnError) {
-        setError(fnError.message);
-        setLoading(false);
+        const { error: fnError } = await invokeWithRetry("allocate-resources", {
+          game_id: gameId,
+          allocations,
+          override_player_id: overridePlayerId,
+        });
+        if (fnError) setError(fnError.message);
       }
-    } else {
-      const allocations = aiPlayers.map((p) => ({
-        player_id: p.id,
-        cpu_delta: pendingCpu[p.id] ?? 0,
-        ram_delta: pendingRam[p.id] ?? 0,
-      }));
-      const { error: fnError } = await invokeWithRetry("allocate-resources", {
-        game_id: gameId,
-        allocations,
-        override_player_id: overridePlayerId,
-      });
-      if (fnError) {
-        setError(fnError.message);
-        setLoading(false);
-      }
+    } finally {
+      setLoading(false);
     }
   }
 

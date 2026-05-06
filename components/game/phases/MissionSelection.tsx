@@ -21,11 +21,12 @@ export function MissionSelection({ gameId, currentPlayer, overridePlayerId, sele
     if (!selected) return;
     setError(null);
     setLoading(true);
-    const { error: fnError } = await invokeWithRetry("select-mission", {
-      game_id: gameId, mission_key: selected, override_player_id: overridePlayerId,
-    });
-    if (fnError) {
-      setError(fnError.message);
+    try {
+      const { error: fnError } = await invokeWithRetry("select-mission", {
+        game_id: gameId, mission_key: selected, override_player_id: overridePlayerId,
+      });
+      if (fnError) setError(fnError.message);
+    } finally {
       setLoading(false);
     }
   }
