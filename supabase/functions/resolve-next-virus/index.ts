@@ -61,6 +61,15 @@ Deno.serve(async (req) => {
     await admin.from("virus_resolution_queue")
       .update({ resolved: true }).eq("id", nextCard.id);
 
+    // Return resolved card to deck cycle (same pattern as discard-cards/play-card)
+    const { data: deckCard } = await admin
+      .from("deck_cards").select("id")
+      .eq("game_id", game_id).eq("card_key", nextCard.card_key).eq("status", "drawn")
+      .limit(1).maybeSingle();
+    if (deckCard) {
+      await admin.from("deck_cards").update({ status: "discarded" }).eq("id", deckCard.id);
+    }
+
     // Apply the virus effect
     const pauseForTargeting = await applyVirusEffect(admin, game, nextCard);
 
@@ -323,20 +332,7 @@ function cardDisplayName(key: string): string {
 async function refillVirusPool(admin: any, game_id: string) {
   const { count: poolCount } = await admin.from("virus_pool")
     .select("*", { count: "exact", head: true }).eq("game_id", game_id);
-  const currentCount = poolCount ?? 0;
-
-  // Trim excess if pool somehow exceeded 4
-  if (currentCount > 4) {
-    const { data: excess } = await admin.from("virus_pool")
-      .select("id").eq("game_id", game_id)
-      .order("position", { ascending: false }).limit(currentCount - 4);
-    if (excess && excess.length > 0) {
-      await admin.from("virus_pool").delete().in("id", excess.map((r: any) => r.id));
-    }
-    return;
-  }
-
-  const needed = 4 - currentCount;
+  const needed = 4 - (poolCount ?? 0);
   if (needed <= 0) return;
 
   let drawCards = await drawFromDeck(admin, game_id, needed);

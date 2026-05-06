@@ -1,7 +1,7 @@
 # Session Notes
 
 ## Current Phase
-**Playtest bugs fixed (2026-05-05 solo session). Ready for friends playtest.**
+**Virus pool / pending_viruses lifecycle bugs fixed (2026-05-06).** Three coordinated changes: (1) reverted v9 trim in refillVirusPool (wrong fix — masked accumulation, destroyed cards); (2) end-play-phase now deletes pending_viruses BEFORE inserting into pool and throws on delete error (eliminates stale-row accumulation on retry); (3) resolve-next-virus now marks each resolved queue card as status='discarded' in deck_cards (fixes permanent card loss from cascade resolution).
 
 Recent completed work:
 - **Playtest bug fixes (commits 62b92e6, 4aa44ca, f6f23d0)** — Bug 2: PlayerTurn.tsx now renders virus card effect descriptions in hand (8pt #cca0a0, only when card_type==="virus" and cardDef.description exists). Bug 1/1.5: CentralBoard.tsx RAM track moved from right column to left column stacked below CPU (x=10/40+i*7); button y-coords updated with isTop conditional (CPU: y=43/55, RAM: y=62/73). Bug 4b/4a: resolve-next-virus — data_drift/model_corruption/validation_failure logs now inside if(mission) with else-branch; refillVirusPool trims excess rows if pool > 4. resolve-next-virus deployed as **v9**. Canary: 9 fail / 12 did not run — all pre-existing webServer cold-start infrastructure failures at fillLobby; zero tests executed game logic. Not related to code changes (visual-only changes to PlayerTurn/CentralBoard; log/trim to resolve-next-virus). DIAGNOSIS_2026-05-05-playtest-bugs.md covers root causes.
@@ -79,7 +79,7 @@ Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2
 | Role reveal modal | **DONE** | Migration 016 (role_revealed), acknowledge-role edge function v1, RoleRevealModal (misaligned/aligned/human themes), GameBoard wiring (optimistic acknowledge). UX_DESIGN §7.11 + §12 updated. Build clean. Screenshots verified. |
 | Wall layout migration | **DONE** | SVG firewall wall x=421–449, chip cluster x=0–420, action region extended. SLOT_SIDES all "right". VirusCardOverlay 220→95. WinnerBanner +27 shift. TrackerBar/TrackerBars deleted. Test selector drift fixed (phase headings, Player Turn p-filter, dismissModal in 5 specs). 5 commits 525cb26–commit5. Canary 11/10/0. |
 
-**Test suite — 2026-05-06 post-playtest-bug-fix run: 64 pass / 13 skip / 2 fail / 2 did not run (11.9 min). Two failures: (1) game-log:535 — pre-existing CPU≥2 race flake (same test as baseline :524, line shifted by prior dismissModal insertion); (2) virus-system:251 "no manual Resolve button — auto-resolve is active" — NEW. Times out at advanceToPlayerTurnWithCpu2 waiting 15s for Player Turn phase after virus resolution. Possibly connected to resolve-next-virus v9 extra DB operations adding marginal latency; possibly a timing flake (not previously in flake list). 2 "did not run" = serial cascade from game-log:535. Needs human review before updating baseline. Previous misclassification corrected: 2026-05-05 overnight test failures were NOT a pre-existing cold-start flake — they were caused by a stale Next.js dev server (PID 190212, started 2026-05-05 22:50, left running from prior session) occupying port 3000 and returning 404 for all routes; reuseExistingServer:true reused the broken process. Killed stale PID before this run.**
+**Test suite baseline: 65/15/1. Known flakes (pass in isolation, can fail in full-suite run): (1) game-log:535 — CPU≥2 path race, same test as prior :524; (2) virus-system:251 "no manual Resolve button — auto-resolve is active" — timing flake, 4/5 isolated pass rate; beforeAll times out waiting 15s for player_turn UI update after allocate-resources; confirmed NOT caused by resolve-next-virus v9 or any of the 2026-05-06 playtest-bug commits; (3) mission-rules test 28 — 15s timeout flake, passes on isolated re-run. 2026-05-06 full-suite run observed 64/13/2/2dnr — both failures are known flakes. Previous misclassification corrected: 2026-05-05 overnight test failures were NOT a cold-start flake — caused by stale Next.js dev server (PID 190212, started 22:50, left running) occupying port 3000 and returning 404; reuseExistingServer:true reused it. Stale PID killed before the 2026-05-06 run.**
 
 ---
 
@@ -97,9 +97,9 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 | allocate-resources | v8 | v8: switched gate to request origin; draws cards + resets has_discarded_this_turn for first player |
 | discard-cards | v3 | v3: switched gate to request origin; Phase 11: typed `discard` log with metadata |
 | place-virus | v2 | v2: switched gate to request origin; moves card from hands → pending_viruses |
-| end-play-phase | v15 | v15: switched gate to request origin; virus_pull phase: sets phase=virus_pull + pending_pull_count |
+| end-play-phase | v16 | v16: delete pending_viruses BEFORE insert into pool, throw on delete error |
 | pull-viruses | v2 | v2: switched gate to request origin; pulls pending_pull_count cards from pool into queue |
-| resolve-next-virus | v9 | v9: data_drift/model_corruption/validation_failure logs guarded by if(mission); refillVirusPool trims excess if pool>4 |
+| resolve-next-virus | v10 | v10: reverted v9 trim (wrong fix); resolved queue cards now marked status='discarded' in deck_cards |
 | secret-target | v3 | v3: switched gate to request origin; Phase 11: typed targeting_resolved log |
 | play-card | v8 | v8: switched gate to request origin; Phase 11: typed card_played log with mission_progress snapshot |
 | abort-mission | v3 | v3: switched gate to request origin; Phase 11: typed mission_aborted log |

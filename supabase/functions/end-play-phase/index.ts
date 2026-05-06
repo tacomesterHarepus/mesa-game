@@ -141,6 +141,11 @@ Deno.serve(async (req) => {
       .from("pending_viruses").select("*").eq("game_id", game_id);
 
     if (pending && pending.length > 0) {
+      // Delete first — throw on error so stale rows cannot accumulate on retry
+      const { error: deleteError } = await admin
+        .from("pending_viruses").delete().eq("game_id", game_id);
+      if (deleteError) throw deleteError;
+
       const { data: maxPoolRow } = await admin.from("virus_pool")
         .select("position").eq("game_id", game_id)
         .order("position", { ascending: false }).limit(1).maybeSingle();
@@ -155,7 +160,6 @@ Deno.serve(async (req) => {
           position: startPos + i,
         }))
       );
-      await admin.from("pending_viruses").delete().eq("game_id", game_id);
     }
 
     const virusesPlacedLog: GameLogInsert<"viruses_placed"> = {
