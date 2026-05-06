@@ -50,7 +50,19 @@ export function SecretTargeting({
   const [error, setError] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number>(60);
   const [voterIds, setVoterIds] = useState<string[]>([]);
+  const [selectedTargetId, setSelectedTargetId] = useState<string>(aiTargets[0]?.id ?? "");
   const deadlineTriggeredRef = useRef(false);
+
+  // Sync nomination from chip-click in CentralBoard
+  useEffect(() => {
+    if (localNominationId) setSelectedTargetId(localNominationId);
+  }, [localNominationId]);
+
+  // Reset on player switch (dev mode PlayerSwitcher)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setSelectedTargetId(aiTargets[0]?.id ?? "");
+  }, [currentPlayer?.id]);
 
   // Countdown from targeting_deadline
   useEffect(() => {
@@ -105,12 +117,12 @@ export function SecretTargeting({
   }, [gameId, isMisaligned, resolutionId]);
 
   async function handleVote() {
-    if (!localNominationId) return;
+    if (!selectedTargetId) return;
     setError(null);
     setLoading(true);
     const { data, error: fnError } = await invokeWithRetry("secret-target", {
       game_id: gameId,
-      target_player_id: localNominationId,
+      target_player_id: selectedTargetId,
       override_player_id: overridePlayerId,
     });
     if (fnError) {
@@ -132,7 +144,7 @@ export function SecretTargeting({
   const cardLabel = cardKey ? (TARGETING_CARD_LABELS[cardKey] ?? cardKey.replace(/_/g, " ")) : "Unknown";
   const cardEffect = cardKey ? (TARGETING_CARD_EFFECTS[cardKey] ?? "") : "";
   const timerColor = secondsLeft <= 10 ? "#a32d2d" : "#555";
-  const nominatedPlayer = localNominationId ? aiTargets.find((p) => p.id === localNominationId) : null;
+  const nominatedPlayer = selectedTargetId ? aiTargets.find((p) => p.id === selectedTargetId) : null;
   const alreadyVoted = currentPlayer ? voterIds.includes(currentPlayer.id) : false;
 
   return (
@@ -221,7 +233,7 @@ export function SecretTargeting({
             ) : (
               <button
                 onClick={handleVote}
-                disabled={loading || !localNominationId}
+                disabled={loading || !selectedTargetId}
                 style={{
                   alignSelf: "flex-start",
                   fontFamily: "monospace",
