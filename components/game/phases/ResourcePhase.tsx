@@ -29,6 +29,7 @@ export function ResourcePhase({
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showUnallocatedWarning, setShowUnallocatedWarning] = useState(false);
   const isHuman = currentPlayer?.role === "human";
 
   const def = mode === "allocation" ? (MISSION_MAP[missionKey ?? ""] ?? null) : null;
@@ -36,8 +37,10 @@ export function ResourcePhase({
   const ramPool = def?.allocation.ram ?? 0;
   const totalPendingCpu = Object.values(pendingCpu).reduce((a, b) => a + b, 0);
   const totalPendingRam = Object.values(pendingRam).reduce((a, b) => a + b, 0);
+  const remainingCpu = cpuPool - totalPendingCpu;
+  const remainingRam = ramPool - totalPendingRam;
 
-  async function handleConfirm() {
+  async function doSubmit() {
     setError(null);
     setLoading(true);
 
@@ -75,6 +78,14 @@ export function ResourcePhase({
         setLoading(false);
       }
     }
+  }
+
+  function handleConfirm() {
+    if (mode === "allocation" && (remainingCpu > 0 || remainingRam > 0)) {
+      setShowUnallocatedWarning(true);
+      return;
+    }
+    doSubmit();
   }
 
   return (
@@ -119,6 +130,52 @@ export function ResourcePhase({
             ? "Waiting for the host to proceed…"
             : "Waiting for resource allocation…"}
         </p>
+      )}
+
+      {showUnallocatedWarning && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.65)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              background: "#111",
+              border: "1px solid #444",
+              borderRadius: 4,
+              padding: "20px 24px",
+              maxWidth: 360,
+              fontFamily: "monospace",
+            }}
+          >
+            <p style={{ fontSize: 12, color: "#ccc", marginBottom: 16, lineHeight: 1.6 }}>
+              Continue without allocating remaining resources?{" "}
+              {remainingCpu > 0 && `Pool CPU: ${remainingCpu}`}
+              {remainingCpu > 0 && remainingRam > 0 && ", "}
+              {remainingRam > 0 && `Pool RAM: ${remainingRam}`}
+              {" "}will be discarded.
+            </p>
+            <div style={{ display: "flex", gap: 12 }}>
+              <Button onClick={() => setShowUnallocatedWarning(false)}>
+                Allocate more
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowUnallocatedWarning(false);
+                  doSubmit();
+                }}
+              >
+                Continue anyway
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
