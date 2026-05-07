@@ -1,7 +1,48 @@
 # Session Notes
 
+## Current Investigation (2026-05-07) — RESOLVED (bb569c6, merge 542ba4c, deployed Supabase v12)
+
+**Virus pool stays at 2 after Cascading Failure — root cause confirmed via DB inspection. No code applied yet.**
+
+User observed: pool sequence 4 → 5 (pending added) → 4 (pull-viruses) → Cascading Failure pulls 2 → pool=2 → phase transitions away → pool stays at 2 permanently (expected 4).
+
+**Confirmed game state (game `1f988535-6f6c-4bc7-b3f3-b4a8e11980ad`):**
+- `phase=card_reveal`, `core_progress=4`, `virus_pool count=2`
+- `virus_resolution_queue`: 7 rows `resolved=TRUE` (all at position=0), PLUS 2 rows `resolved=FALSE` at positions 1 and 2 — both `compute` progress cards with `cascaded_from` CF id `6989de7d`
+- `deck_cards`: discarded=33, drawn=21, in_deck=6 — deck NOT exhausted; partial-fill bug is NOT the cause
+
+**Root cause: TOCTOU race condition in resolve-next-virus**
+
+The auto-resolve timer in `VirusResolution.tsx` fires concurrent calls to `resolve-next-virus`. The race window exists between when CF is marked `resolved=true` (line ~61) and when `applyVirusEffect` finishes inserting cascade cards + deleting pool cards (~line 74). This window spans two async awaits (deck_cards SELECT + UPDATE).
+
+Exact sequence in the buggy call:
+1. **Call A** (triggered by CF card appearing): marks CF `resolved=true` → awaits deck_cards SELECT → awaits deck_cards UPDATE → starts `applyVirusEffect` → CF handler: reads pool (still has cards, not yet deleted) → awaits queue MAX → awaits INSERT cascade_1, cascade_2 → awaits DELETE 2 pool rows → pool goes 4→2
+2. **Call B** (concurrent, fired during deck_cards await window in Call A): CF is `resolved=true`, no other queue row exists yet → `nextCard = null` → enters `!nextCard` branch → calls `refillVirusPool`: pool still has 4 rows (CF deletion hasn't happened yet) → `needed=0` → **refill exits immediately doing nothing** → calls `advanceTurnOrPhase` → logs `mission_transition` → phase transitions away from `virus_resolution`
+3. Call A resumes: `applyVirusEffect` deletes 2 cards from pool (pool now 2) and inserts cascade_1, cascade_2 into queue — **phase is no longer `virus_resolution`**, cascade cards will never be resolved, pool stays at 2 permanently
+
+**Game log proof (timestamps from game `1f988535`):**
+- `virus_effect` — "Cascading Failure! 2 more viruses triggered." at `16:51:35.877`
+- `mission_transition` — "Transitioning to next mission." at `16:51:36.084` — **207ms after CF resolved**
+- `mission_transition` is only logged by `advanceTurnOrPhase` from the `!nextCard` branch. It fired while the cascade cards were not yet inserted (or not yet in the DB). This proves the concurrent call won the TOCTOU race.
+
+**Double-fire evidence (Bot5 turn, same game):**
+- Two `virus_no_effect` entries ("validation in virus pool") at `16:50:56.609` and `16:50:56.632` — 23ms apart
+- Confirms concurrent invocations of resolve-next-virus are happening routinely
+
+**Why refillVirusPool doesn't fix pool=2 in this race:**
+The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 pool rows. At that moment pool=4, so `needed = 4 - 4 = 0` and `refillVirusPool` returns immediately without inserting anything. The CF pool deletion happens AFTER the concurrent call completes, leaving pool at 2 with no refill triggered.
+
+**Fix area (not yet applied):** The race window in `resolve-next-virus/index.ts` — the deck_cards UPDATE block (lines ~65–72) between mark-resolved and `applyVirusEffect` is the vulnerability. The correct fix must either (a) use a DB-level lock/transaction to make mark-resolved + applyVirusEffect atomic, or (b) re-fetch and re-check the queue state immediately before entering the `!nextCard` branch (idempotency check), or (c) move the deck_cards UPDATE to after `applyVirusEffect` to close the window.
+
+**Secondary partial-fill bug still present (unrelated to this race):**
+`refillVirusPool` only reshuffles discards if `drawCards.length === 0` — skips reshuffle when partial draw is possible. This is a separate bug triggered when deck is nearly exhausted. Not the cause of the current pool=2 observation.
+
+---
+
 ## Current Phase
-**Three BACKLOG fixes shipped 2026-05-06 (commits 3923191, a483937, 3fd186b).** (1) ResourcePhase.tsx: confirmation dialog when Start Mission clicked with unallocated pool resources — shows remaining CPU/RAM, "Allocate more" / "Continue anyway". (2) SecretTargeting.tsx: selectedTargetId resets on dev-mode player switch via useEffect keyed on currentPlayer?.id; chip-click nominations still sync via separate effect. (3) MissionSelection.tsx + ResourcePhase.tsx: try/finally ensures setLoading(false) fires on both success and error paths. Build clean. All three BACKLOG entries marked resolved.
+**TOCTOU race in resolve-next-virus fixed and deployed v11 (2026-05-07, commits bb569c6 + merge 542ba4c).** Cascading Failure now correctly inserts cascade cards before marking CF resolved, and the empty-queue branch re-verifies before advancing. Pool returns to 4 after resolution. Awaiting user manual verification in a fresh dev game.
+
+Previous: **Three BACKLOG fixes shipped 2026-05-06 (commits 3923191, a483937, 3fd186b).** (1) ResourcePhase.tsx: confirmation dialog when Start Mission clicked with unallocated pool resources — shows remaining CPU/RAM, "Allocate more" / "Continue anyway". (2) SecretTargeting.tsx: selectedTargetId resets on dev-mode player switch via useEffect keyed on currentPlayer?.id; chip-click nominations still sync via separate effect. (3) MissionSelection.tsx + ResourcePhase.tsx: try/finally ensures setLoading(false) fires on both success and error paths. Build clean. All three BACKLOG entries marked resolved.
 
 Previous: **Virus pool / pending_viruses lifecycle bugs fixed (2026-05-06).** Three coordinated changes: (1) reverted v9 trim in refillVirusPool (wrong fix — masked accumulation, destroyed cards); (2) end-play-phase now deletes pending_viruses BEFORE inserting into pool and throws on delete error (eliminates stale-row accumulation on retry); (3) resolve-next-virus now marks each resolved queue card as status='discarded' in deck_cards (fixes permanent card loss from cascade resolution).
 
@@ -101,7 +142,7 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 | place-virus | v2 | v2: switched gate to request origin; moves card from hands → pending_viruses |
 | end-play-phase | v16 | v16: delete pending_viruses BEFORE insert into pool, throw on delete error |
 | pull-viruses | v2 | v2: switched gate to request origin; pulls pending_pull_count cards from pool into queue |
-| resolve-next-virus | v10 | v10: reverted v9 trim (wrong fix); resolved queue cards now marked status='discarded' in deck_cards |
+| resolve-next-virus | v11 | v11: TOCTOU race fix — applyVirusEffect runs before mark-resolved for cascading_failure; idempotency guard re-fetches queue before !nextCard branch (Supabase internal version 12) |
 | secret-target | v3 | v3: switched gate to request origin; Phase 11: typed targeting_resolved log |
 | play-card | v8 | v8: switched gate to request origin; Phase 11: typed card_played log with mission_progress snapshot |
 | abort-mission | v3 | v3: switched gate to request origin; Phase 11: typed mission_aborted log |
