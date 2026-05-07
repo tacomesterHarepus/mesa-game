@@ -46,9 +46,21 @@ Deno.serve(async (req) => {
       .order("position").limit(1).maybeSingle();
 
     if (!nextCard) {
-      // Queue empty — refill pool and advance turn.
-      // Read pending_mission_outcome before refill so advanceTurnOrPhase can emit
-      // mission_transition; it is cleared atomically inside advanceTurnOrPhase.
+      // Idempotency guard: re-fetch to confirm queue is truly empty before advancing.
+      // Defends against TOCTOU race where cascading_failure is being processed concurrently
+      // and its cascade cards have not yet been written to the queue.
+      const { data: queueCheck } = await admin
+        .from("virus_resolution_queue").select("id")
+        .eq("game_id", game_id).eq("resolved", false)
+        .limit(1).maybeSingle();
+      if (queueCheck) {
+        console.log(`[resolve-next-virus] stale empty-queue — unresolved card ${queueCheck.id} found on re-fetch, exiting`);
+        return new Response(JSON.stringify({ success: true, skipped: "stale_empty_check" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Queue confirmed empty — refill pool and advance turn.
       await refillVirusPool(admin, game_id);
       const { data: freshGame } = await admin.from("games").select("*").eq("id", game_id).single();
       const missionResolved = !freshGame.current_mission_id;
@@ -57,7 +69,13 @@ Deno.serve(async (req) => {
       return await advanceTurnOrPhase(admin, freshGame, fakeCurrentPlayer, missionResolved, pendingOutcome ?? undefined);
     }
 
-    // Mark resolved first to prevent double-resolution
+    // For cascading_failure: apply effect BEFORE marking resolved so cascade cards are in
+    // the queue before any concurrent call can observe CF as resolved with no cascade rows.
+    // For all other cards: mark resolved first to prevent double-application of effects.
+    if (nextCard.card_key === "cascading_failure") {
+      await applyVirusEffect(admin, game, nextCard);
+    }
+
     await admin.from("virus_resolution_queue")
       .update({ resolved: true }).eq("id", nextCard.id);
 
@@ -70,8 +88,11 @@ Deno.serve(async (req) => {
       await admin.from("deck_cards").update({ status: "discarded" }).eq("id", deckCard.id);
     }
 
-    // Apply the virus effect
-    const pauseForTargeting = await applyVirusEffect(admin, game, nextCard);
+    // Apply effect for all non-CF cards (CF already applied above)
+    let pauseForTargeting = false;
+    if (nextCard.card_key !== "cascading_failure") {
+      pauseForTargeting = await applyVirusEffect(admin, game, nextCard);
+    }
 
     if (pauseForTargeting) {
       // Secret targeting phase takes over — virus resolution resumes after (Phase 8)
