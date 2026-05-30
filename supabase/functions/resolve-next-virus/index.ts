@@ -370,12 +370,21 @@ async function refillVirusPool(admin: any, game_id: string) {
     .order("position", { ascending: false }).limit(1).maybeSingle();
   const startPos = (maxPoolRow?.position ?? -1) + 1;
 
-  await admin.from("virus_pool").insert(
+  const { error: insertError } = await admin.from("virus_pool").insert(
     drawCards.map((card: any, i: number) => ({
       game_id, card_key: card.card_key, card_type: card.card_type,
       position: startPos + i,
     }))
   );
+  if (insertError) {
+    if ((insertError as any).code === "23505") {
+      // Unique-constraint violation: a concurrent call already refilled the pool.
+      // Treat as success — do not mark deck cards drawn (the other call did it).
+      console.log("[refillVirusPool] unique-constraint violation — concurrent refill detected, exiting");
+      return;
+    }
+    throw insertError;
+  }
   await admin.from("deck_cards").update({ status: "drawn" })
     .in("id", drawCards.map((c: any) => c.id));
 }
