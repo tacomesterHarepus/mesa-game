@@ -54,7 +54,7 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 - **Bug 5+8 — RESOLVED** (v13 UNIQUE constraint on virus_pool + v14 CAS guard closes the double-refill and double-advance races that caused display drift). Caveat: double-CF application race (two concurrent calls both reading a CF card as resolved=false) is a separate, uncharacterized backlog item — not fixed by v14.
 - **Bug 6 — RESOLVED** (v14 CAS guard's no-op snapshot check removes the source of AUTO-RESOLVE FAILED; no freeze observed in playtest).
 - **Bug 4 — RESOLVED** (commit a483937, playtest-confirmed). Caveat: in dev mode, switching to a Misaligned AI without first clicking a nomination chip defaults selectedTargetId to the first AI — minor UX gap, optional polish only.
-- **Bug 3 — OPEN** ("×? cards" hand-stack: literal `?` never wired, isTop guard limits display to top two chips; proper fix needs server-side hand_count column due to RLS. MEDIUM).
+- **Bug 3 — RESOLVED** (removed by design — hand-stack visual and `×? cards` label deleted from AIChipGroup entirely; hand size intentionally not displayed; UX_DESIGN §5.3 updated).
 
 **Double-CF application race (separate from above):** Backlogged. See BACKLOG.md and DIAGNOSIS_2026-05-30.md §VERIFICATION for characterization.
 

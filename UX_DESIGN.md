@@ -149,8 +149,7 @@ Same on bottom edge.
 - The seat number resets per mission (turn order). Color matches the chip border tint.
 - Below the label: player name in sans-serif 14pt
 - Below the name: CPU track + RAM track (filled/empty squares — see 5.2)
-- Below CPU/RAM: hand stack (face-down cards × count)
-- Below hand: contribution counters `⚙ N · ▣ N · ◆ N` inline
+- Below CPU/RAM: contribution counters `⚙ N · ▣ N · ◆ N` inline
 - Below chip body: reveal slot during card_reveal and resource_allocation phases
 
 ### 5.2 Resource tracks (CPU and RAM)
@@ -165,9 +164,7 @@ RAM track: 7 squares of `6×10`, gap 1px. Same fill rules. Like CPU, this is an 
 
 ### 5.3 Hand stack visualization
 
-Face-down stack to the left of the resource tracks. 3-4 small `14×10` rounded rectangles offset by 2px each, with a `×N cards` label.
-
-Actual count visible to the chip's owner only. Other players see only the stack count, not card details.
+**Removed by design.** The hand-stack visual (face-down card rects + `×? cards` label) has been removed from the chip. Hand size is not displayed to other players. Rationale: CPU governs how many cards can be played per turn, which is the strategically meaningful stat and is already visible on the chip. Hand count is weak information — it fluctuates with draw/discard cycles and reveals little about intent. Displaying a placeholder `?` was confusing; wiring a real count requires a server-side column due to RLS on `hands`. Removed in commit 387120f–(Bug 3 fix commit) rather than implemented.
 
 ### 5.4 Active state
 

@@ -457,16 +457,6 @@ function AIChipGroup({
           );
         })}
 
-        {/* Hand stack — only fits in top chips (bottom chips' RAM track reaches y=87/90) */}
-        {isTop && (
-          <>
-            <rect x="4"  y="74" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" strokeWidth="0.5" rx="1" />
-            <rect x="2"  y="76" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" strokeWidth="0.5" rx="1" />
-            <rect x="0"  y="78" width="14" height="10" fill="#0c1410" stroke="#3a5a4a" strokeWidth="0.5" rx="1" />
-            <text x="22" y="86" fontFamily="monospace" fontSize="9" fill="#9cb4a4">×? cards</text>
-          </>
-        )}
-
         {/* Resource [-]/[+] buttons — rendered outside chip body to the right */}
         {showButtons && resourceChip && (
           <g>
