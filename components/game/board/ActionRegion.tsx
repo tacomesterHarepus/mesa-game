@@ -11,6 +11,7 @@ export function ActionRegion({ children, phase, isActivePlayer, currentTurnPlaye
   const isActionPhase =
     phase === "player_turn" ||
     phase === "between_turns" ||
+    phase === "abort_vote" ||
     phase === "virus_pull" ||
     phase === "mission_selection" ||
     phase === "resource_adjustment" ||
@@ -49,6 +50,10 @@ export function ActionRegion({ children, phase, isActivePlayer, currentTurnPlaye
       ? isActivePlayer
         ? "▸ YOUR ACTION REQUIRED · NOMINATE A TARGET"
         : "// MISALIGNED AIs ARE TARGETING…"
+      : phase === "abort_vote"
+      ? isActivePlayer
+        ? "▸ YOUR ACTION REQUIRED · VOTE TO ABORT"
+        : "// HUMANS VOTING ON ABORT…"
       : phase === "game_over"
       ? "PHASE · GAME OVER"
       : showAmber
@@ -59,7 +64,7 @@ export function ActionRegion({ children, phase, isActivePlayer, currentTurnPlaye
 
   const headerColor =
     showAmber ? "#d4a017" :
-    (phase === "virus_resolution" || phase === "secret_targeting" || phase === "game_over") ? "#a32d2d" :
+    (phase === "virus_resolution" || phase === "secret_targeting" || phase === "abort_vote" || phase === "game_over") ? "#a32d2d" :
     "#555";
 
   return (

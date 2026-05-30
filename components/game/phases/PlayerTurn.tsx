@@ -25,6 +25,8 @@ interface Props {
   round: number;
   overridePlayerId?: string;
   activeMission?: ActiveMissionState | null;
+  isLastTurnOfRound2?: boolean;
+  abortFlagPending?: boolean;
 }
 
 const CARD_VISUAL: Record<string, { bg: string; border: string; header: string; icon: string; color: string }> = {
@@ -229,7 +231,7 @@ function CardStackGroup({
   );
 }
 
-export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, round, overridePlayerId, activeMission }: Props) {
+export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, round, overridePlayerId, activeMission, isLastTurnOfRound2 = false, abortFlagPending = false }: Props) {
   const isMyTurn = currentPlayer?.id === currentTurnPlayer?.id;
   const isAI = currentPlayer?.role !== "human" && currentPlayer !== null;
   const isHuman = currentPlayer?.role === "human";
@@ -246,9 +248,8 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
   const [endLoading, setEndLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [abortConfirming, setAbortConfirming] = useState(false);
-  const [abortLoading, setAbortLoading] = useState(false);
-  const [abortError, setAbortError] = useState<string | null>(null);
+  const [flagLoading, setFlagLoading] = useState(false);
+  const [flagError, setFlagError] = useState<string | null>(null);
 
   // Reset turn-local state when the active player changes
   useEffect(() => {
@@ -259,8 +260,7 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
     setSelectedCardKey(null);
     setStagedCardIds(new Set());
     setError(null);
-    setAbortConfirming(false);
-    setAbortError(null);
+    setFlagError(null);
   }, [currentTurnPlayer?.id]);
 
   // Sync discard state from server (bidirectional: true and false both reflected)
@@ -357,19 +357,15 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
     setSelectedCardKey(null);
   }
 
-  async function handleAbortMission() {
-    setAbortError(null);
-    setAbortLoading(true);
-    const { data, error: fnError } = await invokeWithRetry("abort-mission", {
+  async function handleFlagAbort() {
+    setFlagError(null);
+    setFlagLoading(true);
+    const { data, error: fnError } = await invokeWithRetry("flag-abort", {
       game_id: gameId, override_player_id: overridePlayerId,
     });
-    if (fnError) {
-      setAbortError(fnError.message);
-    } else if (data?.error) {
-      setAbortError(data.error);
-    }
-    setAbortLoading(false);
-    setAbortConfirming(false);
+    if (fnError) setFlagError(fnError.message);
+    else if (data?.error) setFlagError(data.error);
+    setFlagLoading(false);
   }
 
   async function handleEndTurn() {
@@ -549,12 +545,11 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
             </p>
           </div>
 
-          {/* Abort (human, round 2 only) */}
-          {isHuman && round === 2 && (
+          {/* Flag abort (human, round 2 only, suppressed on last turn) */}
+          {isHuman && round === 2 && !isLastTurnOfRound2 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {!abortConfirming ? (
-                <button
-                  onClick={() => setAbortConfirming(true)}
+              {abortFlagPending ? (
+                <div
                   style={{
                     padding: "9px 14px",
                     background: "#0c0c0c",
@@ -563,71 +558,36 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
                     fontFamily: "monospace",
                     fontSize: 10,
                     color: "#a32d2d",
-                    cursor: "pointer",
+                    letterSpacing: 1,
+                  }}
+                >
+                  ABORT FLAGGED — vote opens after this turn
+                </div>
+              ) : (
+                <button
+                  onClick={handleFlagAbort}
+                  disabled={flagLoading}
+                  data-testid="flag-abort-btn"
+                  style={{
+                    padding: "9px 14px",
+                    background: "#0c0c0c",
+                    border: "1px solid #5a3a3a",
+                    borderRadius: 2,
+                    fontFamily: "monospace",
+                    fontSize: 10,
+                    color: "#a32d2d",
+                    cursor: flagLoading ? "default" : "pointer",
+                    opacity: flagLoading ? 0.6 : 1,
                     letterSpacing: 1,
                     textAlign: "left" as const,
                   }}
                 >
-                  ABORT MISSION
+                  {flagLoading ? "…" : "FLAG ABORT"}
                 </button>
-              ) : (
-                <div
-                  style={{
-                    padding: "10px 14px",
-                    background: "#0c0c0c",
-                    border: "1px solid #5a3a3a",
-                    borderRadius: 2,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                  }}
-                >
-                  <p style={{ fontFamily: "monospace", fontSize: 9, color: "#a32d2d", margin: 0 }}>
-                    Abort mission? Normal fail penalty applies (Escape Timer increases).
-                  </p>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button
-                      onClick={handleAbortMission}
-                      disabled={abortLoading}
-                      style={{
-                        flex: 1,
-                        padding: "7px 10px",
-                        background: "#1a0808",
-                        border: "1px solid #a32d2d",
-                        borderRadius: 2,
-                        fontFamily: "monospace",
-                        fontSize: 10,
-                        color: "#a32d2d",
-                        cursor: abortLoading ? "default" : "pointer",
-                        opacity: abortLoading ? 0.6 : 1,
-                        letterSpacing: 1,
-                      }}
-                    >
-                      {abortLoading ? "..." : "CONFIRM ABORT"}
-                    </button>
-                    <button
-                      onClick={() => setAbortConfirming(false)}
-                      style={{
-                        flex: 1,
-                        padding: "7px 10px",
-                        background: "#0c0c0c",
-                        border: "1px solid #222",
-                        borderRadius: 2,
-                        fontFamily: "monospace",
-                        fontSize: 10,
-                        color: "#444",
-                        cursor: "pointer",
-                        letterSpacing: 1,
-                      }}
-                    >
-                      CANCEL
-                    </button>
-                  </div>
-                </div>
               )}
-              {abortError && (
+              {flagError && (
                 <p style={{ fontFamily: "monospace", fontSize: 10, color: "#a32d2d", margin: 0 }}>
-                  {abortError}
+                  {flagError}
                 </p>
               )}
             </div>

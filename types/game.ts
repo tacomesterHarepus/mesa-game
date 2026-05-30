@@ -9,6 +9,7 @@ export type Phase =
   | 'virus_resolution'
   | 'secret_targeting'
   | 'between_turns'
+  | 'abort_vote'
   | 'mission_resolution'
   | 'game_over'
 
@@ -30,6 +31,9 @@ export interface Game {
   targeting_deadline: string | null
   current_targeting_resolution_id: string | null
   current_targeting_card_key: string | null
+  abort_vote_deadline: string | null
+  abort_flag_pending: boolean
+  abort_flag_player_id: string | null
   winner: Winner
   host_user_id: string
   created_at: string

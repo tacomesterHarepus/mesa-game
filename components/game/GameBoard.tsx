@@ -9,6 +9,7 @@ import { PlayerTurn } from "./phases/PlayerTurn";
 import { VirusPull } from "./phases/VirusPull";
 import { VirusResolution } from "./phases/VirusResolution";
 import { SecretTargeting } from "./phases/SecretTargeting";
+import { AbortVote } from "./phases/AbortVote";
 import { GameOver } from "./phases/GameOver";
 import { DevModeOverlay } from "./DevModeOverlay";
 import { RoleRevealModal } from "./RoleRevealModal";
@@ -667,7 +668,11 @@ export function GameBoard({
           />
         );
       case "player_turn":
-      case "between_turns":
+      case "between_turns": {
+        const isLastTurnOfRound2 =
+          game.current_round === 2 &&
+          !!game.turn_order_ids?.length &&
+          game.turn_order_ids[game.turn_order_ids.length - 1] === game.current_turn_player_id;
         return (
           <PlayerTurn
             gameId={gameId}
@@ -677,8 +682,11 @@ export function GameBoard({
             round={mission?.round ?? 1}
             overridePlayerId={overridePlayerId}
             activeMission={mission}
+            isLastTurnOfRound2={isLastTurnOfRound2}
+            abortFlagPending={game.abort_flag_pending ?? false}
           />
         );
+      }
       case "virus_pull":
         return (
           <VirusPull
@@ -697,6 +705,16 @@ export function GameBoard({
             overridePlayerId={overridePlayerId}
             currentCard={virusQueue[0] ?? null}
             remaining={virusQueue.length}
+          />
+        );
+      case "abort_vote":
+        return (
+          <AbortVote
+            gameId={gameId}
+            currentPlayer={effectiveCurrentPlayer as import("@/types/game").Player | null}
+            players={sortedPlayers as unknown as import("@/types/game").Player[]}
+            overridePlayerId={overridePlayerId}
+            abortVoteDeadline={game.abort_vote_deadline ?? null}
           />
         );
       case "secret_targeting":
@@ -836,7 +854,9 @@ export function GameBoard({
               effectiveCurrentPlayer.role !== "human" &&
               !effectiveCurrentPlayer.has_revealed_card) ||
             (game.phase === "secret_targeting" &&
-              effectiveCurrentPlayer?.role === "misaligned_ai")
+              effectiveCurrentPlayer?.role === "misaligned_ai") ||
+            (game.phase === "abort_vote" &&
+              effectiveCurrentPlayer?.role === "human")
           }
           currentTurnPlayerName={currentTurnPlayer?.display_name ?? undefined}
         >
