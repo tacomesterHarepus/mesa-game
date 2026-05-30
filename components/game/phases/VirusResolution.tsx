@@ -48,9 +48,10 @@ export function VirusResolution({ gameId, overridePlayerId, currentCard, remaini
   // the 500ms empty-queue timer cancels naturally when the first card arrives.
   useEffect(() => {
     setAutoResolveError(null);
-    resolveInFlightRef.current = false;
 
     if (currentCard) {
+      // New card — safe to reset the in-flight guard for this card's 2s resolve call.
+      resolveInFlightRef.current = false;
       // Restart pacing bar for this card
       setBarWidth(0);
       const barTimer = setTimeout(() => setBarWidth(100), 50);
@@ -75,7 +76,10 @@ export function VirusResolution({ gameId, overridePlayerId, currentCard, remaini
         clearTimeout(resolveTimer);
       };
     } else {
-      // Empty queue — call resolve-next-virus to advance turn (short delay to debounce)
+      // Empty queue — only schedule the advance call if no 2s resolve call is in-flight.
+      // Do NOT reset resolveInFlightRef here: the 2s call may still be completing its
+      // phase transition, and resetting would allow a concurrent advance call to race it.
+      if (resolveInFlightRef.current) return;
       const advanceTimer = setTimeout(async () => {
         if (resolveInFlightRef.current) return;
         resolveInFlightRef.current = true;
