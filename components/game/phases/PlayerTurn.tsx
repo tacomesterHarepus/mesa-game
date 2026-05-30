@@ -117,7 +117,7 @@ function CardStackGroup({
   const typeLabel = first.card_type === "progress" ? "PROGRESS" : "VIRUS";
 
   return (
-    <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 3, flexShrink: 0 }}>
+    <div data-card-key={cardKey} style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 3, flexShrink: 0 }}>
       <div style={{ position: "relative", width: 120, height: 150 }}>
         {/* Shadow cards behind the main card */}
         {Array.from({ length: shadows }, (_, i) => (
@@ -140,6 +140,7 @@ function CardStackGroup({
         {/* Main card (button) */}
         <button
           onClick={!disabled ? onClick : undefined}
+          aria-disabled={disabled ? "true" : undefined}
           style={{
             position: "absolute",
             top: 0,
@@ -287,8 +288,10 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
       : [];
 
   const computeBlocked =
-    activeMission?.mission_key === "dataset_integration" &&
-    (activeMission.compute_contributed ?? 0) >= (activeMission.data_contributed ?? 0) * 2;
+    (activeMission?.mission_key === "dataset_integration" &&
+      (activeMission.compute_contributed ?? 0) >= (activeMission.data_contributed ?? 0) * 2) ||
+    (activeMission?.mission_key === "dataset_preparation" &&
+      (activeMission.data_contributed ?? 0) < 4);
 
   // Click-to-increment: each click adds one more card from the stack to discard selection,
   // wrapping back to 0 when at max (stack size or total-discard limit of 3).
@@ -474,10 +477,12 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
               </div>
             </div>
 
-            {/* Dataset Integration compute-slot hint */}
+            {/* Compute-blocked hint — message varies by mission rule */}
             {hasDiscarded && computeBlocked && (
               <span style={{ fontFamily: "monospace", fontSize: 9, color: "#666", letterSpacing: 1 }}>
-                Play Data to unlock Compute slots.
+                {activeMission?.mission_key === "dataset_preparation"
+                  ? "All 4 Data must be contributed before Compute can be played."
+                  : "Play Data to unlock Compute slots."}
               </span>
             )}
 

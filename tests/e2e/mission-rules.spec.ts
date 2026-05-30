@@ -140,6 +140,20 @@ async function discardIfNeeded(gameId: string, playerId: string, token: string):
   }
 }
 
+// End current player's turn and poll until phase returns to player_turn.
+async function endTurnViaAPI(gameId: string, playerId: string, token: string): Promise<void> {
+  await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ game_id: gameId, override_player_id: playerId }),
+  });
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    const state = await fetchGame(gameId, token);
+    if (state.phase === "player_turn") return;
+  }
+}
+
 // Advances past mission_selection and card_reveal to player_turn, selecting a specific mission if offered.
 // Returns the selected mission_key, or null if the desired mission wasn't available.
 async function advanceToPlayerTurnForMission(
@@ -351,6 +365,88 @@ test.describe("mission special rules", () => {
 
     const result = await playCard(sharedGameId, computeCard.id, currentTurnId, sharedToken);
     expect(result.error).toContain("Compute cannot be played until all 4 Data");
+  });
+
+  // ── Test 4b: dataset_preparation UI — Compute aria-disabled before 4 Data, enabled after ──
+
+  test("dataset_preparation: Compute card visually disabled in UI until 4 Data contributed", async () => {
+    if (missionKey !== "dataset_preparation") { test.skip(); return; }
+
+    const initMission = await fetchActiveMission(sharedGameId, sharedToken);
+    if ((initMission?.data_contributed as number) >= 4) { test.skip(); return; }
+
+    const initGame = await fetchGame(sharedGameId, sharedToken);
+    if (initGame.phase !== "player_turn") { test.skip(); return; }
+    const initTurnId = initGame.current_turn_player_id as string;
+    if (!initTurnId) { test.skip(); return; }
+
+    const initHand = await fetchHand(initTurnId, sharedGameId, sharedToken);
+    if (!initHand.some((c) => c.card_key === "compute" && c.card_type === "progress")) {
+      test.skip(); return;
+    }
+
+    // Ensure player is in play phase (post-discard)
+    await discardIfNeeded(sharedGameId, initTurnId, sharedToken);
+    await sharedPage.waitForTimeout(400);
+
+    // Switch UI to current player
+    const switcher = sharedPage.locator(".fixed.top-7");
+    await switcher.locator(`[data-player-id="${initTurnId}"]`).click();
+    await sharedPage.waitForTimeout(400);
+    await dismissModal(sharedPage);
+
+    // PART 1: Compute card must be aria-disabled="true" while data_contributed < 4
+    await expect(
+      sharedPage.locator('[data-card-key="compute"] button[aria-disabled="true"]').first()
+    ).toBeAttached({ timeout: 5000 });
+
+    // PART 2: Contribute Data cards across turns until data_contributed >= 4 (up to 10 turns)
+    let dataReached = false;
+    for (let attempt = 0; attempt < 10 && !dataReached; attempt++) {
+      const state = await fetchGame(sharedGameId, sharedToken);
+      if (state.phase !== "player_turn") {
+        await new Promise((r) => setTimeout(r, 1000));
+        continue;
+      }
+      const turnId = state.current_turn_player_id as string;
+      if (!turnId) break;
+
+      await discardIfNeeded(sharedGameId, turnId, sharedToken);
+      const playerHand = await fetchHand(turnId, sharedGameId, sharedToken);
+      const dataCard = playerHand.find((c) => c.card_key === "data" && c.card_type === "progress");
+      if (dataCard) {
+        await playCard(sharedGameId, dataCard.id, turnId, sharedToken);
+        const mission = await fetchActiveMission(sharedGameId, sharedToken);
+        if ((mission?.data_contributed as number) >= 4) { dataReached = true; break; }
+      }
+      await endTurnViaAPI(sharedGameId, turnId, sharedToken);
+    }
+
+    if (!dataReached) { test.skip(); return; }
+
+    // PART 3: Compute card must NOT be aria-disabled now that data_contributed >= 4
+    const finalState = await fetchGame(sharedGameId, sharedToken);
+    if (finalState.phase !== "player_turn") { test.skip(); return; }
+    const finalTurnId = finalState.current_turn_player_id as string;
+    if (!finalTurnId) { test.skip(); return; }
+
+    await discardIfNeeded(sharedGameId, finalTurnId, sharedToken);
+    await sharedPage.waitForTimeout(400);
+
+    const finalHand = await fetchHand(finalTurnId, sharedGameId, sharedToken);
+    if (!finalHand.some((c) => c.card_key === "compute" && c.card_type === "progress")) {
+      test.skip(); return; // current player has no Compute to display
+    }
+
+    await switcher.locator(`[data-player-id="${finalTurnId}"]`).click();
+    await sharedPage.waitForTimeout(500);
+    await dismissModal(sharedPage);
+
+    // Compute card group is present but button is NOT aria-disabled
+    await expect(sharedPage.locator('[data-card-key="compute"]').first()).toBeAttached({ timeout: 5000 });
+    await expect(
+      sharedPage.locator('[data-card-key="compute"] button[aria-disabled="true"]')
+    ).toHaveCount(0, { timeout: 5000 });
   });
 
   // ── Test 5: dataset_integration blocks Compute when no slots available ────────
