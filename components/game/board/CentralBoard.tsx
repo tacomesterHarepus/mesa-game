@@ -133,8 +133,6 @@ function RevealSlotGroup({
         <text x="30" y="44" textAnchor="middle" fontFamily="sans-serif" fontSize="22" fill={iconColor}>{icon}</text>
         <text x="30" y="62" textAnchor="middle" fontFamily="monospace" fontSize="7"
           fill={iconColor} letterSpacing="0.5">{cardName}</text>
-        <text x="30" y="76" textAnchor="middle" fontFamily="sans-serif" fontSize="8"
-          fill="#888">{slot.ownerName.slice(0, 8)}</text>
       </g>
     );
   }
