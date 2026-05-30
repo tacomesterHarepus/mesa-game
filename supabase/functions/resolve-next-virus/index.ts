@@ -31,7 +31,13 @@ Deno.serve(async (req) => {
 
     const { data: game } = await admin.from("games").select("*").eq("id", game_id).single();
     if (!game) throw new Error("Game not found");
-    if (game.phase !== "virus_resolution") throw new Error("Not in virus_resolution phase");
+    if (game.phase !== "virus_resolution") {
+      // Concurrent loser: another caller already advanced the phase — return no-op so the
+      // client doesn't surface "AUTO-RESOLVE FAILED".
+      return new Response(JSON.stringify({ success: true, skipped: "not_in_virus_resolution" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Any player in the game may advance resolution (host-controlled in UI)
     const { count: playerCount } = await admin
@@ -56,6 +62,23 @@ Deno.serve(async (req) => {
       if (queueCheck) {
         console.log(`[resolve-next-virus] stale empty-queue — unresolved card ${queueCheck.id} found on re-fetch, exiting`);
         return new Response(JSON.stringify({ success: true, skipped: "stale_empty_check" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // CAS guard: atomically claim the advance by transitioning phase from
+      // 'virus_resolution' → 'between_turns'. Only one concurrent caller wins.
+      // advanceTurnOrPhase immediately overwrites 'between_turns' with the real next
+      // phase (player_turn, resource_adjustment, game_over, etc.).
+      const { data: claimed } = await admin
+        .from("games")
+        .update({ phase: "between_turns" })
+        .eq("id", game_id)
+        .eq("phase", "virus_resolution")
+        .select("id");
+      if (!claimed?.length) {
+        console.log("[resolve-next-virus] advance already claimed by concurrent caller — skipping");
+        return new Response(JSON.stringify({ success: true, skipped: "advance_claimed" }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
