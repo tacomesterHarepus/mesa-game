@@ -670,6 +670,8 @@ For trivial documentation-only changes, BACKLOG/SESSION_NOTES updates, or other 
 
 For code changes scoped to a single area (e.g. a one-line CSS fix), the canary subset (error-handling, turn-order, multi-mission, mission-rules, abort-mission) may be acceptable — but the full suite is the safer default and should be the assumed standard.
 
+"Not testable via E2E" is never a reason to skip the suite. Concurrency, race-condition, and timing fixes still change code paths that deterministic tests exercise — run the full suite and check whether an existing test covers the changed path. Example: the Bug 6 / freeze fix touched VirusResolution.tsx's auto-resolve loop, which virus-system.spec.ts test 3 ("phase auto-advances away from virus_resolution within 30s") exercises directly; skipping the suite on a "race not testable" rationale shipped a 100%-reproducible freeze that the test caught immediately when finally run. Any change to VirusResolution.tsx, resolve-next-virus, end-play-phase, or advanceTurnOrPhase requires the full suite.
+
 ### Pre-existing test issues to ignore
 
 - `tests/e2e/game-log.spec.ts:524` — CPU≥2 path race; passes in isolation, can flake in full suite (DIAGNOSIS_2026-04-27 Item 1)
