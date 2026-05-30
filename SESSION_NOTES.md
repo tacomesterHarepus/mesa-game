@@ -40,7 +40,23 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 ---
 
 ## Current Phase
-**virus_resolution advance is now server-side idempotent (2026-05-30, commits c09eff8 + 5e515a4 + f6b0a8e).**
+**Abort-vote mechanic — Step 2 complete (2026-05-31): server layer deployed, migration written (not applied).**
+
+- Migration `018_abort_vote.sql` written — adds `abort_flag_pending`, `abort_vote_deadline`, `abort_flag_player_id` to `games`; creates `abort_votes` table with RLS. NOT yet applied to live DB.
+- `_shared/advanceTurnOrPhase.ts` — Added 3 exports: `MISSION_FAIL_PENALTIES`, `resetPlayersForNextMission`, `applyMissionAbort`.
+- `abort-mission/index.ts` — Refactored to call `applyMissionAbort`; local helpers removed. Behavior unchanged.
+- `end-play-phase/index.ts` — (a) `abort_flag_pending/player_id/deadline` cleared on both missionResolved branches; (b) abort vote injection before `advanceTurnOrPhase` on no-virus path (round 2, mission live, flag set → opens 30s vote window); (c) `resetPlayersForNextMission` and `MISSION_FAIL_PENALTIES` now imported from `_shared`.
+- `resolve-next-virus/index.ts` — Same abort vote injection at CAS winner path after `refillVirusPool`.
+- `flag-abort/index.ts` — New function: human sets flag during AI turn in round 2. Idempotent. Validates not-last-turn-of-round-2.
+- `submit-abort-vote/index.ts` — New function: vote submission + auto-resolve when all humans voted + force-resolve (timeout) path. CAS guard prevents double-resolution. Calls `applyMissionAbort` on abort, `advanceTurnOrPhase` on continue.
+- Types: `abort_flagged`, `abort_vote_started`, `abort_vote_resolved` added to both `types/gameLog.ts` and `_shared/gameLogTypes.ts`.
+- Pre-flight proofs appended to `DESIGN_abort_vote.md` — both pass.
+- All 5 functions deployed to Supabase.
+- `next build` clean.
+
+**Next (Step 3): UI layer — `flag-abort` button in `PlayerTurn.tsx` (replaces ABORT MISSION button); `AbortVote.tsx` phase component (30s countdown, Abort/Continue for humans, waiting message for AIs); `GameBoard.tsx` wiring; apply migration 018 to live DB.**
+
+Previous: **virus_resolution advance is now server-side idempotent (2026-05-30, commits c09eff8 + 5e515a4 + f6b0a8e).**
 
 - **Commit 1 (c09eff8) — CAS guard in resolve-next-virus:** In the empty-queue path, after the stale-queue re-check, a conditional UPDATE (`UPDATE games SET phase='between_turns' WHERE id=? AND phase='virus_resolution'`) gates the advance. Only one concurrent caller can win (Postgres row lock). Loser gets 0 rows affected and returns no-op success. Snapshot check changed from `throw` to no-op return so concurrent losers arriving after the winner already transitioned don't surface AUTO-RESOLVE FAILED. Deployed as Supabase internal **v14** (2026-05-30).
 
@@ -168,12 +184,14 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 | allocate-resources | v8 | v8: switched gate to request origin; draws cards + resets has_discarded_this_turn for first player |
 | discard-cards | v3 | v3: switched gate to request origin; Phase 11: typed `discard` log with metadata |
 | place-virus | v2 | v2: switched gate to request origin; moves card from hands → pending_viruses |
-| end-play-phase | v16 | v16: delete pending_viruses BEFORE insert into pool, throw on delete error |
+| end-play-phase | v17 | v17: abort flag cleared on mission-resolve branches; abort vote injection on no-virus path; shared helpers imported |
 | pull-viruses | v2 | v2: switched gate to request origin; pulls pending_pull_count cards from pool into queue |
-| resolve-next-virus | v14 | v13: refillVirusPool catches 23505 (concurrent refill), UNIQUE(game_id,position) constraint on virus_pool. v14: CAS guard (phase=virus_resolution→between_turns) makes empty-queue advance idempotent; snapshot check is no-op return not throw |
+| resolve-next-virus | v15 | v14: CAS guard makes empty-queue advance idempotent. v15: abort vote injection at CAS winner path |
 | secret-target | v3 | v3: switched gate to request origin; Phase 11: typed targeting_resolved log |
 | play-card | v8 | v8: switched gate to request origin; Phase 11: typed card_played log with mission_progress snapshot |
-| abort-mission | v3 | v3: switched gate to request origin; Phase 11: typed mission_aborted log |
+| abort-mission | v4 | v4: refactored to use applyMissionAbort from _shared; local helpers removed |
+| flag-abort | v1 | New: human sets abort flag during AI turn in round 2 |
+| submit-abort-vote | v1 | New: human submits abort vote; CAS guard on resolution; calls applyMissionAbort or advanceTurnOrPhase |
 
 ## Dev Mode
 

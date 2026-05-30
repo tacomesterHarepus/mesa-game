@@ -75,6 +75,9 @@ export interface GameLogMetadataMap {
     new_timer: number;
     aborted_by_player_id: string;
   };
+  abort_flagged: { flagging_player_id: string; mission_key: string };
+  abort_vote_started: { flagging_player_id: string; deadline: string; round: number };
+  abort_vote_resolved: { outcome: "abort" | "continue"; votes_for_abort: number; total_humans: number };
   mission_transition: {
     next_first_player_id: string;
     completing_player_id: string;

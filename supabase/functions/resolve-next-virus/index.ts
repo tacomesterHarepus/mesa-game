@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { advanceTurnOrPhase, corsHeaders, shuffle } from "../_shared/advanceTurnOrPhase.ts";
 import type { GameLogInsert, CardType, EffectType, LogWinner, MissionOutcome } from "../_shared/gameLogTypes.ts";
 
+
 // Resolves one card from the virus_resolution_queue.
 // Called by the host (or any human in dev mode) from the VirusResolution UI.
 // Applies the card's effect, marks it resolved, checks win conditions.
@@ -89,6 +90,32 @@ Deno.serve(async (req) => {
       const missionResolved = !freshGame.current_mission_id;
       const fakeCurrentPlayer = { id: game.current_turn_player_id };
       const pendingOutcome = (freshGame.pending_mission_outcome ?? null) as MissionOutcome | null;
+
+      // Abort vote check: flag set, mission still active, round 2 — open the vote window.
+      if (!missionResolved && (freshGame.current_round ?? 1) === 2 && freshGame.abort_flag_pending) {
+        await admin.from("abort_votes").delete().eq("game_id", game_id);
+        const deadline = new Date(Date.now() + 30_000).toISOString();
+        await admin.from("games").update({
+          phase: "abort_vote",
+          abort_vote_deadline: deadline,
+          abort_flag_pending: false,
+        }).eq("id", game_id);
+        const voteStartedLog: GameLogInsert<"abort_vote_started"> = {
+          game_id,
+          event_type: "abort_vote_started",
+          public_description: "Abort vote opened — humans have 30 seconds to vote.",
+          metadata: {
+            flagging_player_id: freshGame.abort_flag_player_id ?? "",
+            deadline,
+            round: freshGame.current_round ?? 2,
+          },
+        };
+        await admin.from("game_log").insert(voteStartedLog);
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       return await advanceTurnOrPhase(admin, freshGame, fakeCurrentPlayer, missionResolved, pendingOutcome ?? undefined);
     }
 

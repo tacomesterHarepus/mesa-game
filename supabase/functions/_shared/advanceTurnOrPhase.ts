@@ -279,3 +279,52 @@ export async function advanceTurnOrPhase(
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
+
+export const MISSION_FAIL_PENALTIES: Record<string, number> = {
+  data_cleanup: 1, basic_model_training: 1,
+  dataset_preparation: 1, cross_validation: 1, distributed_training: 1,
+  balanced_compute_cluster: 2, dataset_integration: 2, multi_model_ensemble: 2,
+  synchronized_training: 2, genome_simulation: 2,
+  global_research_network: 3, experimental_vaccine_model: 3,
+};
+
+export async function resetPlayersForNextMission(admin: any, game_id: string): Promise<void> {
+  await admin.from("players").update({
+    has_revealed_card: false,
+    revealed_card_key: null,
+  }).eq("game_id", game_id).neq("role", "human");
+}
+
+export async function applyMissionAbort(
+  admin: any,
+  game: any,
+  mission: any,
+  abortedByPlayerId: string,
+): Promise<Response> {
+  const game_id = game.id;
+  const penalty = MISSION_FAIL_PENALTIES[mission.mission_key] ?? 1;
+  const newEscapeTimer = (game.escape_timer ?? 0) + penalty;
+
+  await resetPlayersForNextMission(admin, game_id);
+
+  const missionAbortedLog: GameLogInsert<"mission_aborted"> = {
+    game_id,
+    event_type: "mission_aborted",
+    public_description: `Mission aborted by humans. Escape Timer +${penalty}. (${newEscapeTimer}/8)`,
+    metadata: { mission_key: mission.mission_key, penalty, new_timer: newEscapeTimer, aborted_by_player_id: abortedByPlayerId },
+  };
+  await admin.from("game_log").insert(missionAbortedLog);
+
+  const gameUpdates = {
+    escape_timer: newEscapeTimer,
+    current_mission_id: null,
+    pending_mission_options: [],
+    turn_play_count: 0,
+    abort_flag_pending: false,
+    abort_flag_player_id: null,
+    abort_vote_deadline: null,
+  };
+  await admin.from("games").update(gameUpdates).eq("id", game_id);
+  const updatedGame = { ...game, ...gameUpdates };
+  return await advanceTurnOrPhase(admin, updatedGame, { id: game.current_turn_player_id }, true, "aborted");
+}

@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { advanceTurnOrPhase, corsHeaders, drawCardsForPlayer, shuffle } from "../_shared/advanceTurnOrPhase.ts";
+import { advanceTurnOrPhase, corsHeaders, drawCardsForPlayer, MISSION_FAIL_PENALTIES, resetPlayersForNextMission, shuffle } from "../_shared/advanceTurnOrPhase.ts";
 import type { GameLogInsert, MissionOutcome } from "../_shared/gameLogTypes.ts";
 
 const MISSION_REQUIREMENTS: Record<string, { compute?: number; data?: number; validation?: number }> = {
@@ -24,14 +24,6 @@ const MISSION_REWARDS: Record<string, number> = {
   balanced_compute_cluster: 4, dataset_integration: 4, multi_model_ensemble: 4,
   synchronized_training: 5, genome_simulation: 5,
   global_research_network: 6, experimental_vaccine_model: 6,
-};
-
-const MISSION_FAIL_PENALTIES: Record<string, number> = {
-  data_cleanup: 1, basic_model_training: 1,
-  dataset_preparation: 1, cross_validation: 1, distributed_training: 1,
-  balanced_compute_cluster: 2, dataset_integration: 2, multi_model_ensemble: 2,
-  synchronized_training: 2, genome_simulation: 2,
-  global_research_network: 3, experimental_vaccine_model: 3,
 };
 
 // Active AI signals they are done playing cards and virus placements for this turn.
@@ -103,6 +95,9 @@ Deno.serve(async (req) => {
         gameUpdates.core_progress = game.core_progress + reward;
         gameUpdates.current_mission_id = null;
         gameUpdates.pending_mission_options = [];
+        gameUpdates.abort_flag_pending = false;
+        gameUpdates.abort_flag_player_id = null;
+        gameUpdates.abort_vote_deadline = null;
         await resetPlayersForNextMission(admin, game_id);
         const missionCompleteLog: GameLogInsert<"mission_complete"> = {
           game_id,
@@ -124,6 +119,9 @@ Deno.serve(async (req) => {
           gameUpdates.escape_timer = game.escape_timer + penalty;
           gameUpdates.current_mission_id = null;
           gameUpdates.pending_mission_options = [];
+          gameUpdates.abort_flag_pending = false;
+          gameUpdates.abort_flag_player_id = null;
+          gameUpdates.abort_vote_deadline = null;
           await resetPlayersForNextMission(admin, game_id);
           const missionFailedLog: GameLogInsert<"mission_failed"> = {
             game_id,
@@ -203,6 +201,32 @@ Deno.serve(async (req) => {
     // No viruses (or pool empty) — advance turn directly
     await admin.from("games").update(gameUpdates).eq("id", game_id);
     const updatedGame = { ...game, ...gameUpdates };
+
+    // Abort vote check: flag set, mission still active, round 2 — open the vote window.
+    if (!missionResolved && (updatedGame.current_round ?? 1) === 2 && game.abort_flag_pending) {
+      await admin.from("abort_votes").delete().eq("game_id", game_id);
+      const deadline = new Date(Date.now() + 30_000).toISOString();
+      await admin.from("games").update({
+        phase: "abort_vote",
+        abort_vote_deadline: deadline,
+        abort_flag_pending: false,
+      }).eq("id", game_id);
+      const voteStartedLog: GameLogInsert<"abort_vote_started"> = {
+        game_id,
+        event_type: "abort_vote_started",
+        public_description: "Abort vote opened — humans have 30 seconds to vote.",
+        metadata: {
+          flagging_player_id: game.abort_flag_player_id ?? "",
+          deadline,
+          round: updatedGame.current_round ?? 2,
+        },
+      };
+      await admin.from("game_log").insert(voteStartedLog);
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     return await advanceTurnOrPhase(admin, updatedGame, callerPlayer, missionResolved, missionOutcomeForTransition);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -219,13 +243,6 @@ function virusCount(cpu: number, cardsPlayed: number): number {
   const base = cpu >= 2 ? 1 : 0;
   const bonus = cardsPlayed >= 3 ? 1 : 0;
   return Math.min(2, base + bonus);
-}
-
-async function resetPlayersForNextMission(admin: any, game_id: string) {
-  await admin.from("players").update({
-    has_revealed_card: false,
-    revealed_card_key: null,
-  }).eq("game_id", game_id).neq("role", "human");
 }
 
 async function resolvePlayer(
@@ -251,4 +268,3 @@ async function resolvePlayer(
   if (!data) throw new Error("Player not found");
   return data;
 }
-

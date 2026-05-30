@@ -304,3 +304,63 @@ No `unflag-abort` function — the spec has no unflag mechanic. Once flagged, th
 3. **Flag visible to AIs?** The AI players can see the game log — should the "flag raised" event be in the public log, or silent? Recommend silent (don't telegraph human consensus state to misaligned AIs watching the log).
 4. **`abort_flag_pending` clearing:** The flag must be cleared on natural mission resolution. Currently planned in step 2 as additions to `end-play-phase` (missionResolved paths) and `advanceTurnOrPhase` (resource_adjustment transition). Confirm this covers all paths where `current_mission_id` goes null.
 5. **Realtime:** The `AbortVote` phase component needs Realtime on `abort_votes` for live vote display. `GameBoard.tsx` already subscribes to `games` — the `abort_vote_deadline` and phase change will arrive via the existing game subscription. The votes table needs a new subscription.
+
+---
+
+## Step 2 pre-flight proofs
+
+### PROOF 1 — Mission fails exactly once in Round 2
+
+Enumerate all Round 2 failure paths and verify no double-apply is possible.
+
+**Path (a) — Natural end-of-round-2 failure**
+`end-play-phase` detects `isLastPlayer && mission.round === 2`, sets `missionResolved = true`, nulls `current_mission_id`, calls `advanceTurnOrPhase`.
+
+**Path (b) — Abort vote outcome: abort**
+`submit-abort-vote` → CAS wins → `resolveVote` → `applyMissionAbort` → nulls `current_mission_id`, calls `advanceTurnOrPhase`.
+
+**Path (c) — Direct abort (pre-existing; abort-mission called directly)**
+`abort-mission` validates `phase = 'player_turn'`, applies penalty, nulls `current_mission_id`, calls `advanceTurnOrPhase`.
+
+**Path (d) — skip_next_turn processing**
+Not a failure path — `advanceTurnOrPhase` skips players with `skip_next_turn = true` but does not resolve the mission.
+
+**Overlap analysis:**
+
+*(a)×(b):* Impossible. The abort vote injection check is `!missionResolved && round === 2 && abort_flag_pending`. When `isLastPlayer && mission.round === 2` fires, `missionResolved = true` — the injection condition is false, so the abort vote never opens on the last turn of round 2. Paths (a) and (b) are mutually exclusive by construction.
+
+*(b)×(c):* Impossible. `abort-mission` validates `game.phase === 'player_turn'` (line 40). The `abort_vote` phase is a different phase value — `abort-mission` rejects with "Not in player_turn phase" during a vote. Phases are mutually exclusive.
+
+*(a)×(c):* Pre-existing race (not introduced by this mechanic). A human calling `abort-mission` while the active AI calls `end-play-phase` concurrently can both clear `current_mission_id`. Not addressed in step 2; accepted as known pre-existing gap to be closed in step 3 when `abort-mission` direct call is replaced by the flag mechanic.
+
+*(b)×(b):* **Requires CAS guard.** Two concurrent calls to `submit-abort-vote` at deadline expiry (e.g. client retry + cron) could both try to resolve. **Action required:** CAS guard `UPDATE games SET phase='between_turns', abort_vote_deadline=null WHERE id=? AND phase='abort_vote' RETURNING id` — only one caller wins; the loser sees `!claimed?.length` and returns no-op. This is mandatory, not optional.
+
+*(d) skip:* No double-apply scenario — skipped players never call `end-play-phase`.
+
+**PROOF 1 RESULT: PASS.** No double-apply is possible, provided the (b)×(b) CAS guard is implemented as specified. Required action: CAS guard in `submit-abort-vote.resolveVote`.
+
+---
+
+### PROOF 2 — Flag is cleared on every mission-resolution path
+
+Grep for all `current_mission_id = null` writes (confirmed via grep before compaction):
+
+| Site | File | Approx line | Branch |
+|------|------|-------------|--------|
+| 1 | `end-play-phase/index.ts` | 104 | `missionComplete` path |
+| 2 | `end-play-phase/index.ts` | 125 | `isLastPlayer && mission.round === 2` path |
+| 3 | `abort-mission/index.ts` | 65 | direct abort path |
+
+None of these currently write `abort_flag_pending: false`. All three need the fix.
+
+**Site 1 and 2** — both in `end-play-phase`: Add `abort_flag_pending: false, abort_flag_player_id: null, abort_vote_deadline: null` to `gameUpdates` in both mission-resolved branches.
+
+**Site 3** — `abort-mission`: Covered by the `applyMissionAbort` shared helper (step 2 refactor), which includes `abort_flag_pending: false, abort_flag_player_id: null, abort_vote_deadline: null` in its `gameUpdates`.
+
+**Other paths checked:**
+
+`advanceTurnOrPhase` `resource_adjustment` branch (line 155): Does NOT write `current_mission_id = null` — `current_mission_id` is already null by the time any caller reaches `advanceTurnOrPhase` with `missionResolved = true`. No `abort_flag_pending` write needed here because the caller (end-play-phase or applyMissionAbort) already cleared it before calling `advanceTurnOrPhase`.
+
+`game_over` branches in `advanceTurnOrPhase` and `resolve-next-virus`: Do NOT null `current_mission_id`. Game is over — `abort_flag_pending` clearing is irrelevant.
+
+**PROOF 2 RESULT: PASS.** Three write sites identified. All covered: sites 1+2 get explicit `abort_flag_pending: false` in `gameUpdates`; site 3 is covered transitively by `applyMissionAbort`. No gap.

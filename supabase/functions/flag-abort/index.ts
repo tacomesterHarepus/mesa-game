@@ -1,9 +1,11 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { applyMissionAbort, corsHeaders } from "../_shared/advanceTurnOrPhase.ts";
+import { corsHeaders } from "../_shared/advanceTurnOrPhase.ts";
+import type { GameLogInsert } from "../_shared/gameLogTypes.ts";
 
-// Human aborts the mission during round 2. Applies the normal fail penalty,
-// then transitions to resource_adjustment (same path as end-of-round-2 failure).
+// Human flags abort intent during an AI's turn in round 2.
+// Sets abort_flag_pending = true on the game; does not interrupt the current turn.
+// The vote window opens at the next turn boundary (end-play-phase or resolve-next-virus).
 // Body: { game_id, override_player_id?: string }
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -29,17 +31,44 @@ Deno.serve(async (req) => {
     const { data: game } = await admin.from("games").select("*").eq("id", game_id).single();
     if (!game) throw new Error("Game not found");
     if (game.phase !== "player_turn") throw new Error("Not in player_turn phase");
-    if (game.current_round !== 2) throw new Error("Abort only valid in round 2");
+    if ((game.current_round ?? 1) !== 2) throw new Error("Abort flag only valid in round 2");
     if (!game.current_mission_id) throw new Error("No active mission");
 
     const callerPlayer = await resolvePlayer(req, admin, game_id, userId, override_player_id);
-    if (callerPlayer.role !== "human") throw new Error("Only humans can abort the mission");
+    if (callerPlayer.role !== "human") throw new Error("Only humans can flag abort");
 
+    // Block flagging on the last turn of round 2 — mission resolves naturally after that turn.
+    const turnOrderIds: string[] = game.turn_order_ids ?? [];
+    const isLastTurnOfRound2 = turnOrderIds[turnOrderIds.length - 1] === game.current_turn_player_id;
+    if (isLastTurnOfRound2) throw new Error("Cannot flag abort on last turn of round 2");
+
+    // Idempotent: if already flagged, return success without duplicate log.
+    if (game.abort_flag_pending) {
+      return new Response(JSON.stringify({ success: true, already_flagged: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    await admin.from("games").update({
+      abort_flag_pending: true,
+      abort_flag_player_id: callerPlayer.id,
+    }).eq("id", game_id);
+
+    // Fetch mission key for the log (flag stores the key, not the UUID).
     const { data: mission } = await admin
-      .from("active_mission").select("*").eq("id", game.current_mission_id).maybeSingle();
-    if (!mission) throw new Error("Active mission record not found");
+      .from("active_mission").select("mission_key").eq("id", game.current_mission_id).maybeSingle();
 
-    return await applyMissionAbort(admin, game, mission, callerPlayer.id);
+    const flagLog: GameLogInsert<"abort_flagged"> = {
+      game_id,
+      event_type: "abort_flagged",
+      public_description: `${callerPlayer.display_name} flagged for abort — vote will open after this turn.`,
+      metadata: { flagging_player_id: callerPlayer.id, mission_key: mission?.mission_key ?? "" },
+    };
+    await admin.from("game_log").insert(flagLog);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }), {
