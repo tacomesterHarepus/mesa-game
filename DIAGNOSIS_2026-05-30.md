@@ -671,3 +671,162 @@ The idempotency guard closes the **CF-window race** (concurrent call during casc
 Option A is less disruptive (no schema migration, no error-path handling). Option B is more defensive (the DB enforces the invariant regardless of application logic). Either closes the double-refill race.
 
 **Priority:** Bug 6 client fix first (also closes the "AUTO-RESOLVE FAILED" flash, same root cause). Server-side Option A second (closes the residual race that Bug 6 doesn't fully cover).
+
+---
+
+## VERIFICATION 2026-05-30 (freeze re-test)
+
+Post-deploy verification after commits 61ffada (server constraint) and 59ad57a (Bug 6 client fix). Manual playtest froze during `virus_resolution` on the first AI turn: UI showed "// QUEUE EMPTY — ADVANCING" but phase never transitioned, game log stopped at "data in virus pool — no effect."
+
+---
+
+### 1. virus-system.spec.ts results
+
+Run after commit 59ad57a:
+
+| Test | Result |
+|------|--------|
+| no manual Resolve button present — auto-resolve is active | PASS |
+| game is in a valid virus-resolution-adjacent phase (REST check) | PASS |
+| **phase auto-advances away from virus_resolution within 30s** | **FAIL** |
+
+**Exact failure:**
+
+```
+Error: expect(received).toContain(expected)
+Expected value: "virus_resolution"
+Received array: ["player_turn", "between_turns", "resource_adjustment", "secret_targeting", "game_over"]
+
+> 304 |     expect(advancedPhases).toContain(finalPhase);
+```
+
+The test polled REST every 2s for 30s; `finalPhase` stayed `"virus_resolution"` for the full 30 seconds. The advance never fired. **This test would have caught the freeze before push had it been run after commit 59ad57a.**
+
+---
+
+### 2. Code path trace — how the Bug 6 fix causes the freeze
+
+The fix in commit 59ad57a (`components/game/phases/VirusResolution.tsx`):
+
+**Before (original):**
+```tsx
+useEffect(() => {
+  setAutoResolveError(null);
+  resolveInFlightRef.current = false;  // unconditional reset
+
+  if (currentCard) {
+    // 2s resolve timer
+  } else {
+    const advanceTimer = setTimeout(async () => {
+      if (resolveInFlightRef.current) return;
+      resolveInFlightRef.current = true;
+      // ... advance call
+    }, 500);
+    return () => clearTimeout(advanceTimer);
+  }
+}, [currentCard?.id, ...]);
+```
+
+**After (Bug 6 fix):**
+```tsx
+useEffect(() => {
+  setAutoResolveError(null);
+
+  if (currentCard) {
+    resolveInFlightRef.current = false;  // reset only on new non-null card
+    // 2s resolve timer
+  } else {
+    if (resolveInFlightRef.current) return;  // ← NEW GUARD
+    const advanceTimer = setTimeout(async () => { ... }, 500);
+    return () => clearTimeout(advanceTimer);
+  }
+}, [currentCard?.id, ...]);
+```
+
+**Ref state trace — normal last-card resolve path:**
+
+1. `currentCard` = last_card → `if (currentCard)` branch → **ref reset to `false`** → 2s timer starts.
+2. 2s timer callback fires → **`resolveInFlightRef.current = true`** (line 61, before the await).
+3. `invokeWithRetry("resolve-next-virus", ...)` call starts. Server marks card `resolved=true`.
+4. Realtime UPDATE fires (fast — often before the server call returns). Client: `virusQueue` updates → `currentCard = null` → `currentCard?.id` changes from `card-uuid` to `undefined`.
+5. `useEffect` re-runs (dep changed). `currentCard` is null → `else` branch.
+6. **`if (resolveInFlightRef.current) return;` — ref is `true` (set in step 2, never reset in the `else` branch) → EARLY RETURN.**
+7. Server call from step 3 returns `{ success: true }`. The async callback runs, finds no error, exits. **Ref stays `true`.**
+8. `currentCard?.id` is still `undefined`. Deps unchanged. `useEffect` does NOT re-run.
+9. **Advance timer is never scheduled. `advanceTurnOrPhase` is never called. Phase stays `virus_resolution`. FROZEN.**
+
+The ref is reset to `false` ONLY inside the `if (currentCard)` branch (line 54). When the queue is empty, `currentCard` stays `null` permanently — the `if (currentCard)` branch never executes again, the ref stays `true`, and the `else` guard always fires.
+
+**This freeze is 100% reproducible** whenever the last queue card is resolved via the 2s auto-timer path. The advance timer is structurally impossible to schedule.
+
+---
+
+### 3. Live DB confirmation
+
+**Game `54db59e8`** (manual playtest, created 2026-05-30 19:20 UTC):
+- `virus_resolution_queue`: 1 row, `resolved=true` (0 unresolved) — queue genuinely empty
+- `game_log` last entry: `virus_no_effect` — "data in virus pool — no effect." at 19:22:39 UTC
+- No `turn_start`, no phase transition in log after that point
+
+**Game `d16c51e1`** (virus-system spec's game, created 2026-05-30 19:29 UTC):
+- `virus_resolution_queue`: 1 row, `resolved=true` (0 unresolved) — queue genuinely empty
+- Same pattern: queue empty, server ready to advance, advance never called
+
+Both games confirm: queue is empty (server would advance correctly if called), but the client never called the advance. The freeze is client-side.
+
+---
+
+### 4. Classification
+
+**Classification: (A) — Client regression introduced by commit 59ad57a.**
+
+The Bug 6 fix correctly identified that resetting `resolveInFlightRef` unconditionally at the top of the `useEffect` allowed a concurrent advance call to race the 2s resolve call. But the fix went too far: it removed the only mechanism that allows the empty-queue advance to fire after the last card resolves via the 2s timer.
+
+**Classification (B) ruled out:** The 23505 catch in `refillVirusPool` (commit 61ffada) returns early from `refillVirusPool` but does NOT prevent `advanceTurnOrPhase` from being called — the server-side advance path is unaffected. Even if 23505 fired, the phase would still transition. This is not the cause.
+
+The server-side idempotency guard (`stale_empty_check`) also does not cause this — it only fires if there are unresolved queue items, and the queue is genuinely empty here.
+
+---
+
+### 5. Proposed fix (NOT applied)
+
+**Root issue:** The ref must be reset to `false` after the 2s call returns, AND the empty-queue `useEffect` must re-run to see the reset value. The deps (`currentCard?.id`) don't change when the ref resets, so a state variable must be added to the deps to force a re-run.
+
+**Proposed fix:**
+
+Add `const [resolveCompleted, setResolveCompleted] = useState(0);` to `VirusResolution`.
+
+In the 2s timer callback, after `invokeWithRetry` returns:
+```tsx
+const resolveTimer = setTimeout(async () => {
+  if (resolveInFlightRef.current) return;
+  resolveInFlightRef.current = true;
+  const { data, error: fnError } = await invokeWithRetry("resolve-next-virus", {
+    game_id: gameId,
+    override_player_id: overridePlayerId,
+  });
+  resolveInFlightRef.current = false;          // reset after call completes
+  setResolveCompleted((n) => n + 1);           // force useEffect re-run
+  if (fnError) {
+    setAutoResolveError(fnError.message);
+  } else if (data?.error) {
+    setAutoResolveError(data.error);
+  }
+}, 2000);
+```
+
+Add `resolveCompleted` to the `useEffect` deps:
+```tsx
+}, [currentCard?.id, gameId, overridePlayerId, resolveCompleted]);
+```
+
+**Trace with fix applied:**
+1. 2s timer fires → ref=true → Call A starts.
+2. Realtime fires → `currentCard=null` → useEffect re-runs → `else` branch → ref=true → guard fires → return early (no duplicate advance).
+3. Call A returns → `ref=false` → `resolveCompleted++` → state update.
+4. useEffect re-runs (dep `resolveCompleted` changed). `currentCard` is still null → `else` branch → **ref is `false` → guard does NOT fire** → 500ms advance timer schedules.
+5. Advance call fires → `advanceTurnOrPhase` → phase transitions.
+
+The `else` branch's inner guard (`if (resolveInFlightRef.current) return;` inside the `setTimeout` callback) still prevents a duplicate advance if a race somehow fires the callback twice.
+
+**Flag: virus-system.spec.ts test 3 would have caught this had it been run after commit 59ad57a.** It was not run because the task description noted "Full Playwright suite not run — race conditions not testable via E2E." This was incorrect — the suite has an explicit auto-advance test that directly exercises this path. Full suite must be run for any change to `VirusResolution.tsx`.
