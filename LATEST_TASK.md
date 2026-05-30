@@ -1,15 +1,22 @@
 # Latest Task
 
 ## Summary
-Fixed Bug 7 from DIAGNOSIS_2026-05-30.md. `computeBlocked` in `PlayerTurn.tsx` covered only `dataset_integration`; Dataset Preparation's "no Compute until 4 Data" rule was enforced server-side only. Users could click Compute, trigger a round-trip, and receive an error rather than being blocked at the card. Client-side fix: `computeBlocked` now also returns `true` for `dataset_preparation` when `data_contributed < 4`. Hint text updated to be mission-specific. `aria-disabled` and `data-card-key` attributes added to `CardStackGroup` so tests can reliably select and assert disabled state. Server block in `play-card/index.ts` untouched.
+Fixed Bugs 5+8 (server-side) and Bug 6 (client-side) from DIAGNOSIS_2026-05-30.md. Pre-flight audit of all three virus_pool writers (start-game, end-play-phase pending flush, refillVirusPool) confirmed no legitimate duplicate-position write exists under sequential operation — safe to add the constraint. Migration 017 cleaned existing duplicate rows in three affected games (14891e14, 78922007, 8ef6f048), then added UNIQUE(game_id, position) on virus_pool. refillVirusPool now catches Postgres 23505 and returns success without re-inserting. Deployed resolve-next-virus as v13. Bug 6 client fix: moved resolveInFlightRef.current = false from unconditional useEffect top into the if (currentCard) branch; empty-queue branch skips the 500ms timer if the ref is already true. Double-CF application race backlogged. Bugs 5+8 not marked resolved — manual playtest required to confirm pool stays ≤4 through a Cascading Failure chain.
 
 ## Files changed
-- `components/game/phases/PlayerTurn.tsx` — `computeBlocked` extended to cover `dataset_preparation`; hint text conditional on mission key; `CardStackGroup` outer div gains `data-card-key={cardKey}`, button gains `aria-disabled={disabled ? "true" : undefined}`
-- `tests/e2e/mission-rules.spec.ts` — added `endTurnViaAPI` helper; added Test 4b: asserts `[data-card-key="compute"] button[aria-disabled="true"]` present when data < 4, absent after 4 Data contributed via loop
+- `supabase/migrations/017_virus_pool_position_unique.sql` — new migration: deduplication CTE + UNIQUE(game_id, position) constraint
+- `supabase/functions/resolve-next-virus/index.ts` — refillVirusPool catches 23505, treats as concurrent-refill success
+- `components/game/phases/VirusResolution.tsx` — resolveInFlightRef reset moved into currentCard branch; empty-queue branch guards on ref before scheduling advance timer
+- `BACKLOG.md` — double-CF application race entry added
+- `SESSION_NOTES.md` — current phase updated
 
 ## Test status
-- `next build`: clean
-- Test 4b written and syntactically verified; conditional on `dataset_preparation` being drawn — skips otherwise (same pattern as Test 4); full E2E suite not run (scoped BACKLOG fix)
+- `next build`: clean (both commits)
+- Full Playwright suite not run — both fixes are targeted concurrency repairs with no UI selector changes; canary subset not applicable (race conditions not testable via E2E). Manual playtest verification required before marking Bugs 5+8 resolved.
+- Constraint verified live via information_schema query: `virus_pool_game_position_unique UNIQUE` present.
+- Function deployed: resolve-next-virus Supabase internal v13, updated_at 2026-05-30.
 
 ## Suggested next
-Continue DIAGNOSIS_2026-05-30.md — Bugs 3, 5+8, 6 remain. Priority order per diagnosis: Bug 6 (resolveInFlightRef reset allows concurrent empty-queue advances, MEDIUM), Bug 5+8 (refillVirusPool double-fill race, HIGH — Bug 6 fix closes the double-refill pool-corruption path but a separate double-CF concurrency race remains uncharacterized and is NOT closed by the Bug 6 fix — characterize before marking 5+8 resolved), Bug 3 (CentralBoard "×? cards" hand-stack: literal "?" placeholder never wired to a real count, and stack renders only on top two chips; proper fix likely needs a server-side hand_count column due to RLS, MEDIUM). Or from BACKLOG: virus resolution auto-resolve UX cleanup, abort mission timing window, multi-card play.
+1. **Manual playtest: verify pool stays ≤4 through a Cascading Failure chain.** Run a dev game, trigger CF, and query `SELECT position FROM virus_pool ORDER BY position` after resolution. If no duplicates and count ≤4, mark Bugs 5+8 resolved in SESSION_NOTES.
+2. **Bug 3** (CentralBoard "×? cards" hand-stack: literal "?" never wired, renders only on top two chips; proper fix needs server-side hand_count column due to RLS, MEDIUM).
+3. **Double-CF application race** (BACKLOG): two concurrent 2s-resolve calls both read CF as resolved=false and both apply applyVirusEffect — separate from v11/v13 fixes, uncharacterized. Low priority until playtesting surfaces it as disruptive.

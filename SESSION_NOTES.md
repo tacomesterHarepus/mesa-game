@@ -40,7 +40,17 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 ---
 
 ## Current Phase
-**Bug 7 from DIAGNOSIS_2026-05-30.md fixed (2026-05-30, commit 0a6d62e).** `computeBlocked` in PlayerTurn.tsx extended to cover Dataset Preparation (data_contributed < 4). Hint text now mission-specific. `aria-disabled` + `data-card-key` added to CardStackGroup for test selection. New Test 4b in mission-rules.spec.ts. Build clean. Server block untouched.
+**Bugs 5+8 (server) + Bug 6 (client) fixed (2026-05-30, commits 61ffada + 59ad57a).**
+
+- **Bug 5+8 server fix (Commit 1):** Migration 017 adds `UNIQUE(game_id, position)` on `virus_pool`. Duplicate rows from three affected games cleaned before constraint applied. `refillVirusPool` in resolve-next-virus now catches Postgres 23505 and returns success (concurrent call already refilled). Deployed as Supabase internal **v13** (2026-05-30). Constraint verified live.
+
+- **Bug 6 client fix (Commit 2):** `resolveInFlightRef.current = false` moved from unconditional top of useEffect into the `if (currentCard)` branch only. Empty-queue branch now checks the ref before scheduling the 500ms advance timer — skips entirely if a 2s resolve call is in-flight. Closes the "AUTO-RESOLVE FAILED" flash and narrows the double-advance window.
+
+**Do NOT mark Bugs 5+8 resolved until a manual playtest confirms the pool stays ≤4 through a Cascading Failure chain.** The constraint is the actual fix; the client fix alone is insufficient. Playtest verification still required.
+
+**Double-CF application race (separate from above):** Backlogged. See BACKLOG.md and DIAGNOSIS_2026-05-30.md §VERIFICATION for characterization.
+
+Previous: **Bug 7 from DIAGNOSIS_2026-05-30.md fixed (2026-05-30, commit 0a6d62e).** `computeBlocked` in PlayerTurn.tsx extended to cover Dataset Preparation (data_contributed < 4). Hint text now mission-specific. `aria-disabled` + `data-card-key` added to CardStackGroup for test selection. New Test 4b in mission-rules.spec.ts. Build clean. Server block untouched.
 
 Previous: **Bug 1 + Bug 2 from DIAGNOSIS_2026-05-30.md fixed (2026-05-30, commits ffdbbb2 + 42b90de).**
 

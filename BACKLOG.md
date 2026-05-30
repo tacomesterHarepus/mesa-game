@@ -57,6 +57,12 @@ Items to revisit after the final board-redesign phase task (game_over) ships.
 
 ---
 
+- **AI can play multiple cards per turn** — mirror the multi-discard flow already built for discard-cards. Click 1 selects 1, click 2 selects 2, up to the CPU cap for that turn. Confirm plays in a batch via "PLAY CARD ×N" rather than one click per card. Reduces turn latency for AIs with CPU≥2 and matches the physical game's simultaneous card-play feel. Applies to: Play Card and Stage for Pool actions. *(Added 2026-05-30)*
+
+- **Double-CF application race in resolve-next-virus** — Two concurrent 2s-resolve calls can both read a `cascading_failure` card as `resolved=false` and both call `applyVirusEffect`, producing duplicate cascade queue rows (observed as paired `virus_effect` log entries 67–104ms apart). Not closed by the v11 TOCTOU fix (which defends the cascade-insert window, not the double-read-before-mark window) or by the Bug 6 client fix (which closes the empty-queue advance race, not the per-card resolution race). Uncharacterized — see `VERIFICATION 2026-05-30 (TOCTOU re-check) §4` in `DIAGNOSIS_2026-05-30.md`. *(Added 2026-05-30)*
+
+---
+
 ## Game Balance
 
 *(empty)*
