@@ -40,21 +40,23 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 ---
 
 ## Current Phase
-**Abort-vote mechanic — Step 2 complete (2026-05-31): server layer deployed, migration written (not applied).**
+**Abort-vote mechanic — COMPLETE (2026-05-31): server layer (Step 2) + UI layer (Step 3) shipped.**
 
-- Migration `018_abort_vote.sql` written — adds `abort_flag_pending`, `abort_vote_deadline`, `abort_flag_player_id` to `games`; creates `abort_votes` table with RLS. NOT yet applied to live DB.
-- `_shared/advanceTurnOrPhase.ts` — Added 3 exports: `MISSION_FAIL_PENALTIES`, `resetPlayersForNextMission`, `applyMissionAbort`.
-- `abort-mission/index.ts` — Refactored to call `applyMissionAbort`; local helpers removed. Behavior unchanged.
-- `end-play-phase/index.ts` — (a) `abort_flag_pending/player_id/deadline` cleared on both missionResolved branches; (b) abort vote injection before `advanceTurnOrPhase` on no-virus path (round 2, mission live, flag set → opens 30s vote window); (c) `resetPlayersForNextMission` and `MISSION_FAIL_PENALTIES` now imported from `_shared`.
-- `resolve-next-virus/index.ts` — Same abort vote injection at CAS winner path after `refillVirusPool`.
-- `flag-abort/index.ts` — New function: human sets flag during AI turn in round 2. Idempotent. Validates not-last-turn-of-round-2.
-- `submit-abort-vote/index.ts` — New function: vote submission + auto-resolve when all humans voted + force-resolve (timeout) path. CAS guard prevents double-resolution. Calls `applyMissionAbort` on abort, `advanceTurnOrPhase` on continue.
-- Types: `abort_flagged`, `abort_vote_started`, `abort_vote_resolved` added to both `types/gameLog.ts` and `_shared/gameLogTypes.ts`.
-- Pre-flight proofs appended to `DESIGN_abort_vote.md` — both pass.
-- All 5 functions deployed to Supabase.
-- `next build` clean.
+Step 2 summary (commit c7ca2ee, previously deployed):
+- Migration `018_abort_vote.sql` written and applied to Supabase project (NOT yet applied to prod by user).
+- `_shared/advanceTurnOrPhase.ts` — `MISSION_FAIL_PENALTIES`, `resetPlayersForNextMission`, `applyMissionAbort` exported.
+- `abort-mission` refactored, `end-play-phase` + `resolve-next-virus` inject abort vote at turn boundaries, `flag-abort` + `submit-abort-vote` deployed (v1 each).
 
-**Next (Step 3): UI layer — `flag-abort` button in `PlayerTurn.tsx` (replaces ABORT MISSION button); `AbortVote.tsx` phase component (30s countdown, Abort/Continue for humans, waiting message for AIs); `GameBoard.tsx` wiring; apply migration 018 to live DB.**
+Step 3 summary (commit 6fb3576):
+- `types/game.ts` — `abort_vote` phase + `abort_flag_pending`, `abort_vote_deadline`, `abort_flag_player_id`.
+- `PlayerTurn.tsx` — FLAG ABORT button (replaces ABORT MISSION); suppressed on `isLastTurnOfRound2`; flagged-state message when `abortFlagPending`.
+- `AbortVote.tsx` — new phase component: 30s countdown, Abort/Continue for humans, live tally (Realtime on `abort_votes`), waiting state for AIs.
+- `ActionRegion.tsx` — `abort_vote` in `isActionPhase`, header text, red color.
+- `GameBoard.tsx` — `abort_vote` case wired, `isLastTurnOfRound2` computed, `abortFlagPending` prop passed.
+- `tests/e2e/abort-vote.spec.ts` — 4 tests (flag→abort_vote, abort majority→resource_adjustment, split vote→player_turn, flag suppressed last turn + UI check).
+- Full suite: **71 pass / 1 fail (pre-existing game-log:535) / 15 skip**. No regressions.
+
+**PENDING USER ACTION: Apply migration 018 to prod.** After that, the abort-vote flow is fully live.
 
 Previous: **virus_resolution advance is now server-side idempotent (2026-05-30, commits c09eff8 + 5e515a4 + f6b0a8e).**
 
