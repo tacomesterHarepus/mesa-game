@@ -40,7 +40,15 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 ---
 
 ## Current Phase
-**TOCTOU race in resolve-next-virus fixed and deployed v11 (2026-05-07, commits bb569c6 + merge 542ba4c).** Cascading Failure now correctly inserts cascade cards before marking CF resolved, and the empty-queue branch re-verifies before advancing. Pool returns to 4 after resolution. Awaiting user manual verification in a fresh dev game.
+**Bug 1 + Bug 2 from DIAGNOSIS_2026-05-30.md fixed (2026-05-30, commits ffdbbb2 + 42b90de).**
+
+- **Bug 2 (Commit 1):** Reveal slot relocated from chip's outside edge to below the chip body. New position: slotX=chipX+50, top chips slotY=chipY+123, bottom chips slotY=chipY+94. Clears firewall (x=421), sibling chips, and [-]/[+] buttons. SLOT_SIDES constant removed. UX_DESIGN §5.6 updated.
+
+- **Bug 1 (Commit 2):** `isRevealPhase` in GameBoard.tsx extended to include `resource_allocation` so revealed cards persist on chip slots until the mission starts. New test in card-reveal.spec.ts verifies persistence through resource_allocation and disappearance at player_turn.
+
+Build clean both commits. Tests written; full suite not run (scoped BACKLOG fixes, not phase implementation).
+
+Previous: **TOCTOU race in resolve-next-virus fixed and deployed v11 (2026-05-07, commits bb569c6 + merge 542ba4c).** Cascading Failure now correctly inserts cascade cards before marking CF resolved, and the empty-queue branch re-verifies before advancing. Pool returns to 4 after resolution. Awaiting user manual verification in a fresh dev game.
 
 Previous: **Three BACKLOG fixes shipped 2026-05-06 (commits 3923191, a483937, 3fd186b).** (1) ResourcePhase.tsx: confirmation dialog when Start Mission clicked with unallocated pool resources — shows remaining CPU/RAM, "Allocate more" / "Continue anyway". (2) SecretTargeting.tsx: selectedTargetId resets on dev-mode player switch via useEffect keyed on currentPlayer?.id; chip-click nominations still sync via separate effect. (3) MissionSelection.tsx + ResourcePhase.tsx: try/finally ensures setLoading(false) fires on both success and error paths. Build clean. All three BACKLOG entries marked resolved.
 
