@@ -1,21 +1,15 @@
 # Latest Task
 
 ## Summary
-Fixed Bug 1 and Bug 2 from DIAGNOSIS_2026-05-30.md in two commits.
-
-**Commit 1 — Bug 2 (reveal slot relocation):** The card reveal slot was anchored to the chip's outside edge — clipped by the firewall for chips A/D, and colliding with the resource [-]/[+] buttons during resource_allocation (which now shows the slots, per Bug 1 fix). Relocated to below the chip body, centered (slotX=chipX+50). Top chips: slotY=chipY+123 (SVG y=203), bottom: chipY+94 (SVG y=414). Verified no collision with firewall (x=421), adjacent chips, or [-]/[+] buttons (chip-local x=171–197). SLOT_SIDES constant removed; RevealSlotGroup simplified (no slotSide param). UX_DESIGN §5.6 updated with new coordinates.
-
-**Commit 2 — Bug 1 (reveal persistence):** `isRevealPhase` in GameBoard.tsx was `phase === "card_reveal"` only. Revealed card data already persists in DB until end-play-phase — only the UI gate was wrong. Extended to include `resource_allocation`. New test in card-reveal.spec.ts asserts revealed slots visible in resource_allocation and gone at player_turn.
+Fixed Bug 7 from DIAGNOSIS_2026-05-30.md. `computeBlocked` in `PlayerTurn.tsx` covered only `dataset_integration`; Dataset Preparation's "no Compute until 4 Data" rule was enforced server-side only. Users could click Compute, trigger a round-trip, and receive an error rather than being blocked at the card. Client-side fix: `computeBlocked` now also returns `true` for `dataset_preparation` when `data_contributed < 4`. Hint text updated to be mission-specific. `aria-disabled` and `data-card-key` attributes added to `CardStackGroup` so tests can reliably select and assert disabled state. Server block in `play-card/index.ts` untouched.
 
 ## Files changed
-- `components/game/board/CentralBoard.tsx` — reveal slot moved outside chip body group at chipX+50 / chipY+123|+94; SLOT_SIDES removed; AIChipGroup `slotSide` prop removed; RevealSlotGroup `slotSide` param removed
-- `UX_DESIGN.md` — §5.1 bullet updated; §5.6 heading and body updated with below-chip coordinates
-- `components/game/GameBoard.tsx` — `isRevealPhase` extended to include `resource_allocation`
-- `tests/e2e/card-reveal.spec.ts` — added `advanceThroughCardReveal` helper + new persistence test
+- `components/game/phases/PlayerTurn.tsx` — `computeBlocked` extended to cover `dataset_preparation`; hint text conditional on mission key; `CardStackGroup` outer div gains `data-card-key={cardKey}`, button gains `aria-disabled={disabled ? "true" : undefined}`
+- `tests/e2e/mission-rules.spec.ts` — added `endTurnViaAPI` helper; added Test 4b: asserts `[data-card-key="compute"] button[aria-disabled="true"]` present when data < 4, absent after 4 Data contributed via loop
 
 ## Test status
-- `next build`: clean (both commits)
-- New test written and syntactically verified; full E2E suite not run (scoped BACKLOG fix)
+- `next build`: clean
+- Test 4b written and syntactically verified; conditional on `dataset_preparation` being drawn — skips otherwise (same pattern as Test 4); full E2E suite not run (scoped BACKLOG fix)
 
 ## Suggested next
-Continue DIAGNOSIS_2026-05-30.md — Bugs 3–8 remain. Priority order per diagnosis: Bug 6 (resolveInFlightRef reset allows concurrent empty-queue advances, MEDIUM), Bug 5+8 (refillVirusPool double-fill race, HIGH — Bug 6 fix closes the double-refill pool-corruption path but a separate double-CF concurrency race remains uncharacterized and is NOT closed by the Bug 6 fix — characterize before marking 5+8 resolved), Bug 3 (CentralBoard "×? cards" hand-stack: literal "?" placeholder never wired to a real count, and stack renders only on top two chips; proper fix likely needs a server-side hand_count column due to RLS, MEDIUM). Or from BACKLOG: virus resolution auto-resolve UX cleanup, abort mission timing window, multi-card play.
+Continue DIAGNOSIS_2026-05-30.md — Bugs 3, 5+8, 6 remain. Priority order per diagnosis: Bug 6 (resolveInFlightRef reset allows concurrent empty-queue advances, MEDIUM), Bug 5+8 (refillVirusPool double-fill race, HIGH — Bug 6 fix closes the double-refill pool-corruption path but a separate double-CF concurrency race remains uncharacterized and is NOT closed by the Bug 6 fix — characterize before marking 5+8 resolved), Bug 3 (CentralBoard "×? cards" hand-stack: literal "?" placeholder never wired to a real count, and stack renders only on top two chips; proper fix likely needs a server-side hand_count column due to RLS, MEDIUM). Or from BACKLOG: virus resolution auto-resolve UX cleanup, abort mission timing window, multi-card play.

@@ -40,7 +40,9 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 ---
 
 ## Current Phase
-**Bug 1 + Bug 2 from DIAGNOSIS_2026-05-30.md fixed (2026-05-30, commits ffdbbb2 + 42b90de).**
+**Bug 7 from DIAGNOSIS_2026-05-30.md fixed (2026-05-30, commit 0a6d62e).** `computeBlocked` in PlayerTurn.tsx extended to cover Dataset Preparation (data_contributed < 4). Hint text now mission-specific. `aria-disabled` + `data-card-key` added to CardStackGroup for test selection. New Test 4b in mission-rules.spec.ts. Build clean. Server block untouched.
+
+Previous: **Bug 1 + Bug 2 from DIAGNOSIS_2026-05-30.md fixed (2026-05-30, commits ffdbbb2 + 42b90de).**
 
 - **Bug 2 (Commit 1):** Reveal slot relocated from chip's outside edge to below the chip body. New position: slotX=chipX+50, top chips slotY=chipY+123, bottom chips slotY=chipY+94. Clears firewall (x=421), sibling chips, and [-]/[+] buttons. SLOT_SIDES constant removed. UX_DESIGN §5.6 updated.
 
