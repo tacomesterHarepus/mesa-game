@@ -263,6 +263,13 @@ test.describe("game phase flow", () => {
 
     await humanPage!.getByRole("button", { name: /Start Mission/i }).click();
 
+    // Dismiss the "Continue anyway" confirmation dialog if it appears (fires when pool
+    // resources are unallocated — added commit 3923191, post-baseline).
+    const continueBtn = humanPage!.getByRole("button", { name: /Continue anyway/i });
+    if (await continueBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await continueBtn.click();
+    }
+
     // Wait briefly for the function to complete, then check for errors
     await humanPage!.waitForTimeout(3000);
     if (allocRawError) {
