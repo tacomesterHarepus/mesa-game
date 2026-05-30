@@ -46,13 +46,14 @@ export function VirusResolution({ gameId, overridePlayerId, currentCard, remaini
   // or 500ms after queue empties (to advance the turn).
   // currentCard?.id dep: undefined both at initial mount and genuine empty-queue —
   // the 500ms empty-queue timer cancels naturally when the first card arrives.
+  // Server-side CAS guard (commit c09eff8) makes the advance idempotent, so this
+  // loop can fire multiple times on an empty queue safely — no client-side in-flight
+  // guard needed to prevent double-advance.
   useEffect(() => {
     setAutoResolveError(null);
+    resolveInFlightRef.current = false;
 
     if (currentCard) {
-      // New card — safe to reset the in-flight guard for this card's 2s resolve call.
-      resolveInFlightRef.current = false;
-      // Restart pacing bar for this card
       setBarWidth(0);
       const barTimer = setTimeout(() => setBarWidth(100), 50);
 
@@ -76,10 +77,6 @@ export function VirusResolution({ gameId, overridePlayerId, currentCard, remaini
         clearTimeout(resolveTimer);
       };
     } else {
-      // Empty queue — only schedule the advance call if no 2s resolve call is in-flight.
-      // Do NOT reset resolveInFlightRef here: the 2s call may still be completing its
-      // phase transition, and resetting would allow a concurrent advance call to race it.
-      if (resolveInFlightRef.current) return;
       const advanceTimer = setTimeout(async () => {
         if (resolveInFlightRef.current) return;
         resolveInFlightRef.current = true;
