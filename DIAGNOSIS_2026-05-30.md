@@ -830,3 +830,130 @@ Add `resolveCompleted` to the `useEffect` deps:
 The `else` branch's inner guard (`if (resolveInFlightRef.current) return;` inside the `setTimeout` callback) still prevents a duplicate advance if a race somehow fires the callback twice.
 
 **Flag: virus-system.spec.ts test 3 would have caught this had it been run after commit 59ad57a.** It was not run because the task description noted "Full Playwright suite not run — race conditions not testable via E2E." This was incorrect — the suite has an explicit auto-advance test that directly exercises this path. Full suite must be run for any change to `VirusResolution.tsx`.
+
+---
+
+## BUG 3 — verification + fix options
+
+Ground-truth verification of the three claims, followed by Option A vs Option B analysis and recommendation. No code changes applied.
+
+---
+
+### Verification
+
+#### (a) Literal `×?` — never wired
+
+**Confirmed.** `CentralBoard.tsx:466` contains:
+
+```tsx
+<text x="22" y="86" fontFamily="monospace" fontSize="9" fill="#9cb4a4">×? cards</text>
+```
+
+The `Props` interface (lines 38–52) has no `handCounts` or equivalent prop. `AIChipGroup` receives no hand count parameter. The `?` was a placeholder that was never wired to any data source — it renders literally for every AI chip where `isTop=true`.
+
+#### (b) `isTop` guard limits hand-stack to top two chips
+
+**Confirmed.** `CentralBoard.tsx:461`:
+
+```tsx
+{/* Hand stack — only fits in top chips (bottom chips' RAM track reaches y=87/90) */}
+{isTop && (
+  <>
+    <rect x="4" y="74" width="14" height="10" ... />
+    <rect x="2" y="76" width="14" height="10" ... />
+    <rect x="0" y="78" width="14" height="10" ... />
+    <text x="22" y="86" ...>×? cards</text>
+  </>
+)}
+```
+
+`CHIP_SLOTS` (lines 55–60): chips A and B have `isTop=true`; chips C and D have `isTop=false`. Chips C and D render no hand-stack UI at all — not even a `?` indicator.
+
+The layout conflict driving the guard is confirmed by code:
+- RAM track on bottom chips: `y={isTop ? 61 : 72}`, `height=11` → bottom chips' RAM track occupies y=72–83 (chip-local)
+- Hand-stack rects: y=74, 76, 78 (each height=10) → occupies y=74–88
+- Overlap: y=74–83 (the bottom 9px of the RAM track is covered by the hand-stack rects)
+
+#### (c) RLS prevents reading other AIs' hand counts
+
+**Confirmed.** `hands` table RLS (CLAUDE.md §RLS Policy Summary): "Only readable/writable by owning player." A client authenticated as Bot2 cannot `SELECT * FROM hands WHERE player_id = Bot3.id` — Supabase RLS filters those rows to empty. GameBoard's `hand` state is the current player's own hand only. No path exists to read other AIs' `hands` counts client-side in multiplayer.
+
+---
+
+### Fix options
+
+#### Option A — Client-only: thread own hand.length
+
+**What changes:**
+
+1. Add `handCounts?: Record<string, number>` to `CentralBoard.Props`.
+2. In `AIChipGroup`, receive `handCount?: number` and render it when defined, falling back to `?` when undefined.
+3. In `GameBoard.tsx`, build `handCounts` from the `hand` state (current player's own hand): `{ [currentPlayerId]: hand.length }`. Pass to `CentralBoard`.
+4. In `CentralBoard`, pass `handCounts[player.id]` into each `AIChipGroup`.
+
+**Result:** The viewing player sees their own chip's correct count. All other chips continue to show `?`. No DB change, no migration, no edge function changes.
+
+**Limitations:**
+- In dev mode with PlayerSwitcher, only the currently selected player's chip shows a count (count switches as you switch players). Other chips always show `?`.
+- In production multiplayer, each player's own chip shows a count visible only to themselves. Observers and other players see `?` on all chips — which is actually correct for a game with hidden hand information.
+- This is fundamentally a partial solution for single-player view. It does not give humans (who have no hand) any hand-count visibility.
+
+#### Option B — Server: add `hand_count int` to `players`
+
+**What changes:**
+
+Schema (new migration): `ALTER TABLE players ADD COLUMN hand_count int NOT NULL DEFAULT 0;`
+
+`players.hand_count` is readable by all players in the game (no RLS restriction on public AI stats — same visibility as `cpu` and `ram`). The column is updated by every operation that inserts or deletes from the `hands` table.
+
+**Write sites (5 code locations):**
+
+| Site | Operation | Update |
+|------|-----------|--------|
+| `start-game/index.ts:112` | `hands.insert(allHandRecords)` — deals initial hands to all AIs | After insert: `players.update({ hand_count: cardsDealt }).eq("id", player.id)` per player |
+| `_shared/advanceTurnOrPhase.ts` — `drawCardsForPlayer` | `hands.insert(...)` — top-up to RAM on turn start / mission start | After insert: `players.update({ hand_count: handSize + cardsInserted })` |
+| `discard-cards/index.ts:63` | `hands.delete().eq("id", cardId)` — called N times per discard | After all deletes: `players.update({ hand_count: handSize - cardIds.length })` |
+| `play-card/index.ts:112` | `hands.delete().eq("id", card_id)` | After delete: `players.update({ hand_count: sql("hand_count - 1") })` |
+| `place-virus/index.ts:55` | `hands.delete().eq("id", card_id)` | After delete: `players.update({ hand_count: sql("hand_count - 1") })` |
+
+Notes:
+- `reveal-card` does not modify `hands` (card stays in hand after reveal). No update needed.
+- `resetPlayersForNextMission` (in `end-play-phase` and `abort-mission`) does NOT delete from `hands` — it only clears `has_revealed_card` / `revealed_card_key`. Hand rows persist across missions; the count does not reset between missions.
+- `drawCardsForPlayer` is the shared helper called by `advanceTurnOrPhase`, `allocate-resources`, and `select-mission`. Updating it in one place covers all three callers.
+
+**Result:** `players.hand_count` is always accurate and readable by all. `CentralBoard` can show live counts on all 6–8 chips. Humans see all AI hand counts.
+
+**Limitations:**
+- Requires a migration.
+- Write sites must be kept in sync if any new edge function modifies `hands` in the future. The current set is complete but could drift.
+- `hand_count` is an application-maintained denormalisation — it can drift from `COUNT(*) FROM hands WHERE player_id = ?` if any edge function accidentally skips the update. Low risk given the small write-site set, but worth noting.
+
+---
+
+### Bottom-chip layout constraint (separate issue)
+
+The `isTop` guard is a layout workaround, not a design intent. Even after Option A or B wires a real count, bottom chips (C and D) would still show nothing under the current guard.
+
+**Constraint:** Hand-stack rects at chip-local y=74–88 conflict with the RAM track at y=72–83 on bottom chips. The overlap is 9px (y=74–83). The card-stack visual cannot simply be enabled for bottom chips without moving it.
+
+**Proposed fix for bottom chips:** Replace the stacked-rects visual with a compact count-only badge positioned above the chip body, in the gap between the chip's contribution counter row (rendered below/above the chip body depending on `isTop`) and the chip top edge.
+
+For bottom chips (isTop=false, chip SVG-local y=320):
+- Contribution counters for bottom chips are rendered above the chip at approximately chip-local y=-40 to y=-10 (SVG y=280–310 range — the gap between the top chip rows at SVG y≈240 and bottom chip body start at y=320).
+- A badge at chip-local y=-30 to y=-20 (SVG y=290–300) fits in this gap without overlapping either the contribution counter or the top chip below.
+- Compact form: a single `<rect>` background + `<text>` showing `×N` (e.g. "×3") at the top-left of the chip (mirror of the x=0 position used by top chips).
+- The stacked-rects card visual is omitted for bottom chips; only the count text is shown. This is acceptable — the stacked rects are a decorative chrome detail, not information-bearing.
+
+This is a 4-line SVG change to the `!isTop` case, independent of which count option (A or B) is chosen.
+
+---
+
+### Recommendation
+
+**Implement Option B (server `hand_count` column).** Option A is one afternoon of work but solves the wrong problem — the main use case for hand counts is letting humans assess all AI hands, not letting an AI see their own count (which they already know). The 5 write sites for Option B are well-bounded, the migration is non-destructive (`DEFAULT 0` backfill), and the column makes the information publicly available via `players` which is already polled by `GameBoard`.
+
+**Sequencing:** Address the bottom-chip badge fix first (4-line SVG change, zero dependencies). Then add the migration + write-site updates as a single commit. Then thread `handCounts` from `GameBoard` → `CentralBoard` → `AIChipGroup`.
+
+**Rationale against Option A:** The `?` on other chips is worse UX than no count at all — it implies the information exists but is unavailable, which is confusing in dev mode where the operator controls all players. Partial data is harder to interpret than no data. If Option A ships, the `?` placeholder should be removed from chips where no count is available (render nothing instead).
+
+**Priority:** MEDIUM per impact ranking. Not blocking gameplay; hand counts are inferrable from log entries. However, in playtests this is the most commonly noted display gap for observers and hosts.

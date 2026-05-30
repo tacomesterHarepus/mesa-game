@@ -50,7 +50,11 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 
 **Test suite: 66 pass / 1 fail (pre-existing game-log:535 CPU≥2 flake) / 16 skip.** virus-system.spec.ts test 3 ("phase auto-advances away from virus_resolution within 30s") passes.
 
-**Do NOT mark Bugs 5+8 or Bug 6 resolved until a manual playtest confirms:** (a) no freeze after virus resolution, (b) pool stays ≤4 through a Cascading Failure chain. Server idempotency is now the authoritative fix; client no longer guards against double-advance.
+**Bug status (2026-05-30):**
+- **Bug 5+8 — RESOLVED** (v13 UNIQUE constraint on virus_pool + v14 CAS guard closes the double-refill and double-advance races that caused display drift). Caveat: double-CF application race (two concurrent calls both reading a CF card as resolved=false) is a separate, uncharacterized backlog item — not fixed by v14.
+- **Bug 6 — RESOLVED** (v14 CAS guard's no-op snapshot check removes the source of AUTO-RESOLVE FAILED; no freeze observed in playtest).
+- **Bug 4 — RESOLVED** (commit a483937, playtest-confirmed). Caveat: in dev mode, switching to a Misaligned AI without first clicking a nomination chip defaults selectedTargetId to the first AI — minor UX gap, optional polish only.
+- **Bug 3 — OPEN** ("×? cards" hand-stack: literal `?` never wired, isTop guard limits display to top two chips; proper fix needs server-side hand_count column due to RLS. MEDIUM).
 
 **Double-CF application race (separate from above):** Backlogged. See BACKLOG.md and DIAGNOSIS_2026-05-30.md §VERIFICATION for characterization.
 
