@@ -151,7 +151,7 @@ Same on bottom edge.
 - Below the name: CPU track + RAM track (filled/empty squares — see 5.2)
 - Below CPU/RAM: hand stack (face-down cards × count)
 - Below hand: contribution counters `⚙ N · ▣ N · ◆ N` inline
-- Outside left/right edge: reveal slot during card_reveal phase
+- Below chip body: reveal slot during card_reveal and resource_allocation phases
 
 ### 5.2 Resource tracks (CPU and RAM)
 
@@ -191,13 +191,13 @@ Humans, aligned AIs, and "neutral observers" never see role tags on chips that a
 
 The "(you)" parenthetical follows the name on the player's own chip in lieu of a separate "YOU" tag. Combined with the amber active border, this is sufficient to identify the owner's chip.
 
-### 5.6 Reveal slots (card_reveal phase only)
+### 5.6 Reveal slots (card_reveal and resource_allocation phases)
 
-A `60×84` slot appears to the outside edge of each chip:
-- Cleo (top-left): slot to the left
-- Dax (top-right): slot to the right
-- Echo (bottom-right): slot to the right
-- Finn (bottom-left): slot to the left
+A `60×84` slot appears below each chip body, centered horizontally (slot x = chipX+50, chip is 160px wide):
+- Top chips (A at x=25,y=80 and B at x=225,y=80): slot top at SVG-local y=203 (chipY+123), bottom y=287
+- Bottom chips (C at x=225,y=320 and D at x=25,y=320): slot top at SVG-local y=414 (chipY+94), bottom y=498
+
+The below-chip position keeps slots clear of: the firewall column (x=421–449), adjacent chips, and the resource [-]/[+] buttons (chip-local x=171–197).
 
 States:
 - **Pending**: outlined dashed border, `?` inside, "SELECTING" label

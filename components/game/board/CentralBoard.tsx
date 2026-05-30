@@ -107,14 +107,9 @@ function SVGChipButton({
 
 function RevealSlotGroup({
   slot,
-  slotSide,
 }: {
   slot: RevealChipConfig;
-  slotSide: "left" | "right";
 }) {
-  const slotX = slotSide === "left" ? -65 : 165;
-  const slotY = 3;
-
   if (slot.hasRevealed && slot.revealedCardKey) {
     const cardDef = CARD_MAP[slot.revealedCardKey];
     const isVirus = cardDef?.type === "virus";
@@ -131,7 +126,7 @@ function RevealSlotGroup({
     const cardName = (cardDef?.name ?? slot.revealedCardKey).toUpperCase().slice(0, 9);
 
     return (
-      <g transform={`translate(${slotX}, ${slotY})`}>
+      <g data-testid="reveal-slot" data-revealed="true">
         <rect x="0" y="0" width="60" height="84" fill={isVirus ? "#180c0c" : "#0c1410"}
           stroke={isVirus ? "#a32d2d" : "#3a5a4a"} strokeWidth="1" rx="2" />
         <rect x="0" y="0" width="60" height="18" fill={isVirus ? "#2a1010" : "#0f1820"} rx="2" />
@@ -151,7 +146,7 @@ function RevealSlotGroup({
   const labelColor = slot.isOwnSlot ? "#a87a17" : "#555";
 
   return (
-    <g transform={`translate(${slotX}, ${slotY})`}>
+    <g data-testid="reveal-slot" data-revealed="false">
       <rect x="0" y="0" width="60" height="84" fill="none"
         stroke={borderColor} strokeWidth={borderWidth} strokeDasharray="3 2" rx="2" />
       <text x="30" y="48" textAnchor="middle" fontFamily="monospace" fontSize="24" fill={questionColor}>?</text>
@@ -160,9 +155,6 @@ function RevealSlotGroup({
     </g>
   );
 }
-
-// All chips reveal to the right — slots appear to the right of the chip body
-const SLOT_SIDES: ("left" | "right")[] = ["right", "right", "right", "right"];
 
 function AIChipGroup({
   slotLabel,
@@ -176,7 +168,6 @@ function AIChipGroup({
   revealSlot,
   targetingChip,
   contributions,
-  slotSide = "left",
   isGameOver,
   gameOverRole,
   showMisBadge = false,
@@ -192,7 +183,6 @@ function AIChipGroup({
   revealSlot?: RevealChipConfig;
   targetingChip?: TargetingChipConfig;
   contributions?: { compute: number; data: number; validation: number };
-  slotSide?: "left" | "right";
   isGameOver?: boolean;
   gameOverRole?: string;
   showMisBadge?: boolean;
@@ -529,11 +519,14 @@ function AIChipGroup({
           </g>
         )}
 
-        {/* Reveal slot — rendered in chip-local coords, to outside edge */}
-        {revealSlot && (
-          <RevealSlotGroup slot={revealSlot} slotSide={slotSide} />
-        )}
       </g>
+
+      {/* Reveal slot — below chip body, centered on chip (slot 60px wide, chip 160px wide → offset 50) */}
+      {revealSlot && (
+        <g transform={`translate(${chipX + 50}, ${isTop ? chipY + 123 : chipY + 94})`}>
+          <RevealSlotGroup slot={revealSlot} />
+        </g>
+      )}
     </g>
   );
 }
@@ -777,7 +770,6 @@ export function CentralBoard({
             targetingChip={player ? targetingChips?.[player.id] : undefined}
             contributions={player ? contributions?.[player.id] : undefined}
             showMisBadge={player ? (showMisBadges?.[player.id] ?? false) : false}
-            slotSide={SLOT_SIDES[i]}
             isGameOver={isGameOver}
             gameOverRole={player && gameOverRoles ? gameOverRoles[player.id] : undefined}
           />
