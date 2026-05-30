@@ -40,13 +40,17 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 ---
 
 ## Current Phase
-**Bugs 5+8 (server) + Bug 6 (client) fixed (2026-05-30, commits 61ffada + 59ad57a).**
+**virus_resolution advance is now server-side idempotent (2026-05-30, commits c09eff8 + 5e515a4 + f6b0a8e).**
 
-- **Bug 5+8 server fix (Commit 1):** Migration 017 adds `UNIQUE(game_id, position)` on `virus_pool`. Duplicate rows from three affected games cleaned before constraint applied. `refillVirusPool` in resolve-next-virus now catches Postgres 23505 and returns success (concurrent call already refilled). Deployed as Supabase internal **v13** (2026-05-30). Constraint verified live.
+- **Commit 1 (c09eff8) — CAS guard in resolve-next-virus:** In the empty-queue path, after the stale-queue re-check, a conditional UPDATE (`UPDATE games SET phase='between_turns' WHERE id=? AND phase='virus_resolution'`) gates the advance. Only one concurrent caller can win (Postgres row lock). Loser gets 0 rows affected and returns no-op success. Snapshot check changed from `throw` to no-op return so concurrent losers arriving after the winner already transitioned don't surface AUTO-RESOLVE FAILED. Deployed as Supabase internal **v14** (2026-05-30).
 
-- **Bug 6 client fix (Commit 2):** `resolveInFlightRef.current = false` moved from unconditional top of useEffect into the `if (currentCard)` branch only. Empty-queue branch now checks the ref before scheduling the 500ms advance timer — skips entirely if a 2s resolve call is in-flight. Closes the "AUTO-RESOLVE FAILED" flash and narrows the double-advance window.
+- **Commit 2 (5e515a4) — Client revert:** Reverted the resolveInFlightRef workaround from commit 59ad57a. `resolveInFlightRef.current = false` is now unconditional at the top of every useEffect execution. The server CAS guard is the authoritative double-advance prevention; no client guard needed. This also closes the 100% freeze introduced by commit 59ad57a (where ref=true in else-branch permanently blocked the advance timer).
 
-**Do NOT mark Bugs 5+8 resolved until a manual playtest confirms the pool stays ≤4 through a Cascading Failure chain.** The constraint is the actual fix; the client fix alone is insufficient. Playtest verification still required.
+- **Commit 3 (f6b0a8e) — Test fix (mission-flow.spec.ts):** `a human player submits resource allocation advancing to player_turn` was failing because commit 3923191 added an unallocated-pool confirmation dialog. Test now dismisses it with a 2s optional-click for "Continue anyway".
+
+**Test suite: 66 pass / 1 fail (pre-existing game-log:535 CPU≥2 flake) / 16 skip.** virus-system.spec.ts test 3 ("phase auto-advances away from virus_resolution within 30s") passes.
+
+**Do NOT mark Bugs 5+8 or Bug 6 resolved until a manual playtest confirms:** (a) no freeze after virus resolution, (b) pool stays ≤4 through a Cascading Failure chain. Server idempotency is now the authoritative fix; client no longer guards against double-advance.
 
 **Double-CF application race (separate from above):** Backlogged. See BACKLOG.md and DIAGNOSIS_2026-05-30.md §VERIFICATION for characterization.
 
@@ -142,7 +146,7 @@ Diagnosis files: `DIAGNOSIS_2026-04-24.md` (Phase 7.5 root causes), `DIAGNOSIS_2
 | Role reveal modal | **DONE** | Migration 016 (role_revealed), acknowledge-role edge function v1, RoleRevealModal (misaligned/aligned/human themes), GameBoard wiring (optimistic acknowledge). UX_DESIGN §7.11 + §12 updated. Build clean. Screenshots verified. |
 | Wall layout migration | **DONE** | SVG firewall wall x=421–449, chip cluster x=0–420, action region extended. SLOT_SIDES all "right". VirusCardOverlay 220→95. WinnerBanner +27 shift. TrackerBar/TrackerBars deleted. Test selector drift fixed (phase headings, Player Turn p-filter, dismissModal in 5 specs). 5 commits 525cb26–commit5. Canary 11/10/0. |
 
-**Test suite baseline: 65/15/1. Known flakes (pass in isolation, can fail in full-suite run): (1) game-log:535 — CPU≥2 path race, same test as prior :524; (2) virus-system:251 "no manual Resolve button — auto-resolve is active" — timing flake, 4/5 isolated pass rate; beforeAll times out waiting 15s for player_turn UI update after allocate-resources; confirmed NOT caused by resolve-next-virus v9 or any of the 2026-05-06 playtest-bug commits; (3) mission-rules test 28 — 15s timeout flake, passes on isolated re-run. 2026-05-06 full-suite run observed 64/13/2/2dnr — both failures are known flakes. Previous misclassification corrected: 2026-05-05 overnight test failures were NOT a cold-start flake — caused by stale Next.js dev server (PID 190212, started 22:50, left running) occupying port 3000 and returning 404; reuseExistingServer:true reused it. Stale PID killed before the 2026-05-06 run.**
+**Test suite baseline: 66/16/1. Known flakes (pass in isolation, can fail in full-suite run): (1) game-log:535 — CPU≥2 path race (pre-existing, same as prior :524); (2) mission-rules test 28 — 15s timeout flake, passes on isolated re-run. 2026-05-30 full-suite run: 66 pass / 1 fail (game-log:535) / 16 skip — clean. virus-system test 3 passes. mission-flow:249 now fixed (dialog dismiss added).**
 
 ---
 
@@ -162,7 +166,7 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 | place-virus | v2 | v2: switched gate to request origin; moves card from hands → pending_viruses |
 | end-play-phase | v16 | v16: delete pending_viruses BEFORE insert into pool, throw on delete error |
 | pull-viruses | v2 | v2: switched gate to request origin; pulls pending_pull_count cards from pool into queue |
-| resolve-next-virus | v11 | v11: TOCTOU race fix — applyVirusEffect runs before mark-resolved for cascading_failure; idempotency guard re-fetches queue before !nextCard branch (Supabase internal version 12) |
+| resolve-next-virus | v14 | v13: refillVirusPool catches 23505 (concurrent refill), UNIQUE(game_id,position) constraint on virus_pool. v14: CAS guard (phase=virus_resolution→between_turns) makes empty-queue advance idempotent; snapshot check is no-op return not throw |
 | secret-target | v3 | v3: switched gate to request origin; Phase 11: typed targeting_resolved log |
 | play-card | v8 | v8: switched gate to request origin; Phase 11: typed card_played log with mission_progress snapshot |
 | abort-mission | v3 | v3: switched gate to request origin; Phase 11: typed mission_aborted log |
