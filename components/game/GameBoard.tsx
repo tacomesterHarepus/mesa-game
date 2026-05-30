@@ -605,7 +605,7 @@ export function GameBoard({
       : undefined;
 
   // ── Card reveal chip config ───────────────────────────────────────────────
-  const isRevealPhase = game.phase === "card_reveal";
+  const isRevealPhase = game.phase === "card_reveal" || game.phase === "resource_allocation";
   const revealSlots: Record<string, RevealChipConfig> | undefined = isRevealPhase
     ? Object.fromEntries(
         aiPlayers.map((player) => [

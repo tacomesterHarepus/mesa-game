@@ -86,6 +86,46 @@ async function dismissModal(page: Page): Promise<void> {
   }
 }
 
+// Advance through mission_selection + card_reveal via API, stop at resource_allocation.
+async function advanceThroughCardReveal(
+  page: Page,
+  gameId: string,
+  token: string,
+  aiIds: string[],
+  humanId: string,
+): Promise<void> {
+  await page.getByRole("heading", { name: "Mission Selection" }).waitFor({ state: "visible", timeout: 30000 });
+  const gResp = await fetch(
+    `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=pending_mission_options`,
+    { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+  );
+  const [gRow] = (await gResp.json()) as Array<{ pending_mission_options: string[] }>;
+  await devFetch(`${SUPABASE_URL}/functions/v1/select-mission`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ game_id: gameId, mission_key: gRow.pending_mission_options[0], override_player_id: humanId }),
+  });
+
+  await page.getByRole("heading", { name: "Card Reveal" }).waitFor({ state: "visible", timeout: 15000 });
+  for (const playerId of aiIds) {
+    const handResp = await fetch(
+      `${SUPABASE_URL}/rest/v1/hands?player_id=eq.${playerId}&game_id=eq.${gameId}&select=card_key`,
+      { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+    );
+    if (!handResp.ok) continue;
+    const hand = (await handResp.json()) as Array<{ card_key: string }>;
+    if (!hand.length) continue;
+    await devFetch(`${SUPABASE_URL}/functions/v1/reveal-card`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ game_id: gameId, card_key: hand[0].card_key, override_player_id: playerId }),
+    });
+    await page.waitForTimeout(300);
+  }
+
+  await page.getByRole("heading", { name: "Resource Allocation" }).waitFor({ state: "visible", timeout: 45000 });
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 test.describe("card reveal", () => {
@@ -153,6 +193,44 @@ test.describe("card reveal", () => {
       await expect(
         page.getByRole("button", { name: /reveal card/i })
       ).toBeVisible({ timeout: 5000 });
+    } finally {
+      await ctx.close().catch(() => {});
+    }
+  });
+
+  test("revealed cards persist through resource_allocation and disappear at player_turn", async ({ browser }) => {
+    const ctx: BrowserContext = await browser.newContext();
+
+    try {
+      const { page, gameId } = await fillLobby(ctx, "Bot1");
+      await startDevGame(page);
+
+      const token = await extractAuthToken(page);
+      expect(token).not.toBeNull();
+
+      const { humanId, aiIds } = await collectPlayerIds(page);
+      expect(humanId).not.toBeNull();
+      expect(aiIds.length).toBeGreaterThanOrEqual(2);
+
+      await advanceThroughCardReveal(page, gameId, token!, aiIds, humanId!);
+
+      // At least one AI's card should be shown as revealed in resource_allocation
+      await expect(
+        page.locator('[data-testid="reveal-slot"][data-revealed="true"]').first()
+      ).toBeAttached({ timeout: 5000 });
+
+      // Submit empty allocation → advances to player_turn
+      await devFetch(`${SUPABASE_URL}/functions/v1/allocate-resources`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ game_id: gameId, allocations: [], override_player_id: humanId }),
+      });
+      await page.locator("p").filter({ hasText: /Player Turn/ }).first().waitFor({ state: "visible", timeout: 15000 });
+
+      // Reveal slots must be gone once in player_turn
+      await expect(
+        page.locator('[data-testid="reveal-slot"]')
+      ).toHaveCount(0, { timeout: 5000 });
     } finally {
       await ctx.close().catch(() => {});
     }
