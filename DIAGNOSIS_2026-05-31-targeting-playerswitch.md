@@ -226,15 +226,17 @@ The game_over write at line 159 is not a concurrent race risk: it runs after the
 
 **Empty-queue CAS loser (existing):** 0 rows returned → logs and returns `{ success: true, skipped: "advance_claimed" }`. No throw, no re-advance. ✓
 
-**Targeting CAS loser (proposed):** 0 rows returned → `applyVirusEffect` returns `false` → back in resolve-next-virus, `if (pauseForTargeting)` is false → falls through to win-condition re-fetch at line 154. For all five targeting cards (process_crash, memory_leak, resource_surge, cpu_drain, memory_allocation), none modify `escape_timer` or `core_progress` — the win-condition check at lines 157-170 passes harmlessly and the function returns `{ success: true }`. No throw, no re-advance. ✓
+**Targeting CAS loser (designed here):** return `false` → falls through to win-condition re-fetch. Safe for targeting cards (none touch escape_timer/core_progress), but the fall-through path has a `game_over` DB write (line 159) that the loser must never reach.
 
-The loser of the targeting CAS does NOT write the `virus_effect` game_log entry (the `INSERT` at line 371 is skipped — it's after the `claimed?.length` check). Only the winner logs the effect.
+**Targeting CAS loser (shipped in e4964cf — CORRECTION):** returns `true` (not `false`). The implementation instruction was "if there is any write on the fall-through path, make the loser return EARLY via pauseForTargeting." `true` is the correct choice. The caller's `if (pauseForTargeting)` at lines 147-152 exits immediately via `return new Response({ success: true, paused: "secret_targeting" })` — **zero DB reads or writes, no assumption about whether this caller won**. Lines 154-175 (re-fetch + game_over write) are never reached. The `paused: "secret_targeting"` response body is a no-op to the client: VirusResolution.tsx auto-resolve checks only for errors and ignores the `paused` field (comment at line 72: "phase changes and component unmounts — no action needed"). Both winner and loser exit via the same response path; only the winner wrote the log before returning. True no-op confirmed.
+
+The loser does NOT write the `virus_effect` game_log entry (the INSERT at line 381 is skipped — it's after the `claimed?.length` check). Only the winner logs the effect.
 
 ---
 
 ### Summary of the fix
 
-**One-line scope:** add `.eq("phase", "virus_resolution").select("id")` to the targeting UPDATE at `resolve-next-virus/index.ts:364`, check `claimed?.length`, and return `false` if 0 rows. This brings the targeting exit branch under the same CAS discipline as the empty-queue exit branch. After the fix, both exits from `virus_resolution` are mutually exclusive at the Postgres row level.
+**One-line scope:** add `.eq("phase", "virus_resolution").select("id")` to the targeting UPDATE at `resolve-next-virus/index.ts:367`, check `claimed?.length`, and return `true` if 0 rows (loser exits immediately via pauseForTargeting path). This brings the targeting exit branch under the same CAS discipline as the empty-queue exit branch. After the fix, both exits from `virus_resolution` are mutually exclusive at the Postgres row level.
 
 The VirusResolution.tsx dep-array change (removing `overridePlayerId` at line 97) is a **secondary hardening** that eliminates the spurious concurrent call at the source, but it is not the root-cause fix. The server-side race can also be triggered by legitimate network retry or any other scenario where two `resolve-next-virus` calls overlap. The CAS fix is the correct structural solution independent of what triggers the concurrent call.
 
