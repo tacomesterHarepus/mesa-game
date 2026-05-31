@@ -40,7 +40,17 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 ---
 
 ## Current Phase
-**Abort-vote mechanic — COMPLETE (2026-05-31): server layer (Step 2) + UI layer (Step 3) shipped.**
+**secret_targeting concurrency race — CLOSED (2026-05-31, commits e4964cf + c4b41fe, deployed resolve-next-virus).**
+
+Two concurrent `resolve-next-virus` calls could both pass the top-of-function `phase='virus_resolution'` guard. The targeting branch in `applyVirusEffect` wrote `phase='secret_targeting'` with no CAS condition, allowing the empty-queue CAS winner to claim `between_turns` first while the targeting write overrode it, then `advanceTurnOrPhase` wrote `player_turn` — leaving targeting fields orphaned and the game in `player_turn` with no `targeting_resolved` log.
+
+Fix: added `.eq("phase", "virus_resolution").select("id")` CAS to the targeting UPDATE; loser returns `true` immediately (exits via `pauseForTargeting` path, no further writes). Also removed spurious `overridePlayerId` dep from `VirusResolution.tsx` auto-resolve useEffect dep array — this was the DevMode-specific trigger. Full root cause and DB forensics in `DIAGNOSIS_2026-05-31-targeting-playerswitch.md`.
+
+Full suite: **72 pass / 1 fail (pre-existing game-log:535) / 14 skip**. virus-system.spec.ts 85-87 all pass.
+
+**PENDING USER ACTION: Apply migration 018 to prod.** After that, the abort-vote flow is fully live.
+
+Previous: **Abort-vote mechanic — COMPLETE (2026-05-31): server layer (Step 2) + UI layer (Step 3) shipped.**
 
 Step 2 summary (commit c7ca2ee, previously deployed):
 - Migration `018_abort_vote.sql` written and applied to Supabase project (NOT yet applied to prod by user).
