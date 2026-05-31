@@ -40,6 +40,15 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 ---
 
 ## Current Phase
+**Race 1 — double-CF application race — CLOSED (2026-05-31, commits e1f02ec + f761e1a, resolve-next-virus v17).**
+
+Atomic per-card CAS claim added to `resolve-next-virus` between the `nextCard` SELECT (line 53) and the CF/non-CF processing branches. `being_processed=true` + `being_processed_at=now()` marks the owner; 5s timestamp reclaim recovers a card if the winner crashes in the CF failure window (~250ms, 5 DB awaits). v11 CF ordering (cascade INSERT before `resolved=true`) preserved unchanged. Migration 019 adds `being_processed boolean NOT NULL DEFAULT false` and `being_processed_at timestamptz` to `virus_resolution_queue`. Full suite: **71 pass / 1 fail (pre-existing game-log:535) / 15 skip** — clean, no regressions. See `DIAGNOSIS_2026-05-31-virus-cascade-loop.md §Race 1 fix design`.
+
+**PENDING USER ACTIONS:**
+- Apply migration 018 to prod (abort-vote flow goes fully live).
+- Apply migration 019 to prod (Race 1 CAS claim goes fully live).
+- Race 1 manual verification: cross-browser CF chain, confirm exactly N cascade rows per CF, no duplicate positions in `virus_resolution_queue`.
+
 **secret_targeting concurrency race — CLOSED (2026-05-31, commits e4964cf + c4b41fe, deployed resolve-next-virus).**
 
 Two concurrent `resolve-next-virus` calls could both pass the top-of-function `phase='virus_resolution'` guard. The targeting branch in `applyVirusEffect` wrote `phase='secret_targeting'` with no CAS condition, allowing the empty-queue CAS winner to claim `between_turns` first while the targeting write overrode it, then `advanceTurnOrPhase` wrote `player_turn` — leaving targeting fields orphaned and the game in `player_turn` with no `targeting_resolved` log.
@@ -198,7 +207,7 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 | place-virus | v2 | v2: switched gate to request origin; moves card from hands → pending_viruses |
 | end-play-phase | v17 | v17: abort flag cleared on mission-resolve branches; abort vote injection on no-virus path; shared helpers imported |
 | pull-viruses | v2 | v2: switched gate to request origin; pulls pending_pull_count cards from pool into queue |
-| resolve-next-virus | v15 | v14: CAS guard makes empty-queue advance idempotent. v15: abort vote injection at CAS winner path |
+| resolve-next-virus | v17 | v14: empty-queue CAS. v15: abort vote injection. v17: per-card being_processed CAS claim (Race 1 fix) |
 | secret-target | v3 | v3: switched gate to request origin; Phase 11: typed targeting_resolved log |
 | play-card | v8 | v8: switched gate to request origin; Phase 11: typed card_played log with mission_progress snapshot |
 | abort-mission | v4 | v4: refactored to use applyMissionAbort from _shared; local helpers removed |
