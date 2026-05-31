@@ -356,12 +356,22 @@ async function applyVirusEffect(admin: any, game: any, card: any): Promise<boole
     case "cpu_drain":
     case "memory_allocation": {
       const deadline = new Date(Date.now() + 60_000).toISOString();
-      await admin.from("games").update({
+      // CAS: only one concurrent resolve-next-virus call can win the virus_resolution exit.
+      // The empty-queue branch already guards with WHERE phase='virus_resolution'; this
+      // makes the targeting branch identical so the two exits are mutually exclusive.
+      const { data: claimed } = await admin.from("games").update({
         phase: "secret_targeting",
         targeting_deadline: deadline,
         current_targeting_resolution_id: card.id,
         current_targeting_card_key: card.card_key,
-      }).eq("id", game_id);
+      }).eq("id", game_id).eq("phase", "virus_resolution").select("id");
+      if (!claimed?.length) {
+        // CAS lost — concurrent caller already won the virus_resolution exit. Return true
+        // so the caller exits immediately via the pauseForTargeting path with no further
+        // writes (the fall-through path has a game_over write; loser must not reach it).
+        console.log("[resolve-next-virus] targeting CAS lost — concurrent caller advanced phase");
+        return true;
+      }
       const targetingLog: GameLogInsert<"virus_effect"> = {
         game_id,
         event_type: "virus_effect",
