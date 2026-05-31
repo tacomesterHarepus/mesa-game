@@ -12,6 +12,7 @@ import { SecretTargeting } from "./phases/SecretTargeting";
 import { AbortVote } from "./phases/AbortVote";
 import { GameOver } from "./phases/GameOver";
 import { DevModeOverlay } from "./DevModeOverlay";
+import { DevQueueInspector } from "./dev/DevQueueInspector";
 import { RoleRevealModal } from "./RoleRevealModal";
 import { TopBar } from "./board/TopBar";
 import { MissionPanel } from "./board/MissionPanel";
@@ -779,6 +780,7 @@ export function GameBoard({
           turnOrderIds={game.turn_order_ids}
         />
       )}
+      {devMode && <DevQueueInspector gameId={gameId} />}
 
       {/* Fixed 1440×900 board — all child elements absolutely positioned */}
       <div
