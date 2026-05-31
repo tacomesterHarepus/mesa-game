@@ -119,9 +119,31 @@ Deno.serve(async (req) => {
       return await advanceTurnOrPhase(admin, freshGame, fakeCurrentPlayer, missionResolved, pendingOutcome ?? undefined);
     }
 
-    // For cascading_failure: apply effect BEFORE marking resolved so cascade cards are in
-    // the queue before any concurrent call can observe CF as resolved with no cascade rows.
-    // For all other cards: mark resolved first to prevent double-application of effects.
+    // Atomic per-card claim: prevents two concurrent callers from both processing the
+    // same card. being_processed=true + being_processed_at=now() marks this caller as
+    // the owner. The 5s reclaim window guards against a winner that dies mid-processing
+    // (the CF failure window is ~5 DB awaits, ~250ms worst case — 5s is 20× that).
+    // The v11 CF ordering (cascade INSERT before resolved=true) is unchanged: the CAS
+    // gates entry to the CF/non-CF branches below, which run unmodified after the gate.
+    const claimCutoff = new Date(Date.now() - 5_000).toISOString();
+    const { data: cardClaimed } = await admin
+      .from("virus_resolution_queue")
+      .update({ being_processed: true, being_processed_at: new Date().toISOString() })
+      .eq("id", nextCard.id)
+      .eq("resolved", false)
+      .or(`being_processed.eq.false,being_processed_at.lt.${claimCutoff}`)
+      .select("id");
+
+    if (!cardClaimed?.length) {
+      console.log("[resolve-next-virus] card claim lost — concurrent caller holds live claim");
+      return new Response(JSON.stringify({ success: true, skipped: "card_claimed" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // For cascading_failure: v11 ordering preserved — cascade INSERT before resolved=true.
+    // No concurrent caller reaches this point; the claim CAS above is the sole gate.
+    // For all other cards: mark resolved first, then apply effect.
     if (nextCard.card_key === "cascading_failure") {
       await applyVirusEffect(admin, game, nextCard);
     }
