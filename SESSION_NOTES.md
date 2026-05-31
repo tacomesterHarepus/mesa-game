@@ -40,6 +40,19 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 ---
 
 ## Current Phase
+**Pool shuffle fix — CLOSED (2026-05-31/06-01, 4 commits + 2 deploys).**
+
+New invariant: `virus_pool.position` encodes nothing — after any mutation, positions are a random permutation of {0..N-1}. Eliminates the FIFO information leak where staged cards were distinguishable by position.
+
+Changes:
+- `end-play-phase` (v18): CAS player_turn→between_turns sentinel at top; pending→pool replaced with DELETE-all + INSERT (survivors+pending) shuffled. Removed maxPoolRow query.
+- `resolve-next-virus` (v18): refillVirusPool replaces maxPos+1 append + 23505 catch with DELETE-all + INSERT (survivors+drawn) shuffled.
+- `GameBoard.tsx`: virus_pool INSERT/DELETE handlers → re-fetch-on-event (delta counting broke under batch reshuffle).
+- `tests/e2e/virus-placement.spec.ts`: FIFO comment rewritten to reflect random-position invariant.
+- Migration 020: virus_pool added to supabase_realtime publication (applied prior session).
+
+Full suite: 52 pass / 12 fail / 2 skip / 21 did not run. All 12 failures pre-existing (same as .last-run.json before session). virus-placement:151 and virus-system:251 are cold-start timeouts — did not reach pool assertion logic.
+
 **Race 1 — double-CF application race — CLOSED (2026-05-31, commits e1f02ec + f761e1a, resolve-next-virus v17).**
 
 Atomic per-card CAS claim added to `resolve-next-virus` between the `nextCard` SELECT (line 53) and the CF/non-CF processing branches. `being_processed=true` + `being_processed_at=now()` marks the owner; 5s timestamp reclaim recovers a card if the winner crashes in the CF failure window (~250ms, 5 DB awaits). v11 CF ordering (cascade INSERT before `resolved=true`) preserved unchanged. Migration 019 adds `being_processed boolean NOT NULL DEFAULT false` and `being_processed_at timestamptz` to `virus_resolution_queue`. Full suite: **71 pass / 1 fail (pre-existing game-log:535) / 15 skip** — clean, no regressions. See `DIAGNOSIS_2026-05-31-virus-cascade-loop.md §Race 1 fix design`.
@@ -205,9 +218,9 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 | allocate-resources | v8 | v8: switched gate to request origin; draws cards + resets has_discarded_this_turn for first player |
 | discard-cards | v3 | v3: switched gate to request origin; Phase 11: typed `discard` log with metadata |
 | place-virus | v2 | v2: switched gate to request origin; moves card from hands → pending_viruses |
-| end-play-phase | v17 | v17: abort flag cleared on mission-resolve branches; abort vote injection on no-virus path; shared helpers imported |
+| end-play-phase | v18 | v17: abort flag/vote injection. v18: player_turn→between_turns CAS + full pool reshuffle (DELETE-all + INSERT shuffled 0..N-1) |
 | pull-viruses | v2 | v2: switched gate to request origin; pulls pending_pull_count cards from pool into queue |
-| resolve-next-virus | v17 | v14: empty-queue CAS. v15: abort vote injection. v17: per-card being_processed CAS claim (Race 1 fix) |
+| resolve-next-virus | v18 | v14: empty-queue CAS. v17: Race 1 per-card CAS. v18: refillVirusPool full reshuffle, removed 23505 catch |
 | secret-target | v3 | v3: switched gate to request origin; Phase 11: typed targeting_resolved log |
 | play-card | v8 | v8: switched gate to request origin; Phase 11: typed card_played log with mission_progress snapshot |
 | abort-mission | v4 | v4: refactored to use applyMissionAbort from _shared; local helpers removed |

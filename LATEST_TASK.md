@@ -1,25 +1,22 @@
 # Latest Task
 
 ## Summary
-Closed Race 1 (double-CF application race) in `resolve-next-virus`. Two concurrent calls could both read a `cascading_failure` card as `resolved=false` and both invoke `applyVirusEffect`, inserting duplicate cascade rows (observed in playtest: positions 4+5 each duplicated, Bot4 CPU over-drained by 1). Fix: atomic per-card CAS claim inserted between the `nextCard` SELECT and the CF/non-CF branch. `UPDATE virus_resolution_queue SET being_processed=true, being_processed_at=now() WHERE id=X AND resolved=false AND (being_processed=false OR being_processed_at < now()-5s) RETURNING id`. Loser (0 rows) returns `{skipped:"card_claimed"}` immediately. Winner proceeds to unchanged CF/non-CF branches. v11 CF ordering (cascade INSERT before `resolved=true`) preserved — the CAS is purely a gate before existing logic, nothing after the gate changes. Migration 019 adds the two claim columns.
+Pool shuffle fix: virus_pool position now encodes nothing. After any mutation, positions are a random permutation of {0..N-1}. This eliminates the information leak where FIFO append let observers infer which AI staged which card. Four commits: (1) end-play-phase CAS sentinel + reshuffle — concurrent callers serialized by player_turn→between_turns CAS before any work begins; pool reshuffle replaces the old maxPos+1 append; (2) refillVirusPool in resolve-next-virus — same DELETE-all+INSERT-shuffled pattern, 23505 catch removed (now impossible under between_turns CAS); (3) GameBoard.tsx — pool count handlers switched from delta-counting (prev+1/prev-1) to re-fetch-on-event so batch reshuffle doesn't transiently zero the display; (4) virus-placement.spec.ts — FIFO comment updated to reflect random-position invariant. Both edge functions deployed. Migration 020 (virus_pool added to supabase_realtime publication) was applied in the preceding session.
 
 ## Files changed
-- `supabase/migrations/019_virus_queue_claim.sql` — new: adds `being_processed boolean NOT NULL DEFAULT false` and `being_processed_at timestamptz` to `virus_resolution_queue`
-- `supabase/functions/resolve-next-virus/index.ts` — CAS claim block inserted at line 122–142 (was line 122–127); v11 comment updated; deployed as v17
-- `DIAGNOSIS_2026-05-31-virus-cascade-loop.md` — Race 1 fix design + being_processed cleanup sections appended; Race 1 status marked CLOSED
-- `BACKLOG.md` — double-CF entry closed; Race 2 (duplicate secret-target) entry added as still open
+- `supabase/functions/end-play-phase/index.ts` — CAS phase claim (player_turn→between_turns) moved to top of function; pending→pool logic replaced with DELETE-all-pool + INSERT (survivors+pending) shuffled 0..N-1; removed maxPoolRow query
+- `supabase/functions/resolve-next-virus/index.ts` — refillVirusPool: replaced maxPos+1 append + 23505 catch with DELETE-all-survivors + INSERT (survivors+drawn) shuffled 0..N-1
+- `components/game/GameBoard.tsx` — virus_pool INSERT/DELETE handlers: delta counting replaced with async re-fetch of exact count
+- `tests/e2e/virus-placement.spec.ts` — lines 205-208 comment: FIFO "highest pool position / lowest position 0" assumption replaced with random-position explanation
+- `supabase/migrations/020_virus_pool_realtime.sql` — (applied prior session) `ALTER PUBLICATION supabase_realtime ADD TABLE virus_pool`
 
 ## Test status
-- `next build`: clean
-- Full Playwright suite: **71 pass / 1 fail (pre-existing game-log:535 flake) / 15 skip** (13.8 min)
-- Baseline was 72/1/14; the one extra skip is the conditional game-log CPU≥2 path test flipping on deck randomness — documented pre-existing, not a regression
-- virus-system.spec.ts tests pass (directly exercises the changed code path)
-- Race 1 concurrent-race E2E test: not added — staging two simultaneous server calls with DB-timing precision is not feasible in Playwright. Manual verification: cross-browser CF chain, confirm exactly N cascade rows per CF card in `virus_resolution_queue`, no duplicate positions.
+Full Playwright suite: 52 pass / 12 fail / 2 skip / 21 did not run.
+All 12 failures are pre-existing (same set as `.last-run.json` before this session):
+- game-log:535 — pre-existing CPU≥2 path flake (listed in CLAUDE.md)
+- card-reveal:132, mission-flow:215 — DevQueueInspector fixed overlay blocking Reveal Card button (pre-existing, in .last-run.json before session)
+- 9 remaining — infrastructure cold-start timeouts (`locator.fill: Test ended` at game creation); not caused by code changes
+virus-placement:151 and virus-system:251 failures are both cold-start timeouts — the tests never reached pool assertion logic.
 
 ## Suggested next
-**User applies migration 019 to prod** — Race 1 CAS claim goes fully live. (Migration 018 for abort-vote is also still pending prod apply.)
-
-After that, candidates from BACKLOG:
-- **Race 2 (duplicate secret-target resolution)** — `secret-target` phase guard is read-then-check; CAS on the phase transition `WHERE phase='secret_targeting'` closes it. Small fix, similar pattern to the targeting CAS already in place. See `DIAGNOSIS_2026-05-31-virus-cascade-loop.md §Race 2`.
-- Chat system (Phase 12) — public + misaligned private chat
-- End game screen + rematch flow
+Apply pending migrations to prod: migration 018 (abort_vote tables) and migration 019 (being_processed columns on virus_resolution_queue). Both are written and tested but not yet applied. After 018, the abort-vote mechanic is fully live in production. After 019, the Race 1 per-card CAS claim is live. See SESSION_NOTES for the explicit PENDING USER ACTIONS entries.

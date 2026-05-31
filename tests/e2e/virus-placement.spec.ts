@@ -203,9 +203,9 @@ test.describe("virus placement", () => {
       const stagedCardName = CARD_NAMES[stagedCardKey] ?? stagedCardKey;
 
       // Baseline: count of this card_key in pool + queue before End Turn.
-      // Mathematical proof: after end-play-phase with CPU=2, the staged card is added at
-      // the highest pool position and the 1 drawn card comes from the lowest (position 0).
-      // So pool.count(K) + queue.count(K) increases by exactly 1 regardless of overlap.
+      // After end-play-phase the staged card is shuffled into the pool (random position) and
+      // 1 virus is drawn from the pool into the resolution queue.
+      // pool.count(K) + queue.count(K) increases by exactly 1 regardless of which card is drawn.
       const [poolBefore, queueBefore] = await Promise.all([
         fetch(
           `${SUPABASE_URL}/rest/v1/virus_pool?game_id=eq.${gameId}&card_key=eq.${stagedCardKey}&select=id`,
