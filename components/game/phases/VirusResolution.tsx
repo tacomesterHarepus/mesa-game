@@ -94,7 +94,10 @@ export function VirusResolution({ gameId, overridePlayerId, currentCard, remaini
       return () => clearTimeout(advanceTimer);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentCard?.id, gameId, overridePlayerId]);
+  // overridePlayerId intentionally excluded: it is read from closure at effect fire time,
+  // not needed as a dep. Including it re-fires on player switch, which was the client-side
+  // trigger for the secret_targeting concurrency race (DIAGNOSIS_2026-05-31-targeting-playerswitch.md).
+  }, [currentCard?.id, gameId]);
 
   async function handleManualContinue() {
     setAutoResolveError(null);
