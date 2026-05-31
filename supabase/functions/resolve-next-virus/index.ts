@@ -447,26 +447,24 @@ async function refillVirusPool(admin: any, game_id: string) {
 
   if (drawCards.length === 0) return;
 
-  const { data: maxPoolRow } = await admin.from("virus_pool")
-    .select("position").eq("game_id", game_id)
-    .order("position", { ascending: false }).limit(1).maybeSingle();
-  const startPos = (maxPoolRow?.position ?? -1) + 1;
+  // Full reshuffle: read survivors, combine with draw cards, DELETE all, INSERT shuffled 0..N-1
+  const { data: survivors } = await admin.from("virus_pool")
+    .select("card_key, card_type").eq("game_id", game_id);
 
+  const combined = [
+    ...(survivors ?? []).map((c: any) => ({ card_key: c.card_key, card_type: c.card_type })),
+    ...drawCards.map((c: any) => ({ card_key: c.card_key, card_type: c.card_type })),
+  ];
+  const shuffledCombined = shuffle(combined);
+
+  await admin.from("virus_pool").delete().eq("game_id", game_id);
   const { error: insertError } = await admin.from("virus_pool").insert(
-    drawCards.map((card: any, i: number) => ({
-      game_id, card_key: card.card_key, card_type: card.card_type,
-      position: startPos + i,
+    shuffledCombined.map((card: any, i: number) => ({
+      game_id, card_key: card.card_key, card_type: card.card_type, position: i,
     }))
   );
-  if (insertError) {
-    if ((insertError as any).code === "23505") {
-      // Unique-constraint violation: a concurrent call already refilled the pool.
-      // Treat as success — do not mark deck cards drawn (the other call did it).
-      console.log("[refillVirusPool] unique-constraint violation — concurrent refill detected, exiting");
-      return;
-    }
-    throw insertError;
-  }
+  if (insertError) throw insertError;
+
   await admin.from("deck_cards").update({ status: "drawn" })
     .in("id", drawCards.map((c: any) => c.id));
 }
