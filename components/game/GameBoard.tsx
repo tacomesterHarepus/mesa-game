@@ -217,12 +217,18 @@ export function GameBoard({
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "virus_pool", filter: `game_id=eq.${gameId}` },
-          () => { setPoolCount((prev) => prev + 1); }
+          async () => {
+            const { count } = await supabase.from("virus_pool").select("id", { count: "exact", head: true }).eq("game_id", gameId);
+            if (!cancelled && count !== null) setPoolCount(count);
+          }
         )
         .on(
           "postgres_changes",
           { event: "DELETE", schema: "public", table: "virus_pool", filter: `game_id=eq.${gameId}` },
-          () => { setPoolCount((prev) => Math.max(0, prev - 1)); }
+          async () => {
+            const { count } = await supabase.from("virus_pool").select("id", { count: "exact", head: true }).eq("game_id", gameId);
+            if (!cancelled && count !== null) setPoolCount(count);
+          }
         );
 
       // Hand updates — subscribe to whichever player's hand is active.
