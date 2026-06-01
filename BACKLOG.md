@@ -6,6 +6,8 @@ Ideas and polish items that aren't blocking current phases. Add freely; prioriti
 
 ## UX Polish
 
+- **Revealed card hover-to-enlarge** — Cards revealed by AIs (RevealSlotGroup on the chip slots, rendered in CentralBoard) are small; for virus cards the full name and effect text are truncated/unreadable at that size. Add hover-to-expand: hovering an exposed revealed card shows the full card (full name + effect description) at readable size, e.g. a popover/tooltip near the slot or a scaled-up overlay. Read-only — no interaction beyond display. Scope is the revealed-card slots specifically, not the active player's hand. *(Reported: 2026-06-01 multiplayer playtest)*
+
 - **Draw cards animation** — When an AI's turn starts, cards should visibly draw from a deck into the hand rather than snapping in. Reinforces the physical card game metaphor and makes draw-count bugs obvious to observers without checking the DB. Priority: medium. Scope: part of the broader game-feel pass, not a standalone feature. *(Reported: 2026-04-25 playtest)*
 
 - **Active turn indicator** — *(Resolved: ring-2 ring-amber/40 added to isActive branch in PlayerRoster.tsx, 2026-04-24)*
