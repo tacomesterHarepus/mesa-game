@@ -53,22 +53,18 @@ Canary (mission-rules + multi-mission): 6 passed / 7 skipped (mission-key guards
 
 ---
 
-**Pool shuffle fix — PARTIALLY COMMITTED. ⚠️ end-play-phase v18 not on master.**
+**Pool shuffle fix — CLOSED (2026-05-31/06-01, commits 1deec96 + 7f76fb7 + 79f47d7 + 40c093a).**
 
 New invariant: `virus_pool.position` encodes nothing — after any mutation, positions are a random permutation of {0..N-1}. Eliminates the FIFO information leak where staged cards were distinguishable by position.
 
-Committed changes (all on master):
-- `resolve-next-virus` (v18, commit 1deec96): refillVirusPool replaces maxPos+1 append + 23505 catch with DELETE-all + INSERT (survivors+drawn) shuffled.
+All changes on master:
+- `end-play-phase` v18 (commit 40c093a): CAS player_turn→between_turns sentinel at top; pending→pool replaced with DELETE-all-pool + INSERT (survivors+pending) shuffled 0..N-1; removed maxPoolRow query. Was deployed but never committed; reconciled 2026-06-01.
+- `resolve-next-virus` v18 (commit 1deec96): refillVirusPool replaces maxPos+1 append + 23505 catch with DELETE-all + INSERT (survivors+drawn) shuffled.
 - `GameBoard.tsx` (commit 7f76fb7): virus_pool INSERT/DELETE handlers → re-fetch-on-event (delta counting broke under batch reshuffle).
 - `tests/e2e/virus-placement.spec.ts` (commit 79f47d7): FIFO comment rewritten to reflect random-position invariant.
-- Migration 020: virus_pool added to supabase_realtime publication — applied to prod; SQL file untracked (`supabase/migrations/020_virus_pool_realtime.sql` in working tree, never committed).
+- Migration 020 SQL (commit 40c093a): virus_pool added to supabase_realtime publication; applied to prod prior session, tracked in master 2026-06-01.
 
-**NOT committed (working-tree only):**
-- `end-play-phase` (v18): CAS player_turn→between_turns sentinel at top; pending→pool logic replaced with DELETE-all-pool + INSERT (survivors+pending) shuffled 0..N-1; removed maxPoolRow query.
-
-The docs update in commit 79f47d7 incorrectly described end-play-phase v18 as committed. The Supabase project may have v18 deployed directly from the working tree (deploy does not require a git commit), but master does not have it. **end-play-phase v18 must be committed and pushed before the pool shuffle fix is fully on master.**
-
-23505 concern status: the 23505 catch was removed from resolve-next-virus v18 because it is unreachable once end-play-phase holds the `between_turns` CAS sentinel (preventing any concurrent pool inserter). That safety argument depends on end-play-phase v18 CAS being deployed. Status: resolved in code; confirmed safe only if Supabase has end-play-phase v18 deployed.
+23505 concern: RESOLVED. The 23505 catch removal from resolve-next-virus v18 is safe — end-play-phase v18 CAS is confirmed deployed and on master, preventing any concurrent pool inserter from running alongside refillVirusPool.
 
 Full suite (from 79f47d7 session): 52 pass / 12 fail / 2 skip / 21 did not run. All 12 failures pre-existing.
 
@@ -79,12 +75,11 @@ DevQueueInspector dev panel (commit 09c5d61): read-only queue + pool inspector p
 Atomic per-card CAS claim added to `resolve-next-virus` between the `nextCard` SELECT (line 53) and the CF/non-CF processing branches. `being_processed=true` + `being_processed_at=now()` marks the owner; 5s timestamp reclaim recovers a card if the winner crashes in the CF failure window (~250ms, 5 DB awaits). v11 CF ordering (cascade INSERT before `resolved=true`) preserved unchanged. Migration 019 adds `being_processed boolean NOT NULL DEFAULT false` and `being_processed_at timestamptz` to `virus_resolution_queue`. Full suite: **71 pass / 1 fail (pre-existing game-log:535) / 15 skip** — clean, no regressions. See `DIAGNOSIS_2026-05-31-virus-cascade-loop.md §Race 1 fix design`.
 
 **PENDING ACTIONS (as of 2026-06-01):**
-- ⚠️ Commit + push `end-play-phase/index.ts` v18 (working tree, never committed). Run `next build` clean, then commit standalone. Deploy to Supabase after push.
-- Commit + push `supabase/migrations/020_virus_pool_realtime.sql` (untracked, applied to prod — needs to land in master for history).
 - Apply migration 018 to prod (abort-vote flow goes fully live).
 - Apply migration 019 to prod (Race 1 CAS claim goes fully live).
 - Manual verification before Tuesday: abort-vote flow end-to-end, targeting cross-browser, full clean round. Pool reshuffle + Race 1 CF chains looking good in playtest.
 - Open backlog items: Race 2 (duplicate secret-target vote) still open. Two DevQueueInspector cosmetic items open (resolved-filter on duplicate detection, clear being_processed on resolve).
+- Untracked project files to decide on: `playwright.noserver.config.ts`, `playwright.test3002.config.ts` (real Playwright configs used in canary runs — not scratch, not committed).
 
 **secret_targeting concurrency race — CLOSED (2026-05-31, commits e4964cf + c4b41fe, deployed resolve-next-virus).**
 
@@ -238,7 +233,7 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 | allocate-resources | v8 | v8: switched gate to request origin; draws cards + resets has_discarded_this_turn for first player |
 | discard-cards | v3 | v3: switched gate to request origin; Phase 11: typed `discard` log with metadata |
 | place-virus | v2 | v2: switched gate to request origin; moves card from hands → pending_viruses |
-| end-play-phase | v18 (⚠️ NOT on master) | v17: abort flag/vote injection. v18: player_turn→between_turns CAS + full pool reshuffle (DELETE-all + INSERT shuffled 0..N-1). **Working tree only — never committed. Needs commit + push + deploy.** |
+| end-play-phase | v18 | v17: abort flag/vote injection. v18: player_turn→between_turns CAS + full pool reshuffle (DELETE-all + INSERT shuffled 0..N-1). Commit 40c093a. |
 | pull-viruses | v2 | v2: switched gate to request origin; pulls pending_pull_count cards from pool into queue |
 | resolve-next-virus | v18 | v14: empty-queue CAS. v17: Race 1 per-card CAS. v18: refillVirusPool full reshuffle, removed 23505 catch |
 | secret-target | v3 | v3: switched gate to request origin; Phase 11: typed targeting_resolved log |
