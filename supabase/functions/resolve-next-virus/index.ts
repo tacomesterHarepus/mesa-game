@@ -435,17 +435,31 @@ function cardDisplayName(key: string): string {
 async function refillVirusPool(admin: any, game_id: string) {
   const { count: poolCount } = await admin.from("virus_pool")
     .select("*", { count: "exact", head: true }).eq("game_id", game_id);
-  const needed = 4 - (poolCount ?? 0);
+  const survivorCount = poolCount ?? 0;
+  const needed = 4 - survivorCount;
   if (needed <= 0) return;
 
+  // Draw needed cards. If drawFromDeck returns fewer than requested (partial draw — either
+  // because in_deck is smaller than needed, or a transient short read), supplement by
+  // reshuffling discards and drawing the remaining deficit. The old guard only handled
+  // drawCards.length === 0; a partial return (0 < length < needed) was silently accepted,
+  // producing a short pool. Per game rules with 60 cards, needed is always satisfiable.
   let drawCards = await drawFromDeck(admin, game_id, needed);
 
-  if (drawCards.length === 0) {
+  if (drawCards.length < needed) {
     await reshuffleDiscard(admin, game_id);
-    drawCards = await drawFromDeck(admin, game_id, needed);
+    const stillNeeded = needed - drawCards.length;
+    const moreCards = await drawFromDeck(admin, game_id, stillNeeded);
+    drawCards = [...drawCards, ...moreCards];
   }
 
-  if (drawCards.length === 0) return;
+  // With 60 total cards and reshuffle available, running out entirely means cards have leaked.
+  if (drawCards.length === 0) {
+    throw new Error(
+      `[refillVirusPool] deck exhausted — no cards in_deck or discarded. ` +
+      `game_id=${game_id} survivors=${survivorCount} needed=${needed}`
+    );
+  }
 
   // Full reshuffle: read survivors, combine with draw cards, DELETE all, INSERT shuffled 0..N-1
   const { data: survivors } = await admin.from("virus_pool")
@@ -467,6 +481,18 @@ async function refillVirusPool(admin: any, game_id: string) {
 
   await admin.from("deck_cards").update({ status: "drawn" })
     .in("id", drawCards.map((c: any) => c.id));
+
+  // Runtime invariant: pool must equal exactly 4 after every refill — no exceptions.
+  // Any deficit means cards have leaked from the 60-card system; throw rather than
+  // propagating silent pool drift to the next turn.
+  const { count: finalCount } = await admin.from("virus_pool")
+    .select("*", { count: "exact", head: true }).eq("game_id", game_id);
+  if ((finalCount ?? 0) !== 4) {
+    throw new Error(
+      `[refillVirusPool] pool invariant violated: pool=${finalCount} (expected 4). ` +
+      `game_id=${game_id} survivors_before=${survivorCount} needed=${needed} drew=${drawCards.length}`
+    );
+  }
 }
 
 async function drawFromDeck(admin: any, game_id: string, count: number): Promise<any[]> {
