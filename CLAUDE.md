@@ -43,6 +43,8 @@ When completing any task that produces commits:
 
 Pushing is part of "done." A task is not complete until it is on origin AND the NTFY ping has been sent.
 
+**Deploy creates a git obligation.** Any edge function deployed to Supabase, or any migration applied to prod, MUST be committed and pushed to origin/master in the same session. Prod and master never diverge: if it is live, its exact source is on master. Never record code as committed (in SESSION_NOTES, LATEST_TASK, or anywhere) without first confirming with `git status` / `git log` that it actually is.
+
 Rationale: the user reviews work from a separate Claude chat that reads the GitHub repo state. LATEST_TASK.md is the rich detail (read by reviewer-Claude on demand), NTFY is the attention signal (read on phone lockscreen). Both must work for the review loop to function when the user is away from the CC machine.
 
 Exception: if the user has explicitly said "don't push yet" for a specific task, hold the push and report ready-to-push status instead.
