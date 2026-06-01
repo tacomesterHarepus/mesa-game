@@ -64,7 +64,7 @@ All changes on master:
 - `tests/e2e/virus-placement.spec.ts` (commit 79f47d7): FIFO comment rewritten to reflect random-position invariant.
 - Migration 020 SQL (commit 40c093a): virus_pool added to supabase_realtime publication; applied to prod prior session, tracked in master 2026-06-01.
 
-23505 concern: RESOLVED. The 23505 catch removal from resolve-next-virus v18 is safe — end-play-phase v18 CAS is confirmed deployed and on master, preventing any concurrent pool inserter from running alongside refillVirusPool.
+23505 concern: RESOLVED. Verified 2026-06-01 via MCP get_edge_function: deployed body (Supabase function version 21) contains the CAS claim and DELETE-all+INSERT-shuffled reshuffle — no maxPoolRow query. The 23505 catch removal from resolve-next-virus v18 is safe: end-play-phase CAS prevents any concurrent pool inserter from running alongside refillVirusPool.
 
 Full suite (from 79f47d7 session): 52 pass / 12 fail / 2 skip / 21 did not run. All 12 failures pre-existing.
 
@@ -74,9 +74,9 @@ DevQueueInspector dev panel (commit 09c5d61): read-only queue + pool inspector p
 
 Atomic per-card CAS claim added to `resolve-next-virus` between the `nextCard` SELECT (line 53) and the CF/non-CF processing branches. `being_processed=true` + `being_processed_at=now()` marks the owner; 5s timestamp reclaim recovers a card if the winner crashes in the CF failure window (~250ms, 5 DB awaits). v11 CF ordering (cascade INSERT before `resolved=true`) preserved unchanged. Migration 019 adds `being_processed boolean NOT NULL DEFAULT false` and `being_processed_at timestamptz` to `virus_resolution_queue`. Full suite: **71 pass / 1 fail (pre-existing game-log:535) / 15 skip** — clean, no regressions. See `DIAGNOSIS_2026-05-31-virus-cascade-loop.md §Race 1 fix design`.
 
-**PENDING ACTIONS (as of 2026-06-01):**
-- Apply migration 018 to prod (abort-vote flow goes fully live).
-- Apply migration 019 to prod (Race 1 CAS claim goes fully live).
+**PENDING ACTIONS (as of 2026-06-01, verified via MCP):**
+- Migration 018 (abort_vote schema): **ALREADY APPLIED** — `abort_votes` table and all three `games` columns confirmed present in prod via information_schema.
+- Migration 019 (being_processed columns): **ALREADY APPLIED** — `being_processed` (boolean NOT NULL) and `being_processed_at` (timestamptz) confirmed present on `virus_resolution_queue` in prod.
 - Manual verification before Tuesday: abort-vote flow end-to-end, targeting cross-browser, full clean round. Pool reshuffle + Race 1 CF chains looking good in playtest.
 - Open backlog items: Race 2 (duplicate secret-target vote) still open. Two DevQueueInspector cosmetic items open (resolved-filter on duplicate detection, clear being_processed on resolve).
 - Untracked project files to decide on: `playwright.noserver.config.ts`, `playwright.test3002.config.ts` (real Playwright configs used in canary runs — not scratch, not committed).
