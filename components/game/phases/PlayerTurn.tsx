@@ -429,6 +429,13 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
               <h3 style={{ fontFamily: "monospace", fontSize: 10, color: "#666", letterSpacing: 1, margin: "0 0 6px 0", fontWeight: "normal" }}>
                 Your Hand
               </h3>
+              {hasDiscarded && computeBlocked && (
+                <span style={{ display: "block", fontFamily: "monospace", fontSize: 9, color: "#666", letterSpacing: 1, marginBottom: 4 }}>
+                  {activeMission?.mission_key === "dataset_preparation"
+                    ? "All 4 Data must be contributed before Compute can be played."
+                    : "Play Data to unlock Compute slots."}
+                </span>
+              )}
               <div style={{ display: "flex", gap: 24, overflowX: "auto", paddingBottom: 4 }}>
                 {!hasDiscarded ? (
                   discardGroups.length > 0 ? (
@@ -453,7 +460,7 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
                   playGroups.length > 0 ? (
                     playGroups.map(([key, cards]) => {
                       const isSelected = selectedCardKey === key;
-                      const isDisabled = virusDisabledKeys.includes(key) || (computeBlocked && key === "compute");
+                      const isDisabled = virusDisabledKeys.includes(key);
                       return (
                         <CardStackGroup
                           key={key}
@@ -472,15 +479,6 @@ export function PlayerTurn({ gameId, currentTurnPlayer, currentPlayer, hand, rou
                 )}
               </div>
             </div>
-
-            {/* Compute-blocked hint — message varies by mission rule */}
-            {hasDiscarded && computeBlocked && (
-              <span style={{ fontFamily: "monospace", fontSize: 9, color: "#666", letterSpacing: 1 }}>
-                {activeMission?.mission_key === "dataset_preparation"
-                  ? "All 4 Data must be contributed before Compute can be played."
-                  : "Play Data to unlock Compute slots."}
-              </span>
-            )}
 
             {/* Errors */}
             {(error || discardError) && (

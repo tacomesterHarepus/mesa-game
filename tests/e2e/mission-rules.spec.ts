@@ -369,7 +369,7 @@ test.describe("mission special rules", () => {
 
   // ── Test 4b: dataset_preparation UI — Compute aria-disabled before 4 Data, enabled after ──
 
-  test("dataset_preparation: Compute card visually disabled in UI until 4 Data contributed", async () => {
+  test("dataset_preparation: Compute card selectable but server-rejected until 4 Data contributed", async () => {
     if (missionKey !== "dataset_preparation") { test.skip(); return; }
 
     const initMission = await fetchActiveMission(sharedGameId, sharedToken);
@@ -395,10 +395,12 @@ test.describe("mission special rules", () => {
     await sharedPage.waitForTimeout(400);
     await dismissModal(sharedPage);
 
-    // PART 1: Compute card must be aria-disabled="true" while data_contributed < 4
-    await expect(
-      sharedPage.locator('[data-card-key="compute"] button[aria-disabled="true"]').first()
-    ).toBeAttached({ timeout: 5000 });
+    // PART 1: Compute card must be present and NOT aria-disabled (selectable); server rejects the play
+    await expect(sharedPage.locator('[data-card-key="compute"]').first()).toBeAttached({ timeout: 5000 });
+    await expect(sharedPage.locator('[data-card-key="compute"] button[aria-disabled="true"]')).toHaveCount(0, { timeout: 5000 });
+    const computeCard = initHand.find((c) => c.card_key === "compute" && c.card_type === "progress");
+    const blockResult = await playCard(sharedGameId, computeCard!.id, initTurnId, sharedToken);
+    expect(blockResult.error).toContain("Dataset Preparation");
 
     // PART 2: Contribute Data cards across turns until data_contributed >= 4 (up to 10 turns)
     let dataReached = false;
