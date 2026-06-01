@@ -28,12 +28,14 @@ const MISSION_REWARDS: Record<string, number> = {
 
 // Active AI signals they are done playing cards and virus placements for this turn.
 // Full Phase 7 implementation:
-//   1. Check mission complete / end-of-round-2 failure
-//   2. Apply score changes if mission resolved; clear current_mission_id
-//   3. Shuffle pending_viruses into virus_pool
-//   4. Compute viruses to resolve: virusCount(player.cpu, turn_play_count)
-//   5. If viruses > 0: draw from pool into virus_resolution_queue, phase = virus_resolution
-//   6. If viruses == 0: advance turn directly (or game_over / resource_adjustment)
+//   1. CAS phase claim (player_turn → between_turns sentinel) — serialises concurrent calls
+//   2. Check mission complete / end-of-round-2 failure
+//   3. Apply score changes if mission resolved; clear current_mission_id
+//   4. Shuffle pending_viruses into virus_pool — full reshuffle (DELETE all + INSERT shuffled 0..N-1)
+//      so pool position never correlates with insertion order or staging AI identity
+//   5. Compute viruses to resolve: virusCount(player.cpu, turn_play_count)
+//   6. If viruses > 0: draw from pool into virus_resolution_queue, phase = virus_resolution
+//   7. If viruses == 0: advance turn directly (or game_over / resource_adjustment)
 // Body: { game_id, override_player_id?: string }
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -63,7 +65,24 @@ Deno.serve(async (req) => {
     const callerPlayer = await resolvePlayer(req, admin, game_id, userId, override_player_id);
     if (callerPlayer.id !== game.current_turn_player_id) throw new Error("Not your turn");
 
-    // ── 1. Check mission outcome ──────────────────────────────────────────────
+    // ── 1. CAS phase claim ────────────────────────────────────────────────────
+    // Atomically claim this invocation by transitioning player_turn → between_turns.
+    // Any concurrent caller (e.g. double-tap) finds phase no longer 'player_turn' and exits.
+    // The sentinel is overwritten on every path: virus_pull sets it to 'virus_pull';
+    // the no-viruses path lets advanceTurnOrPhase write the real next phase; the
+    // abort-vote path sets it to 'abort_vote'. No path leaves the game in 'between_turns'.
+    const { data: claimed } = await admin.from("games")
+      .update({ phase: "between_turns" })
+      .eq("id", game_id).eq("phase", "player_turn")
+      .select("id");
+    if (!claimed?.length) {
+      console.log("[end-play-phase] CAS lost — concurrent caller already claimed this turn");
+      return new Response(JSON.stringify({ success: true, skipped: "already_advanced" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── 2. Check mission outcome ──────────────────────────────────────────────
     const { data: mission } = await admin
       .from("active_mission").select("*").eq("id", game.current_mission_id).maybeSingle();
 
@@ -134,28 +153,37 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── 2. Shuffle pending_viruses into virus_pool ────────────────────────────
+    // ── 3. Shuffle pending_viruses into virus_pool ────────────────────────────
+    // Full reshuffle: DELETE all pool rows + INSERT (survivors + pending) at random positions
+    // 0..N-1 so position never encodes insertion order or staging AI identity.
     const { data: pending } = await admin
       .from("pending_viruses").select("*").eq("game_id", game_id);
 
     if (pending && pending.length > 0) {
-      // Delete first — throw on error so stale rows cannot accumulate on retry
+      // Delete pending_viruses first — throw on error so stale rows cannot accumulate on retry
       const { error: deleteError } = await admin
         .from("pending_viruses").delete().eq("game_id", game_id);
       if (deleteError) throw deleteError;
 
-      const { data: maxPoolRow } = await admin.from("virus_pool")
-        .select("position").eq("game_id", game_id)
-        .order("position", { ascending: false }).limit(1).maybeSingle();
-      const startPos = (maxPoolRow?.position ?? -1) + 1;
-      const shuffled = shuffle([...pending]);
+      // Read current pool survivors
+      const { data: existing } = await admin.from("virus_pool")
+        .select("card_key, card_type").eq("game_id", game_id);
 
+      // Combine survivors + new pending cards, shuffle, assign positions 0..N-1
+      const combined = [
+        ...(existing ?? []).map((c: any) => ({ card_key: c.card_key, card_type: c.card_type })),
+        ...pending.map((c: any) => ({ card_key: c.card_key, card_type: c.card_type })),
+      ];
+      const shuffledCombined = shuffle(combined);
+
+      // DELETE all existing pool rows, then INSERT combined set with fresh positions
+      await admin.from("virus_pool").delete().eq("game_id", game_id);
       await admin.from("virus_pool").insert(
-        shuffled.map((card: any, i: number) => ({
+        shuffledCombined.map((card: any, i: number) => ({
           game_id,
           card_key: card.card_key,
           card_type: card.card_type,
-          position: startPos + i,
+          position: i,
         }))
       );
     }
@@ -168,11 +196,11 @@ Deno.serve(async (req) => {
     };
     await admin.from("game_log").insert(virusesPlacedLog);
 
-    // ── 3. Compute viruses to resolve ─────────────────────────────────────────
+    // ── 4. Compute viruses to resolve ─────────────────────────────────────────
     const cardsPlayedThisTurn = game.turn_play_count;
     const numViruses = virusCount(callerPlayer.cpu, cardsPlayedThisTurn);
 
-    // ── 4. Fork to virus_pull or advance directly ────────────────────────────
+    // ── 5. Fork to virus_pull or advance directly ────────────────────────────
     if (numViruses > 0) {
       const { count: poolSize } = await admin.from("virus_pool")
         .select("id", { count: "exact", head: true }).eq("game_id", game_id);
