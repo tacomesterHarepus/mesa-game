@@ -41,6 +41,21 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 
 ## Current Phase
 
+**Pool drift fix (resolve-next-virus v19) — CLOSED (2026-06-02, commit 2beab6e, deployed).**
+
+Root cause: `drawFromDeck` returned 1 card when 2 were needed (partial PostgREST response). Old guard only handled `drawCards.length === 0`; partial result (0 < length < needed) silently accepted short combined array → pool=3 instead of 4. Observed live game 8b5e8141 (DIAGNOSIS_2026-06-02-virus-pool-drift.md).
+
+Three-part fix:
+- Part 1 (invariant throw): after pool INSERT, re-count and throw if pool ≠ 4. Catches any future under-fill regardless of mechanism.
+- Part 2 (supplement loop): if drawFromDeck returns fewer than needed, reshuffle discards and draw the remaining deficit. Replaces zero-only guard.
+- Part 3 (tests): two new tests in virus-system.spec.ts — 12-turn multi-path pool==4 assertion + supplement-path history check. Helpers added: resolveVirusQueueFully, queryPoolCount, waitForSettledPhase.
+
+Deployed — MCP confirmed 2026-06-02: Supabase internal version 20. Both (a) supplement loop and (b) invariant throw present in deployed body.
+
+Full suite (port 3006, clean server): 51 pass / 6 fail / 14 skip / 18 did not run.
+Pre-existing failures (all 6): card-reveal:132, mission-flow:215, virus-placement:151 (DevQueueInspector overlay), game-log:284 (Card Reveal timeout), game-log:535 (CPU≥2 flake). No new regressions.
+Pool-invariant tests (virus-system:404/439): passed after v19 deploy (verified by targeted run).
+
 **PlayerTurn: Compute selectable when mission-blocked — CLOSED (2026-06-01, commit 325a241).**
 
 `isDisabled` in the play-phase card render previously included `|| (computeBlocked && key === "compute")`, making Compute the only card grayed out / unclickable client-side for a conditional mission rule. All 10 other conditional rules (including `dependency_error`, which is semantically identical) are server-only: card selectable, server rejects illegal play, error shown. The gray-out also blocked staging Compute for virus placement, which has no mission restriction.
@@ -234,8 +249,8 @@ All use `verify_jwt: false` with manual ES256 JWT decode (`atob()` in function b
 | discard-cards | v3 | v3: switched gate to request origin; Phase 11: typed `discard` log with metadata |
 | place-virus | v2 | v2: switched gate to request origin; moves card from hands → pending_viruses |
 | end-play-phase | v18 | v17: abort flag/vote injection. v18: player_turn→between_turns CAS + full pool reshuffle (DELETE-all + INSERT shuffled 0..N-1). Commit 40c093a. |
+| resolve-next-virus | v19 (Supabase: 20) | v18: refillVirusPool full reshuffle, removed 23505 catch. v19: partial-draw supplement loop + runtime invariant throw (pool==4 enforced). Commit 2beab6e. MCP-confirmed deployed 2026-06-02. |
 | pull-viruses | v2 | v2: switched gate to request origin; pulls pending_pull_count cards from pool into queue |
-| resolve-next-virus | v18 | v14: empty-queue CAS. v17: Race 1 per-card CAS. v18: refillVirusPool full reshuffle, removed 23505 catch |
 | secret-target | v3 | v3: switched gate to request origin; Phase 11: typed targeting_resolved log |
 | play-card | v8 | v8: switched gate to request origin; Phase 11: typed card_played log with mission_progress snapshot |
 | abort-mission | v4 | v4: refactored to use applyMissionAbort from _shared; local helpers removed |

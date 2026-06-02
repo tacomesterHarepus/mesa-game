@@ -439,22 +439,37 @@ async function refillVirusPool(admin: any, game_id: string) {
   const needed = 4 - survivorCount;
   if (needed <= 0) return;
 
-  // Draw needed cards. If drawFromDeck returns fewer than requested (partial draw — either
-  // because in_deck is smaller than needed, or a transient short read), supplement by
-  // reshuffling discards and drawing the remaining deficit. The old guard only handled
-  // drawCards.length === 0; a partial return (0 < length < needed) was silently accepted,
-  // producing a short pool. Per game rules with 60 cards, needed is always satisfiable.
-  let drawCards = await drawFromDeck(admin, game_id, needed);
+  // Draw needed cards in retried batches. Each batch is marked drawn IMMEDIATELY before
+  // the next attempt — this prevents the same rows from being returned again by the next
+  // drawFromDeck call when a transient partial read returns fewer rows than requested.
+  // Without immediate marking, a second call to drawFromDeck would see the same in_deck
+  // rows and the supplement would duplicate rather than supplement. reshuffleDiscard is
+  // called once when a batch returns empty (deck genuinely exhausted mid-draw).
+  const allDrawCards: any[] = [];
+  let reshuffled = false;
 
-  if (drawCards.length < needed) {
-    await reshuffleDiscard(admin, game_id);
-    const stillNeeded = needed - drawCards.length;
-    const moreCards = await drawFromDeck(admin, game_id, stillNeeded);
-    drawCards = [...drawCards, ...moreCards];
+  for (let attempt = 0; attempt < 6 && allDrawCards.length < needed; attempt++) {
+    const stillNeeded = needed - allDrawCards.length;
+    const batch = await drawFromDeck(admin, game_id, stillNeeded);
+
+    if (batch.length === 0) {
+      if (!reshuffled) {
+        await reshuffleDiscard(admin, game_id);
+        reshuffled = true;
+        continue; // retry after reshuffle
+      }
+      break; // nothing after reshuffle — fall through to invariant check
+    }
+
+    // Mark this batch drawn now so the next loop iteration skips these rows.
+    await admin.from("deck_cards").update({ status: "drawn" })
+      .in("id", batch.map((c: any) => c.id));
+
+    allDrawCards.push(...batch);
   }
 
-  // With 60 total cards and reshuffle available, running out entirely means cards have leaked.
-  if (drawCards.length === 0) {
+  // Per game rules (60 cards, reshuffle always available), exhaustion means card leak.
+  if (allDrawCards.length === 0) {
     throw new Error(
       `[refillVirusPool] deck exhausted — no cards in_deck or discarded. ` +
       `game_id=${game_id} survivors=${survivorCount} needed=${needed}`
@@ -467,7 +482,7 @@ async function refillVirusPool(admin: any, game_id: string) {
 
   const combined = [
     ...(survivors ?? []).map((c: any) => ({ card_key: c.card_key, card_type: c.card_type })),
-    ...drawCards.map((c: any) => ({ card_key: c.card_key, card_type: c.card_type })),
+    ...allDrawCards.map((c: any) => ({ card_key: c.card_key, card_type: c.card_type })),
   ];
   const shuffledCombined = shuffle(combined);
 
@@ -479,8 +494,7 @@ async function refillVirusPool(admin: any, game_id: string) {
   );
   if (insertError) throw insertError;
 
-  await admin.from("deck_cards").update({ status: "drawn" })
-    .in("id", drawCards.map((c: any) => c.id));
+  // deck_cards already marked drawn incrementally in the loop above — no final update needed.
 
   // Runtime invariant: pool must equal exactly 4 after every refill — no exceptions.
   // Any deficit means cards have leaked from the 60-card system; throw rather than
@@ -490,7 +504,7 @@ async function refillVirusPool(admin: any, game_id: string) {
   if ((finalCount ?? 0) !== 4) {
     throw new Error(
       `[refillVirusPool] pool invariant violated: pool=${finalCount} (expected 4). ` +
-      `game_id=${game_id} survivors_before=${survivorCount} needed=${needed} drew=${drawCards.length}`
+      `game_id=${game_id} survivors_before=${survivorCount} needed=${needed} drew=${allDrawCards.length}`
     );
   }
 }
