@@ -86,9 +86,8 @@ export function GameBoard({
 
   const gameId = game.id;
 
-  // Polling fallback: re-fetch game, players, active_mission, and hand every 3s.
-  // Covers the cases where Realtime misses an event — without this, mission progress
-  // and hand state go permanently stale for the session.
+  // Hand-only polling fallback: game/players/mission/log are now gap-filled by the
+  // reconnect-refresh in the Realtime subscription. This setInterval stays until Phase 4.
   useEffect(() => {
     const supabase = createClient();
     const handPlayerId = devMode ? activeDevPlayer?.id : currentPlayer?.id;
@@ -96,51 +95,9 @@ export function GameBoard({
 
     const poll = async () => {
       await supabase.auth.getSession();
-      // Fetch game first — need current_mission_id to query active_mission by ID.
-      // active_mission is a history table (one row per completed mission); querying
-      // by game_id with maybeSingle() returns PGRST116 (multiple rows) on mission 2+.
-      const { data: g } = await supabase.from("games").select("*").eq("id", gameId).single();
-      if (g) setGame((prev) => ({ ...prev, ...(g as unknown as Partial<Game>) }));
-
-      const missionId = g?.current_mission_id ?? null;
-      const [{ data: p }, { data: m }, { data: contrib }] = await Promise.all([
-        supabase.from("players").select("*").eq("game_id", gameId),
-        missionId
-          ? supabase.from("active_mission").select("*").eq("id", missionId).maybeSingle()
-          : Promise.resolve({ data: null }),
-        missionId
-          ? supabase.from("mission_contributions").select("*").eq("mission_id", missionId)
-          : Promise.resolve({ data: [] }),
-      ]);
-      if (p && p.length > 0) setPlayers(p);
-      // m is null when there is no active mission (lobby, resource_adjustment, etc.) — that is valid
-      if (m !== undefined) setMission(m);
-      // Pool count comes from games.virus_pool_count (set here from the game poll above).
-      // Cast via Game since the generated Supabase type lags behind schema migrations.
-      const gGame = g as unknown as Partial<Game>;
-      if (gGame.virus_pool_count != null) setPoolCount(gGame.virus_pool_count);
-      setContributions(contrib ?? []);
-
-      // game_log poll backup: Realtime INSERT can be missed silently; poll catches stragglers.
-      // Fetches the 50 most-recent rows and appends any not yet in state. gameId is referenced
-      // only in the query (captured at useEffect setup); setLog uses a functional update so
-      // prev is current at apply time, no stale-closure risk on game switch.
-      // Assumes game_log is append-only — no edge function ever DELETEs from it.
-      const { data: recentLog } = await supabase
-        .from("game_log")
-        .select("*")
-        .eq("game_id", gameId)
-        .order("created_at", { ascending: false })
-        .limit(50);
-      if (recentLog && recentLog.length > 0) {
-        setLog((prev) => {
-          const existingIds = new Set(prev.map((e) => e.id));
-          const newRows = recentLog.filter((r) => !existingIds.has(r.id)).reverse();
-          return newRows.length > 0 ? [...prev, ...newRows] : prev;
-        });
-      }
-
       // Hand poll backup: avoids invisible cards when Realtime INSERT/DELETE is dropped.
+      // game/players/mission/log are now covered by the reconnect-refresh on the Realtime
+      // subscription (fires on every 'SUBSCRIBED' transition — including reconnects).
       // Sort by id ensures stable display order across polls (hands table has no position column).
       if (handPlayerId && handPlayerRole !== "human") {
         const { data: h } = await supabase
@@ -183,6 +140,9 @@ export function GameBoard({
             const newGame = payload.new as Partial<Game>;
             setGame((prev) => ({ ...prev, ...newGame }));
             if (newGame.virus_pool_count != null) setPoolCount(newGame.virus_pool_count);
+            if (newGame.winner != null || newGame.phase === "game_over") {
+              if (channel) { supabase.removeChannel(channel); channel = null; }
+            }
           }
         )
         .on(
@@ -257,7 +217,42 @@ export function GameBoard({
           );
       }
 
-      channel.subscribe();
+      channel.subscribe(async (status) => {
+        if (status === "SUBSCRIBED" && !cancelled) {
+          await supabase.auth.getSession();
+          if (cancelled) return;
+          // Reconnect gap-fill: fetch current game state to recover any events missed
+          // during the disconnect window. Fires on every SUBSCRIBED transition (initial
+          // connect + every reconnect). First fire is harmless redundancy vs. server-
+          // rendered props; subsequent fires are the recovery mechanism.
+          const { data: g } = await supabase.from("games").select("*").eq("id", gameId).single();
+          if (cancelled) return;
+          const missionId = (g as unknown as Partial<Game>)?.current_mission_id ?? null;
+          const [{ data: p }, { data: m }, { data: recentLog }] = await Promise.all([
+            supabase.from("players").select("*").eq("game_id", gameId),
+            missionId
+              ? supabase.from("active_mission").select("*").eq("id", missionId).maybeSingle()
+              : Promise.resolve({ data: null }),
+            supabase.from("game_log").select("*").eq("game_id", gameId)
+              .order("created_at", { ascending: false }).limit(50),
+          ]);
+          if (cancelled) return;
+          if (g) {
+            const gGame = g as unknown as Partial<Game>;
+            setGame((prev) => ({ ...prev, ...gGame }));
+            if (gGame.virus_pool_count != null) setPoolCount(gGame.virus_pool_count);
+          }
+          if (p && p.length > 0) setPlayers(p);
+          if (m !== undefined) setMission(m);
+          if (recentLog && recentLog.length > 0) {
+            setLog((prev) => {
+              const existingIds = new Set(prev.map((e) => e.id));
+              const newRows = recentLog.filter((r) => !existingIds.has(r.id)).reverse();
+              return newRows.length > 0 ? [...prev, ...newRows] : prev;
+            });
+          }
+        }
+      });
     };
 
     setup();
