@@ -1,0 +1,12 @@
+-- Migration 021: defer mission-completion reward until after completing turn's virus chain.
+--
+-- pending_core_progress_delta stores the mission reward when a mission is detected as
+-- complete by end-play-phase. The reward is NOT applied immediately to core_progress.
+-- Instead, advanceTurnOrPhase applies it post-chain after re-checking that requirements
+-- are still met (a contribution-removing virus — model_corruption, data_drift,
+-- validation_failure — may have dropped the mission below threshold during the chain).
+--
+-- NULL = no pending reward (normal state).
+-- Non-null = mission completion is in flight; reward value is the delta to add to core_progress.
+-- Cleared atomically with reward application or rejection in advanceTurnOrPhase.
+ALTER TABLE games ADD COLUMN pending_core_progress_delta int;
