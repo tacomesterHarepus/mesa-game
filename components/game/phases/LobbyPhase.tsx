@@ -55,28 +55,6 @@ export function LobbyPhase({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Polling fallback: re-fetch lobby state every 3s in case Realtime misses events.
-  // Also checks game phase so all players navigate when the host starts the game,
-  // even if their Realtime subscription was established before they had a session.
-  useEffect(() => {
-    const supabase = createClient();
-
-    const poll = async () => {
-      await supabase.auth.getSession();
-      const [{ data: p }, { data: s }, { data: g }] = await Promise.all([
-        supabase.from("players").select("*").eq("game_id", gameId),
-        supabase.from("spectators").select("*").eq("game_id", gameId),
-        supabase.from("games").select("phase").eq("id", gameId).single(),
-      ]);
-      if (p) setPlayers(p);
-      if (s) setSpectators(s);
-      if (g && g.phase !== "lobby") router.push(gameUrl);
-    };
-
-    const id = setInterval(poll, 2000);
-    return () => clearInterval(id);
-  }, [gameId, router, gameUrl]);
-
   // Realtime: players, spectators, game phase change
   useEffect(() => {
     const supabase = createClient();
@@ -130,7 +108,21 @@ export function LobbyPhase({
             if (payload.new.phase !== "lobby") router.push(gameUrl);
           }
         )
-        .subscribe();
+        .subscribe(async (status) => {
+          if (status === "SUBSCRIBED" && !cancelled) {
+            await supabase.auth.getSession();
+            if (cancelled) return;
+            const [{ data: p }, { data: s }, { data: g }] = await Promise.all([
+              supabase.from("players").select("*").eq("game_id", gameId),
+              supabase.from("spectators").select("*").eq("game_id", gameId),
+              supabase.from("games").select("phase").eq("id", gameId).single(),
+            ]);
+            if (cancelled) return;
+            if (p) setPlayers(p);
+            if (s) setSpectators(s);
+            if (g && g.phase !== "lobby") router.push(gameUrl);
+          }
+        });
     };
 
     setup();
