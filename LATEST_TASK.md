@@ -1,18 +1,27 @@
 # Latest Task
 
 ## Summary
-Fixed virus pool drift bug (DIAGNOSIS_2026-06-02): `refillVirusPool` in resolve-next-virus was silently producing pool=3 instead of 4 when `drawFromDeck` returned a partial result (1 card when 2 were needed). The old guard only handled the zero-draw case; any partial return was silently accepted. Three-part fix: (1) runtime invariant throw after pool INSERT — catches any under-fill regardless of mechanism; (2) supplement loop — if first draw is short, reshuffle discards and draw the remaining deficit; (3) two new E2E tests asserting pool==4 after every settled turn across 12 turns, covering 1-virus, 2-virus, and deck-depletion paths. Deployed as resolve-next-virus v19.
+
+Reconciled a mid-deploy interruption for the virus_pool lock + virus_pool_count feature. Migration 022 had already been applied to prod (games.virus_pool_count column, virus_pool SELECT policy dropped, virus_pool removed from Realtime publication). Three of the four edge functions were already deployed with count-sync. The fourth (resolve-next-virus) was at v21 and missing both the CF-path count update and the refill count update. Deployed resolve-next-virus as v22 with both additions. Committed all 11 previously-uncommitted files (8 source + 2 tests + migration SQL) as a single logical changeset and pushed to master.
 
 ## Files changed
-- `supabase/functions/resolve-next-virus/index.ts` (commit 2beab6e) — refillVirusPool: replaced zero-only guard with `drawCards.length < needed` supplement loop; added runtime invariant throw (`pool != 4` → throws with diagnostic context).
-- `tests/e2e/virus-system.spec.ts` (commit 2beab6e) — new describe block "pool invariant — pool equals 4 after every settled virus resolution" with 2 tests + 3 helper functions (resolveVirusQueueFully, queryPoolCount, waitForSettledPhase).
-- `DIAGNOSIS_2026-06-02-virus-pool-drift.md` (commit 2beab6e) — diagnosis closed; verification pass results appended.
-- `playwright.port3006.config.ts` (commit 2beab6e) — Playwright config for port 3006 (needed after stale .next cache broke port 3005 during this session).
+
+- `supabase/migrations/022_virus_pool_count_and_lock.sql` — new migration (already applied to prod)
+- `supabase/functions/start-game/index.ts` — sets virus_pool_count=4 on game start
+- `supabase/functions/end-play-phase/index.ts` — sets virus_pool_count=newPoolSize after pending shuffle
+- `supabase/functions/pull-viruses/index.ts` — sets virus_pool_count=poolSizeAfter after pull
+- `supabase/functions/resolve-next-virus/index.ts` — sets count after CF deletion AND =4 after refill (v22)
+- `supabase/functions/_shared/advanceTurnOrPhase.ts` — added MISSION_REQUIREMENTS export + pending_core_progress_delta post-chain recheck
+- `supabase/functions/_shared/gameLogTypes.ts` — added mission_requirements_unmet event type
+- `components/game/GameBoard.tsx` — poolCount from games.virus_pool_count; removed virus_pool Realtime subscriptions
+- `types/game.ts` — added virus_pool_count and pending_core_progress_delta fields
+- `tests/e2e/virus-system.spec.ts` — updated for new pool count behavior
+- `tests/e2e/virus-placement.spec.ts` — updated comments for random-position invariant
 
 ## Test status
-Full suite (port 3006, clean server): **51 pass / 6 fail / 14 skip / 18 did not run** (16.7 min)
-All 6 failures pre-existing: card-reveal:132, mission-flow:215, virus-placement:151 (DevQueueInspector overlay blocks UI clicks), game-log:284 (Card Reveal heading timeout), game-log:535 (CPU≥2 flake).
-Pool-invariant tests (virus-system:404/439): failed before v19 deploy (correctly caught pool=3), passed after v19 deploy (verified by targeted virus-system.spec.ts run).
+
+No test run this session (reconciliation only — no logic changes beyond the missing count updates in resolve-next-virus). Prior baseline: 51 pass / 6 fail / 14 skip (all failures pre-existing). Prod verifications via MCP: migration applied, RLS policy dropped, Realtime publication updated, all 4 functions live with count sync.
 
 ## Suggested next
-Migrations 018 and 019 already applied to prod (confirmed 2026-06-01 via MCP). Pool drift fix deployed: MCP confirmed Supabase internal version 20, both supplement loop and invariant throw live. Manual verification still open: abort-vote flow end-to-end, targeting cross-browser, full clean round. Any future pool under-fill will surface as a logged 400 from resolve-next-virus (invariant throw). Decide whether to keep or .gitignore the untracked Playwright config files (playwright.noserver.config.ts, playwright.test3002.config.ts, playwright.port3006.config.ts) — used in canary runs but not in source control.
+
+Manual playtest to confirm pool count display updates correctly mid-game, especially the CF path (that was the missing update in v21). Also: migration 021 is untracked in git — confirm whether it was applied to prod and commit it. Race 2 (duplicate secret-target vote) and DevQueueInspector polish items remain open in BACKLOG.

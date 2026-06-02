@@ -41,6 +41,17 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 
 ## Current Phase
 
+**virus_pool lock + virus_pool_count — CLOSED (2026-06-02, commit 7a6b88f, deployed).**
+
+Migration 022 applied (games.virus_pool_count int, virus_pool SELECT policy dropped, virus_pool removed from Realtime).
+All 4 pool-mutating functions deployed with count sync: start-game v12, pull-viruses v6, end-play-phase v23 were already live; resolve-next-virus deployed as v22 (added CF-path count update + refill count update=4). GameBoard poolCount now sourced from games.virus_pool_count; virus_pool Realtime subscriptions removed. Reconciled from mid-deploy interruption: confirmed via MCP before committing.
+
+Prod end state verified:
+- games.virus_pool_count: column exists (integer)
+- virus_pool policies: none (player SELECT leak closed)
+- virus_pool in Realtime: not present
+- All 4 functions: live with count sync
+
 **Pool drift fix (resolve-next-virus v19) — CLOSED (2026-06-02, commit 2beab6e, deployed).**
 
 Root cause: `drawFromDeck` returned 1 card when 2 were needed (partial PostgREST response). Old guard only handled `drawCards.length === 0`; partial result (0 < length < needed) silently accepted short combined array → pool=3 instead of 4. Observed live game 8b5e8141 (DIAGNOSIS_2026-06-02-virus-pool-drift.md).
