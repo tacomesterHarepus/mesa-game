@@ -2,26 +2,30 @@
 
 ## Summary
 
-Reconciled a mid-deploy interruption for the virus_pool lock + virus_pool_count feature. Migration 022 had already been applied to prod (games.virus_pool_count column, virus_pool SELECT policy dropped, virus_pool removed from Realtime publication). Three of the four edge functions were already deployed with count-sync. The fourth (resolve-next-virus) was at v21 and missing both the CF-path count update and the refill count update. Deployed resolve-next-virus as v22 with both additions. Committed all 11 previously-uncommitted files (8 source + 2 tests + migration SQL) as a single logical changeset and pushed to master.
+Phase 1 of the polling → Realtime migration (from MIGRATION_PLAN_websocket.md). Removed the 3-second setInterval backup poll from PublicChat.tsx and MisalignedPrivateChat.tsx. Both components already had working Realtime subscriptions covering INSERT events; the poll was pure redundancy. Root-cause of the double-message bug from the 02.06.26 playtest: poll and subscription could both queue setMessages in the same React flush, with the poll reading a stale messagesRef (not yet updated by the React effect) and adding the same message the subscription already added. Removing the poll eliminates the overlap entirely.
+
+messagesRef and its syncing effect are intentionally left in place per MIGRATION_PLAN_websocket.md §Out of Scope — they become dead code but cleaning them up is a separate simplify pass.
 
 ## Files changed
 
-- `supabase/migrations/022_virus_pool_count_and_lock.sql` — new migration (already applied to prod)
-- `supabase/functions/start-game/index.ts` — sets virus_pool_count=4 on game start
-- `supabase/functions/end-play-phase/index.ts` — sets virus_pool_count=newPoolSize after pending shuffle
-- `supabase/functions/pull-viruses/index.ts` — sets virus_pool_count=poolSizeAfter after pull
-- `supabase/functions/resolve-next-virus/index.ts` — sets count after CF deletion AND =4 after refill (v22)
-- `supabase/functions/_shared/advanceTurnOrPhase.ts` — added MISSION_REQUIREMENTS export + pending_core_progress_delta post-chain recheck
-- `supabase/functions/_shared/gameLogTypes.ts` — added mission_requirements_unmet event type
-- `components/game/GameBoard.tsx` — poolCount from games.virus_pool_count; removed virus_pool Realtime subscriptions
-- `types/game.ts` — added virus_pool_count and pending_core_progress_delta fields
-- `tests/e2e/virus-system.spec.ts` — updated for new pool count behavior
-- `tests/e2e/virus-placement.spec.ts` — updated comments for random-position invariant
+- `components/chat/PublicChat.tsx` — removed 27-line setInterval poll block (lines 71–97)
+- `components/chat/MisalignedPrivateChat.tsx` — removed 27-line setInterval poll block (lines 71–97)
 
 ## Test status
 
-No test run this session (reconciliation only — no logic changes beyond the missing count updates in resolve-next-virus). Prior baseline: 51 pass / 6 fail / 14 skip (all failures pre-existing). Prod verifications via MCP: migration applied, RLS policy dropped, Realtime publication updated, all 4 functions live with count sync.
+Full Playwright suite on port 3002 (playwright.test3002.config.ts):
+**69 passed / 4 failed / 16 skipped / 2 did not run**
+
+All 4 failures are documented pre-existing issues:
+- `card-reveal.spec.ts:132` — DevQueueInspector overlay intercepts clicks (pre-existing)
+- `game-log.spec.ts:535` — CPU≥2 path timing race (pre-existing, known flake)
+- `mission-flow.spec.ts:215` — DevQueueInspector overlay intercepts clicks (pre-existing)
+- `virus-placement.spec.ts:151` — DevQueueInspector overlay intercepts clicks (pre-existing)
+
+No new failures. Build clean.
+
+Note: no E2E test exercises chat message dedup directly. The double-message fix is verified by code inspection (removed the overlapping poll) and requires manual in-game confirmation per the plan's verify criteria.
 
 ## Suggested next
 
-Manual playtest to confirm pool count display updates correctly mid-game, especially the CF path (that was the missing update in v21). Also: migration 021 is untracked in git — confirm whether it was applied to prod and commit it. Race 2 (duplicate secret-target vote) and DevQueueInspector polish items remain open in BACKLOG.
+Manual in-game verify of Phase 1: open a game, send several messages in both public and private chat rapidly, confirm each appears exactly once (no duplicates). Then approve Phase 2 (LobbyPhase poll removal) to continue the migration. See MIGRATION_PLAN_websocket.md for full phasing.

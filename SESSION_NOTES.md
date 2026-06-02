@@ -41,6 +41,12 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 
 ## Current Phase
 
+**Polling → Realtime migration Phase 1 — CLOSED (2026-06-02, commit cadaf6f).**
+
+Removed 3s setInterval backup poll from PublicChat.tsx and MisalignedPrivateChat.tsx. Both had existing Realtime subscriptions; poll was redundant. Root cause of playtest #1 double-message bug confirmed (stale messagesRef race between poll and subscription). Full suite: 69 pass / 4 fail (all pre-existing) / 16 skip — no regressions. See MIGRATION_PLAN_websocket.md for Phases 2–4. Awaiting user manual verification of double-message fix before Phase 2 approval.
+
+---
+
 **virus_pool lock + virus_pool_count — CLOSED (2026-06-02, commit 7a6b88f, deployed).**
 
 Migration 022 applied (games.virus_pool_count int, virus_pool SELECT policy dropped, virus_pool removed from Realtime).
