@@ -41,6 +41,10 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 
 ## Current Phase
 
+**Polling → Realtime migration Phase 2 — CLOSED (2026-06-03, commit 7566673).**
+
+Removed 2s setInterval poll from LobbyPhase.tsx; added reconnect-refresh (re-fetch players/spectators/game.phase on every 'SUBSCRIBED' transition). Scoped test run lobby+dev-mode: 11/12 pass (1 cold-start flake on fresh port, not a regression). Build clean. Awaiting manual lobby reconnect verification before Phase 3 approval.
+
 **Polling → Realtime migration Phase 1 — CLOSED (2026-06-02, commit cadaf6f).**
 
 Removed 3s setInterval backup poll from PublicChat.tsx and MisalignedPrivateChat.tsx. Both had existing Realtime subscriptions; poll was redundant. Root cause of playtest #1 double-message bug confirmed (stale messagesRef race between poll and subscription). Full suite: 69 pass / 4 fail (all pre-existing) / 16 skip — no regressions. See MIGRATION_PLAN_websocket.md for Phases 2–4. Awaiting user manual verification of double-message fix before Phase 2 approval.

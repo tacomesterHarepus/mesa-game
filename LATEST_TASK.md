@@ -2,30 +2,26 @@
 
 ## Summary
 
-Phase 1 of the polling → Realtime migration (from MIGRATION_PLAN_websocket.md). Removed the 3-second setInterval backup poll from PublicChat.tsx and MisalignedPrivateChat.tsx. Both components already had working Realtime subscriptions covering INSERT events; the poll was pure redundancy. Root-cause of the double-message bug from the 02.06.26 playtest: poll and subscription could both queue setMessages in the same React flush, with the poll reading a stale messagesRef (not yet updated by the React effect) and adding the same message the subscription already added. Removing the poll eliminates the overlap entirely.
+Phase 2 of the polling → Realtime migration (from MIGRATION_PLAN_websocket.md). Removed the 2-second setInterval backup poll from LobbyPhase.tsx and added a reconnect-refresh to the existing Realtime subscription. The lobby subscription already covered all three data sources (players INSERT/DELETE, spectators INSERT/DELETE, games UPDATE); the poll was pure redundancy.
 
-messagesRef and its syncing effect are intentionally left in place per MIGRATION_PLAN_websocket.md §Out of Scope — they become dead code but cleaning them up is a separate simplify pass.
+Reconnect-refresh pattern: `.subscribe(async (status) => ...)` callback fires on every 'SUBSCRIBED' transition — including reconnects after a network drop or tab backgrounding. On SUBSCRIBED it re-fetches players, spectators, and games.phase in parallel, applies results to state, and checks for the lobby-exit navigation case (game started while disconnected). A double `cancelled` guard (before and after the async Promise.all) prevents state updates after component unmount.
 
 ## Files changed
 
-- `components/chat/PublicChat.tsx` — removed 27-line setInterval poll block (lines 71–97)
-- `components/chat/MisalignedPrivateChat.tsx` — removed 27-line setInterval poll block (lines 71–97)
+- `components/game/phases/LobbyPhase.tsx` — removed 21-line setInterval poll block (lines 58–78); changed `.subscribe()` to `.subscribe(async (status) => ...)` with reconnect-refresh body (15 lines added)
 
 ## Test status
 
-Full Playwright suite on port 3002 (playwright.test3002.config.ts):
-**69 passed / 4 failed / 16 skipped / 2 did not run**
+Scoped run — `lobby.spec.ts` + `dev-mode.spec.ts` against port 3010:
+**11 passed / 1 failed**
 
-All 4 failures are documented pre-existing issues:
-- `card-reveal.spec.ts:132` — DevQueueInspector overlay intercepts clicks (pre-existing)
-- `game-log.spec.ts:535` — CPU≥2 path timing race (pre-existing, known flake)
-- `mission-flow.spec.ts:215` — DevQueueInspector overlay intercepts clicks (pre-existing)
-- `virus-placement.spec.ts:151` — DevQueueInspector overlay intercepts clicks (pre-existing)
+All 5 lobby.spec.ts tests passed (home page, create game, lobby ID display, second player join, start game enable).
+All 7 dev-mode.spec.ts tests passed (fill lobby visible, player switcher, active highlight, banner, chat input), including the Phase 1 chat regression test (dev-mode:144).
 
-No new failures. Build clean.
+1 failure: `dev-mode.spec.ts:38 — Fill Lobby creates 6 players...` — cold-start Supabase timing flake on the fresh port 3010 server. Page navigated to `/game/create` twice instead of reaching the lobby. The same test passed cleanly (2.0s) in the Phase 1 full suite on port 3002. Not caused by Phase 2 change (failure occurs on `/game/create` before LobbyPhase.tsx ever mounts).
 
-Note: no E2E test exercises chat message dedup directly. The double-message fix is verified by code inspection (removed the overlapping poll) and requires manual in-game confirmation per the plan's verify criteria.
+Build clean.
 
 ## Suggested next
 
-Manual in-game verify of Phase 1: open a game, send several messages in both public and private chat rapidly, confirm each appears exactly once (no duplicates). Then approve Phase 2 (LobbyPhase poll removal) to continue the migration. See MIGRATION_PLAN_websocket.md for full phasing.
+Manual verify: open a lobby from two browser tabs, confirm joins/leaves appear live; have host start game, confirm all tabs navigate to game board. Then briefly disable/re-enable network in one tab and confirm lobby state recovers. Once verified, approve Phase 3 (GameBoard core state + game-over teardown). See MIGRATION_PLAN_websocket.md for Phase 3 scope.
