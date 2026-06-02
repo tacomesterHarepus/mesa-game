@@ -87,7 +87,10 @@ Deno.serve(async (req) => {
       // Queue confirmed empty — refill pool and advance turn.
       await refillVirusPool(admin, game_id);
       const { data: freshGame } = await admin.from("games").select("*").eq("id", game_id).single();
-      const missionResolved = !freshGame.current_mission_id;
+      // current_mission_id stays non-null while a deferred mission completion is in flight
+      // (pending_core_progress_delta set). Treat that state as missionResolved so
+      // advanceTurnOrPhase runs the post-chain recheck rather than the next-turn path.
+      const missionResolved = !freshGame.current_mission_id || (freshGame.pending_core_progress_delta != null);
       const fakeCurrentPlayer = { id: game.current_turn_player_id };
       const pendingOutcome = (freshGame.pending_mission_outcome ?? null) as MissionOutcome | null;
 
@@ -227,6 +230,9 @@ async function applyVirusEffect(admin: any, game: any, card: any): Promise<boole
           }))
         );
         await admin.from("virus_pool").delete().in("id", pool.map((c: any) => c.id));
+        const { count: poolCountAfterCF } = await admin.from("virus_pool")
+          .select("id", { count: "exact", head: true }).eq("game_id", game_id);
+        await admin.from("games").update({ virus_pool_count: poolCountAfterCF ?? 0 }).eq("id", game_id);
         const cascadeLog: GameLogInsert<"virus_effect"> = {
           game_id,
           event_type: "virus_effect",
@@ -507,6 +513,8 @@ async function refillVirusPool(admin: any, game_id: string) {
       `game_id=${game_id} survivors_before=${survivorCount} needed=${needed} drew=${allDrawCards.length}`
     );
   }
+  // Keep games.virus_pool_count in sync — always 4 after a successful refill.
+  await admin.from("games").update({ virus_pool_count: 4 }).eq("id", game_id);
 }
 
 async function drawFromDeck(admin: any, game_id: string, count: number): Promise<any[]> {

@@ -202,21 +202,22 @@ test.describe("virus placement", () => {
       const stagedCardKey = hand[0].card_key;
       const stagedCardName = CARD_NAMES[stagedCardKey] ?? stagedCardKey;
 
-      // Baseline: count of this card_key in pool + queue before End Turn.
-      // After end-play-phase the staged card is shuffled into the pool (random position) and
-      // 1 virus is drawn from the pool into the resolution queue.
-      // pool.count(K) + queue.count(K) increases by exactly 1 regardless of which card is drawn.
-      const [poolBefore, queueBefore] = await Promise.all([
+      // Baseline before End Turn: pool count (via games.virus_pool_count — pool table is service-role-only)
+      // and unresolved queue count for this card_key.
+      // After end-play-phase + pull-viruses: pool count stays at 4 (staged card added then pulled),
+      // and unresolved queue count for the staged card_key increases by 1.
+      const [poolCountRespBefore, queueBefore] = await Promise.all([
         fetch(
-          `${SUPABASE_URL}/rest/v1/virus_pool?game_id=eq.${gameId}&card_key=eq.${stagedCardKey}&select=id`,
+          `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=virus_pool_count`,
           { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
-        ).then((r) => r.json() as Promise<Array<{ id: string }>>),
+        ).then((r) => r.json() as Promise<Array<{ virus_pool_count: number }>>),
         fetch(
           `${SUPABASE_URL}/rest/v1/virus_resolution_queue?game_id=eq.${gameId}&card_key=eq.${stagedCardKey}&resolved=eq.false&select=id`,
           { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
         ).then((r) => r.json() as Promise<Array<{ id: string }>>),
       ]);
-      const countBefore = poolBefore.length + queueBefore.length;
+      const poolCountBefore = poolCountRespBefore[0]?.virus_pool_count ?? 4;
+      const countBefore = poolCountBefore + queueBefore.length;
 
       // Switch to first AI player in the DevModeOverlay switcher
       const switcherPanel = page.locator(".fixed.top-7");
@@ -268,18 +269,20 @@ test.describe("virus placement", () => {
       }
       await page.waitForTimeout(500);
 
-      // After end-play-phase: staged card is in pool or queue (pool.count + queue.count = B + 1)
-      const [poolAfter, queueAfter] = await Promise.all([
+      // After end-play-phase + pull-viruses: pool count is back to 4 (staged card was added then pulled),
+      // and unresolved queue count for the staged card_key should have increased by 1.
+      const [poolCountRespAfter, queueAfter] = await Promise.all([
         fetch(
-          `${SUPABASE_URL}/rest/v1/virus_pool?game_id=eq.${gameId}&card_key=eq.${stagedCardKey}&select=id`,
+          `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=virus_pool_count`,
           { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
-        ).then((r) => r.json() as Promise<Array<{ id: string }>>),
+        ).then((r) => r.json() as Promise<Array<{ virus_pool_count: number }>>),
         fetch(
           `${SUPABASE_URL}/rest/v1/virus_resolution_queue?game_id=eq.${gameId}&card_key=eq.${stagedCardKey}&resolved=eq.false&select=id`,
           { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
         ).then((r) => r.json() as Promise<Array<{ id: string }>>),
       ]);
-      const countAfter = poolAfter.length + queueAfter.length;
+      const poolCountAfter = poolCountRespAfter[0]?.virus_pool_count ?? 4;
+      const countAfter = poolCountAfter + queueAfter.length;
 
       expect(countAfter).toBe(countBefore + 1);
     } finally {

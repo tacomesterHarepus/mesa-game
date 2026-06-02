@@ -37,6 +37,8 @@ export interface Game {
   winner: Winner
   host_user_id: string
   created_at: string
+  virus_pool_count: number
+  pending_core_progress_delta: number | null
 }
 
 export interface Player {

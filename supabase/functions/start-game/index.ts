@@ -133,6 +133,7 @@ Deno.serve(async (req) => {
         turn_order_ids: turnOrderIds,
         current_round: 1,
         pending_mission_options: missionOptions,
+        virus_pool_count: 4,
       })
       .eq("id", game_id);
 

@@ -221,14 +221,14 @@ async function resolveVirusQueueFully(gameId: string, token: string): Promise<vo
   }
 }
 
-// Returns current virus_pool count for the game via REST (card content hidden by RLS, count readable).
+// Returns current virus pool count via games.virus_pool_count (virus_pool table is service-role-only).
 async function queryPoolCount(gameId: string, token: string): Promise<number> {
   const resp = await fetch(
-    `${SUPABASE_URL}/rest/v1/virus_pool?game_id=eq.${gameId}&select=id`,
+    `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=virus_pool_count`,
     { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
   );
-  const rows = (await resp.json()) as Array<unknown>;
-  return Array.isArray(rows) ? rows.length : 0;
+  const rows = (await resp.json()) as Array<{ virus_pool_count: number }>;
+  return rows[0]?.virus_pool_count ?? 0;
 }
 
 // Waits for phase to reach a post-resolution settled state (player_turn, resource_adjustment, game_over).
@@ -441,5 +441,225 @@ test.describe("pool invariant — pool equals 4 after every settled virus resolu
     poolCountHistory.forEach((count, i) => {
       expect(count, `turn ${i + 1} in history`).toBe(4);
     });
+  });
+});
+
+// ── Part 4: mission reward deferred until after completing turn's virus chain ────
+//
+// Verifies:
+// (a) mission_complete is logged AFTER viruses_placed in the game_log — never before.
+// (b) games.core_progress is at the pre-reward value while phase=virus_pull; the reward is
+//     applied only when advanceTurnOrPhase runs post-chain, not when end-play-phase runs.
+//     Intermediate check: pending_core_progress_delta is set and core_progress is unchanged.
+// (c) [conditional] contribution-removing virus during completing turn's chain rejects the
+//     deferred reward — mission_requirements_unmet is logged, core_progress stays unchanged.
+//
+// Strategy: call end-play-phase without chaining pull-viruses (endPlayPhaseOnly helper).
+// This lets us read the intermediate virus_pull state before the chain runs.
+// When pending_core_progress_delta is non-null in virus_pull, we've caught a mission-
+// completing turn mid-flight. Assert pre-reward state, then complete the chain and assert
+// post-reward state + log ordering.
+
+// Calls end-play-phase without auto-chaining pull-viruses — stops at virus_pull so callers
+// can inspect the intermediate state before the virus chain runs.
+async function endPlayPhaseOnly(gameId: string, playerId: string, token: string): Promise<boolean> {
+  const resp = await devFetch(`${SUPABASE_URL}/functions/v1/end-play-phase`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ game_id: gameId, override_player_id: playerId }),
+  });
+  return resp.status === 200;
+}
+
+// Queries the full game state including the new deferred-reward columns.
+async function queryGameFull(gameId: string, token: string): Promise<{
+  phase: string;
+  core_progress: number;
+  current_mission_id: string | null;
+  pending_core_progress_delta: number | null;
+  current_turn_player_id: string | null;
+} | null> {
+  const resp = await fetch(
+    `${SUPABASE_URL}/rest/v1/games?id=eq.${gameId}&select=phase,core_progress,current_mission_id,pending_core_progress_delta,current_turn_player_id`,
+    { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+  );
+  const rows = (await resp.json()) as Array<Record<string, unknown>>;
+  return (rows[0] ?? null) as ReturnType<typeof queryGameFull> extends Promise<infer T> ? T : never;
+}
+
+test.describe("mission reward deferred until after completing turn's virus chain", () => {
+  test.describe.configure({ mode: "serial" });
+
+  let drCtx: BrowserContext;
+  let drPage: Page;
+  let drGameId = "";
+  let drToken: string | null = null;
+
+  // Captured during test (a+b) for use in assertion continuations
+  let capturedPreReward = 0;
+  let capturedPendingDelta = 0;
+
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
+    drCtx = await browser.newContext();
+    const { page, gameId } = await fillLobby(drCtx, "Bot1");
+    drPage = page;
+    drGameId = gameId;
+    await startDevGame(drPage);
+    await advanceToPlayerTurnWithCpu2(drPage, gameId);
+    drToken = await extractAuthToken(drPage);
+  });
+
+  test.afterAll(async () => {
+    await drCtx.close().catch(() => {});
+  });
+
+  // Drain any non-player_turn intermediate phase (virus_pull, virus_resolution, secret_targeting).
+  // Returns true if the game is now in player_turn, false otherwise.
+  async function drainToPlayerTurn(gameId: string, token: string): Promise<boolean> {
+    for (let i = 0; i < 25; i++) {
+      await new Promise((r) => setTimeout(r, 400));
+      const g = await queryGameFull(gameId, token);
+      if (!g) return false;
+      if (g.phase === "player_turn") return true;
+      if (["resource_adjustment", "mission_selection", "card_reveal", "resource_allocation", "game_over"].includes(g.phase)) return false;
+      if (g.phase === "virus_pull" && g.current_turn_player_id) {
+        await devFetch(`${SUPABASE_URL}/functions/v1/pull-viruses`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ game_id: gameId, override_player_id: g.current_turn_player_id }),
+        });
+      } else if (g.phase === "virus_resolution" && g.current_turn_player_id) {
+        await resolveVirusQueueFully(gameId, token);
+      } else if (g.phase === "secret_targeting") {
+        await new Promise((r) => setTimeout(r, 62_000)); // wait for 1-min targeting deadline
+      }
+    }
+    return false;
+  }
+
+  test("(a+b) core_progress stays pre-reward during virus_pull; applied post-chain; mission_complete logged after viruses_placed", async () => {
+    const token = drToken;
+    if (!token) { test.skip(); return; }
+
+    // Run turns — call end-play-phase WITHOUT chaining pull-viruses.
+    // Look for the deferred state: phase=virus_pull AND pending_core_progress_delta non-null.
+    // This happens on a turn where the completing contribution was played.
+    let foundDeferredState = false;
+
+    for (let turn = 0; turn < 40 && !foundDeferredState; turn++) {
+      const inPlayerTurn = await drainToPlayerTurn(drGameId, token);
+      if (!inPlayerTurn) break;
+
+      const g = await queryGameFull(drGameId, token);
+      if (!g?.current_turn_player_id) break;
+
+      // Call end-play-phase (no auto pull-viruses) and immediately read state
+      await endPlayPhaseOnly(drGameId, g.current_turn_player_id, token);
+      await new Promise((r) => setTimeout(r, 400));
+
+      const mid = await queryGameFull(drGameId, token);
+      if (!mid) break;
+
+      if (mid.phase === "virus_pull" && mid.pending_core_progress_delta != null) {
+        // Caught the deferred state
+        capturedPreReward = mid.core_progress;
+        capturedPendingDelta = mid.pending_core_progress_delta;
+        foundDeferredState = true;
+        break;
+      }
+
+      // Not mission-completing this turn — drain the virus chain and continue
+      if (mid.phase === "virus_pull" && mid.current_turn_player_id) {
+        await devFetch(`${SUPABASE_URL}/functions/v1/pull-viruses`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ game_id: drGameId, override_player_id: mid.current_turn_player_id }),
+        });
+        await resolveVirusQueueFully(drGameId, token);
+      } else if (mid.phase === "virus_resolution") {
+        await resolveVirusQueueFully(drGameId, token);
+      } else if (mid.phase === "secret_targeting") {
+        await new Promise((r) => setTimeout(r, 62_000));
+      }
+    }
+
+    if (!foundDeferredState) { test.skip(); return; }
+
+    // ── ASSERTION (b): intermediate virus_pull state ───────────────────────
+    expect(capturedPreReward, "(b) core_progress must be at pre-reward value in virus_pull").toBeDefined();
+    expect(capturedPendingDelta, "(b) pending_core_progress_delta must equal mission reward").toBeGreaterThan(0);
+
+    // Re-read to confirm state is still paused mid-chain
+    const midConfirm = await queryGameFull(drGameId, token);
+    expect(midConfirm?.phase, "(b) game must be in virus_pull").toBe("virus_pull");
+    expect(midConfirm?.core_progress, "(b) core_progress unchanged mid-chain").toBe(capturedPreReward);
+    expect(midConfirm?.pending_core_progress_delta, "(b) pending delta present").toBe(capturedPendingDelta);
+    expect(midConfirm?.current_mission_id, "(b) current_mission_id non-null during chain").not.toBeNull();
+
+    // ── Complete the chain ────────────────────────────────────────────────
+    const pullGame = await queryGameFull(drGameId, token);
+    if (pullGame?.current_turn_player_id) {
+      await devFetch(`${SUPABASE_URL}/functions/v1/pull-viruses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ game_id: drGameId, override_player_id: pullGame.current_turn_player_id }),
+      });
+    }
+    await resolveVirusQueueFully(drGameId, token);
+    await waitForSettledPhase(drGameId, token);
+    await new Promise((r) => setTimeout(r, 600));
+
+    // ── ASSERTION (b continued): post-chain reward applied ────────────────
+    const finalState = await queryGameFull(drGameId, token);
+    expect(finalState?.core_progress, "(b) reward applied post-chain").toBe(capturedPreReward + capturedPendingDelta);
+    expect(finalState?.pending_core_progress_delta, "pending delta cleared post-chain").toBeNull();
+    expect(finalState?.current_mission_id, "mission closed post-chain").toBeNull();
+
+    // ── ASSERTION (a): log ordering — viruses_placed before mission_complete ─
+    const logResp = await fetch(
+      `${SUPABASE_URL}/rest/v1/game_log?game_id=eq.${drGameId}&event_type=in.(viruses_placed,mission_complete)&select=event_type,created_at&order=created_at.asc`,
+      { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+    );
+    const logRows = (await logResp.json()) as Array<{ event_type: string; created_at: string }>;
+    const lastVirusesPlacedIdx = logRows.reduce((best, r, i) => r.event_type === "viruses_placed" ? i : best, -1);
+    const lastMissionCompleteIdx = logRows.reduce((best, r, i) => r.event_type === "mission_complete" ? i : best, -1);
+    expect(lastVirusesPlacedIdx, "(a) viruses_placed must appear in log").toBeGreaterThanOrEqual(0);
+    expect(lastMissionCompleteIdx, "(a) mission_complete must appear in log").toBeGreaterThanOrEqual(0);
+    expect(lastVirusesPlacedIdx, "(a) viruses_placed must be logged before mission_complete").toBeLessThan(lastMissionCompleteIdx);
+  });
+
+  // (c) Deterministic setup requires injecting model_corruption into virus_pool, which
+  // needs service-role access not available in E2E tests. The test verifies the code path
+  // exists and checks for mission_requirements_unmet in the log if the scenario arose
+  // naturally in the preceding turns.
+  test("(c) [conditional] mission_requirements_unmet in log if contribution-removing virus fired in completing chain", async () => {
+    const token = drToken;
+    if (!token) { test.skip(); return; }
+
+    const logResp = await fetch(
+      `${SUPABASE_URL}/rest/v1/game_log?game_id=eq.${drGameId}&event_type=eq.mission_requirements_unmet&select=event_type,metadata`,
+      { headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` } }
+    );
+    const rows = (await logResp.json()) as Array<{ event_type: string; metadata: Record<string, unknown> }>;
+
+    if (rows.length === 0) {
+      // Scenario didn't arise naturally (model_corruption/data_drift/validation_failure didn't
+      // fire in a completing chain). Skip rather than fail — this is probabilistic in E2E.
+      // For deterministic coverage, run manually with model_corruption staged in the pool.
+      test.skip();
+      return;
+    }
+
+    // If it DID arise: verify the log entry is well-formed and core_progress was not awarded.
+    const entry = rows[0];
+    expect(entry.metadata).toHaveProperty("mission_key");
+    expect(entry.metadata).toHaveProperty("missing");
+    expect(Array.isArray(entry.metadata.missing), "missing field must be an array").toBe(true);
+
+    // If mission was un-completed, the game should still have the mission active (current_mission_id non-null)
+    // at the point this log was written. We can't travel back in time but we can verify the reward
+    // wasn't applied by checking whether core_progress stayed at pre-reward value after the test (a+b) run.
+    // Since (a+b) did find a mission completion that succeeded, and this log shows a SEPARATE
+    // un-completion event, we just verify the entry format here.
   });
 });

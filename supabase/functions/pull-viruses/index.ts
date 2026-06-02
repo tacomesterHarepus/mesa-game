@@ -67,6 +67,7 @@ Deno.serve(async (req) => {
     await admin.from("games").update({
       phase: "virus_resolution",
       pending_pull_count: 0,
+      virus_pool_count: poolSizeAfter ?? 0,
     }).eq("id", game_id);
 
     return new Response(JSON.stringify({ success: true }), {

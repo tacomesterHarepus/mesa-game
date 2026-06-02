@@ -1,22 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { advanceTurnOrPhase, corsHeaders, drawCardsForPlayer, MISSION_FAIL_PENALTIES, resetPlayersForNextMission, shuffle } from "../_shared/advanceTurnOrPhase.ts";
+import { advanceTurnOrPhase, corsHeaders, drawCardsForPlayer, MISSION_FAIL_PENALTIES, MISSION_REQUIREMENTS, resetPlayersForNextMission, shuffle } from "../_shared/advanceTurnOrPhase.ts";
 import type { GameLogInsert, MissionOutcome } from "../_shared/gameLogTypes.ts";
-
-const MISSION_REQUIREMENTS: Record<string, { compute?: number; data?: number; validation?: number }> = {
-  data_cleanup: { data: 4, compute: 3 },
-  basic_model_training: { compute: 4, data: 2 },
-  dataset_preparation: { data: 4, compute: 1 },
-  cross_validation: { compute: 2, validation: 3 },
-  distributed_training: { compute: 5 },
-  balanced_compute_cluster: { compute: 4, data: 2 },
-  dataset_integration: { compute: 4, data: 3 },
-  multi_model_ensemble: { compute: 4, data: 3, validation: 2 },
-  synchronized_training: { compute: 5, validation: 1 },
-  genome_simulation: { compute: 5, data: 3, validation: 1 },
-  global_research_network: { compute: 6, data: 4, validation: 1 },
-  experimental_vaccine_model: { compute: 5, data: 3, validation: 2 },
-};
 
 const MISSION_REWARDS: Record<string, number> = {
   data_cleanup: 2, basic_model_training: 2,
@@ -111,20 +96,17 @@ Deno.serve(async (req) => {
         missionResolved = true;
         missionOutcomeForTransition = "complete";
         const reward = MISSION_REWARDS[mission.mission_key] ?? 2;
-        gameUpdates.core_progress = game.core_progress + reward;
-        gameUpdates.current_mission_id = null;
-        gameUpdates.pending_mission_options = [];
+        // Defer reward: store the delta in pending_core_progress_delta.
+        // current_mission_id intentionally NOT cleared here — it must stay non-null through
+        // the completing turn's virus chain so model_corruption, data_drift, and
+        // validation_failure can still decrement contributions. advanceTurnOrPhase rechecks
+        // requirements post-chain and applies (or rejects) the reward at that point.
+        // mission_complete is also logged there, after viruses_placed — correct ordering.
+        gameUpdates.pending_core_progress_delta = reward;
+        // Abort flags are unrelated to the virus chain; clear eagerly.
         gameUpdates.abort_flag_pending = false;
         gameUpdates.abort_flag_player_id = null;
         gameUpdates.abort_vote_deadline = null;
-        await resetPlayersForNextMission(admin, game_id);
-        const missionCompleteLog: GameLogInsert<"mission_complete"> = {
-          game_id,
-          event_type: "mission_complete",
-          public_description: `Mission complete! Core Progress +${reward}. (${gameUpdates.core_progress}/10)`,
-          metadata: { mission_key: mission.mission_key, reward, new_progress: gameUpdates.core_progress },
-        };
-        await admin.from("game_log").insert(missionCompleteLog);
       } else {
         // Check end of round 2
         const turnOrderIds: string[] = game.turn_order_ids ?? [];
@@ -159,6 +141,9 @@ Deno.serve(async (req) => {
     const { data: pending } = await admin
       .from("pending_viruses").select("*").eq("game_id", game_id);
 
+    // Track new pool size so virus_pool_count stays in sync without player-visible SELECT.
+    let newPoolSize: number = (game as any).virus_pool_count ?? 4;
+
     if (pending && pending.length > 0) {
       // Delete pending_viruses first — throw on error so stale rows cannot accumulate on retry
       const { error: deleteError } = await admin
@@ -186,7 +171,10 @@ Deno.serve(async (req) => {
           position: i,
         }))
       );
+      newPoolSize = combined.length;
     }
+
+    gameUpdates.virus_pool_count = newPoolSize;
 
     const virusesPlacedLog: GameLogInsert<"viruses_placed"> = {
       game_id,

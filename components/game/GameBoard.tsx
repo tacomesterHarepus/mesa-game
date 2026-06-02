@@ -76,7 +76,7 @@ export function GameBoard({
   );
   const [mission, setMission] = useState<ActiveMission | null>(initialMission);
   const [log, setLog] = useState<LogEntry[]>(initialLog);
-  const [poolCount, setPoolCount] = useState(4);
+  const [poolCount, setPoolCount] = useState(initialGame?.virus_pool_count ?? 4);
   const [virusQueue, setVirusQueue] = useState<QueueCard[]>([]);
   const [localNominationId, setLocalNominationId] = useState<string | null>(null);
   const [contributions, setContributions] = useState<MissionContribution[]>([]);
@@ -103,12 +103,11 @@ export function GameBoard({
       if (g) setGame((prev) => ({ ...prev, ...(g as unknown as Partial<Game>) }));
 
       const missionId = g?.current_mission_id ?? null;
-      const [{ data: p }, { data: m }, poolResult, { data: contrib }] = await Promise.all([
+      const [{ data: p }, { data: m }, { data: contrib }] = await Promise.all([
         supabase.from("players").select("*").eq("game_id", gameId),
         missionId
           ? supabase.from("active_mission").select("*").eq("id", missionId).maybeSingle()
           : Promise.resolve({ data: null }),
-        supabase.from("virus_pool").select("id", { count: "exact", head: true }).eq("game_id", gameId),
         missionId
           ? supabase.from("mission_contributions").select("*").eq("mission_id", missionId)
           : Promise.resolve({ data: [] }),
@@ -116,7 +115,10 @@ export function GameBoard({
       if (p && p.length > 0) setPlayers(p);
       // m is null when there is no active mission (lobby, resource_adjustment, etc.) — that is valid
       if (m !== undefined) setMission(m);
-      if (poolResult.count !== null) setPoolCount(poolResult.count);
+      // Pool count comes from games.virus_pool_count (set here from the game poll above).
+      // Cast via Game since the generated Supabase type lags behind schema migrations.
+      const gGame = g as unknown as Partial<Game>;
+      if (gGame.virus_pool_count != null) setPoolCount(gGame.virus_pool_count);
       setContributions(contrib ?? []);
 
       // game_log poll backup: Realtime INSERT can be missed silently; poll catches stragglers.
@@ -178,7 +180,9 @@ export function GameBoard({
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "games", filter: `id=eq.${gameId}` },
           (payload) => {
-            setGame((prev) => ({ ...prev, ...(payload.new as Partial<Game>) }));
+            const newGame = payload.new as Partial<Game>;
+            setGame((prev) => ({ ...prev, ...newGame }));
+            if (newGame.virus_pool_count != null) setPoolCount(newGame.virus_pool_count);
           }
         )
         .on(
@@ -214,22 +218,7 @@ export function GameBoard({
             setLog((prev) => [...prev, payload.new as LogEntry]);
           }
         )
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "virus_pool", filter: `game_id=eq.${gameId}` },
-          async () => {
-            const { count } = await supabase.from("virus_pool").select("id", { count: "exact", head: true }).eq("game_id", gameId);
-            if (!cancelled && count !== null) setPoolCount(count);
-          }
-        )
-        .on(
-          "postgres_changes",
-          { event: "DELETE", schema: "public", table: "virus_pool", filter: `game_id=eq.${gameId}` },
-          async () => {
-            const { count } = await supabase.from("virus_pool").select("id", { count: "exact", head: true }).eq("game_id", gameId);
-            if (!cancelled && count !== null) setPoolCount(count);
-          }
-        );
+        ;
 
       // Hand updates — subscribe to whichever player's hand is active.
       // In dev mode this is the currently-selected bot; otherwise the auth user's player.

@@ -69,6 +69,7 @@ export interface GameLogMetadataMap {
   turn_skipped: { actor_player_id: string; reason: string };
   round_start: { round: number; first_player_id: string };
   mission_complete: { mission_key: string; reward: number; new_progress: number };
+  mission_requirements_unmet: { mission_key: string; missing: string[] };
   mission_failed: { mission_key: string; penalty: number; new_timer: number };
   mission_aborted: {
     mission_key: string;

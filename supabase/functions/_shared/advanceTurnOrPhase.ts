@@ -1,6 +1,21 @@
 // deno-lint-ignore-file no-explicit-any
 import type { GameLogInsert, MissionOutcome } from "./gameLogTypes.ts";
 
+export const MISSION_REQUIREMENTS: Record<string, { compute?: number; data?: number; validation?: number }> = {
+  data_cleanup: { data: 4, compute: 3 },
+  basic_model_training: { compute: 4, data: 2 },
+  dataset_preparation: { data: 4, compute: 1 },
+  cross_validation: { compute: 2, validation: 3 },
+  distributed_training: { compute: 5 },
+  balanced_compute_cluster: { compute: 4, data: 2 },
+  dataset_integration: { compute: 4, data: 3 },
+  multi_model_ensemble: { compute: 4, data: 3, validation: 2 },
+  synchronized_training: { compute: 5, validation: 1 },
+  genome_simulation: { compute: 5, data: 3, validation: 1 },
+  global_research_network: { compute: 6, data: 4, validation: 1 },
+  experimental_vaccine_model: { compute: 5, data: 3, validation: 2 },
+};
+
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -114,6 +129,70 @@ export async function advanceTurnOrPhase(
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+
+  // Re-check mission requirements if a reward was deferred by end-play-phase.
+  // current_mission_id stays non-null through the completing turn's virus chain so that
+  // contribution-removing viruses (model_corruption, data_drift, validation_failure) can
+  // still decrement counts. We now verify requirements are still met before applying the reward.
+  if ((game.pending_core_progress_delta ?? null) !== null && game.current_mission_id) {
+    const { data: pendingMission } = await admin
+      .from("active_mission").select("*").eq("id", game.current_mission_id).maybeSingle();
+
+    if (pendingMission) {
+      const reqs = MISSION_REQUIREMENTS[pendingMission.mission_key] ?? {};
+      const stillMet =
+        (pendingMission.compute_contributed ?? 0) >= (reqs.compute ?? 0) &&
+        (pendingMission.data_contributed ?? 0) >= (reqs.data ?? 0) &&
+        (pendingMission.validation_contributed ?? 0) >= (reqs.validation ?? 0);
+
+      if (stillMet) {
+        const reward: number = game.pending_core_progress_delta;
+        const newProgress = (game.core_progress ?? 0) + reward;
+        const missionCloseUpdates: Record<string, any> = {
+          core_progress: newProgress,
+          current_mission_id: null,
+          pending_core_progress_delta: null,
+          pending_mission_options: [],
+          abort_flag_pending: false,
+          abort_flag_player_id: null,
+          abort_vote_deadline: null,
+        };
+        await admin.from("games").update(missionCloseUpdates).eq("id", game_id);
+        await resetPlayersForNextMission(admin, game_id);
+        const missionCompleteLog: GameLogInsert<"mission_complete"> = {
+          game_id,
+          event_type: "mission_complete",
+          public_description: `Mission complete! Core Progress +${reward}. (${newProgress}/10)`,
+          metadata: { mission_key: pendingMission.mission_key, reward, new_progress: newProgress },
+        };
+        await admin.from("game_log").insert(missionCompleteLog);
+        // Update local snapshot so subsequent win check uses the applied value.
+        game = { ...game, core_progress: newProgress, current_mission_id: null, pending_core_progress_delta: null };
+      } else {
+        // A virus removed a contribution — requirements no longer met. Reject the deferred
+        // reward. Mission continues; remaining players in the round may still complete it,
+        // or it fails at end of round 2 under existing logic.
+        const missing: string[] = [];
+        if ((pendingMission.compute_contributed ?? 0) < (reqs.compute ?? 0)) missing.push("compute");
+        if ((pendingMission.data_contributed ?? 0) < (reqs.data ?? 0)) missing.push("data");
+        if ((pendingMission.validation_contributed ?? 0) < (reqs.validation ?? 0)) missing.push("validation");
+        await admin.from("games").update({
+          pending_core_progress_delta: null,
+          pending_mission_outcome: null,
+        }).eq("id", game_id);
+        const reqsUnmetLog: GameLogInsert<"mission_requirements_unmet"> = {
+          game_id,
+          event_type: "mission_requirements_unmet",
+          public_description: "A virus removed a contribution — mission requirements no longer met. Mission continues.",
+          metadata: { mission_key: pendingMission.mission_key, missing },
+        };
+        await admin.from("game_log").insert(reqsUnmetLog);
+        game = { ...game, pending_core_progress_delta: null };
+        missionResolved = false;
+      }
+    }
+  }
+
   if ((game.core_progress ?? 0) >= 10) {
     await admin.from("games").update({ phase: "game_over", winner: "humans" }).eq("id", game_id);
     const gameOverLog: GameLogInsert<"game_over"> = {
