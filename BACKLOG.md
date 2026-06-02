@@ -69,6 +69,12 @@ Items to revisit after the final board-redesign phase task (game_over) ships.
 
 ---
 
+## Misaligned coordination
+
+- **Live nomination sharing between misaligned AIs** — During secret_targeting, when one misaligned AI nominates and votes for a target, fellow misaligned AIs currently cannot see that nomination — they must coordinate via private chat before voting. Make nominations propagate live to all misaligned AIs to ease coordination. DESIGN DECISION REQUIRED before building: should a fellow AI's nomination (a) pre-fill the others' nomination for one-click confirm, (b) auto-cast their vote, or (c) just display the pick while each still votes independently? Option (b) effectively lets one AI vote for the whole team — changes balance; (a)/(c) preserve independent votes per rules Q7. RISK NOTE: this touches the secret_targeting concurrency path (CAS race fixed 2026-05-31; Race 2 still open) — treat as diagnose-first, not a quick change. Workaround for current playtest: verbal instruction to players to coordinate via private chat before voting. *(Surfaced: 2026-06-02 pre-playtest testing)*
+
+---
+
 ## Game Balance
 
 *(empty)*
