@@ -41,6 +41,10 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 
 ## Current Phase
 
+**Polling → Realtime migration Phase 3 — SHIPPED but Phase 4 BLOCKED (2026-06-03, commit 1fba3b0).**
+
+GameBoard 3s poll stripped of game/players/mission/log/poolCount fetches. Added reconnect-refresh on SUBSCRIBED to game-${gameId} channel. Added game-over teardown (removeChannel on winner≠null or phase=game_over). Hand fetch stays in poll for Phase 4. Full suite: 58 pass / 8 fail / 16 skip / 9 did not run (15.7m). Gate FAILED: 4 new failures. Most actionable: card-reveal.spec.ts:201 — heading not found in 15s (PASSING in Phase 1). Suspected cause: reconnect-refresh async fetch overwrites games UPDATE phase transition (race condition). See LATEST_TASK.md §Gate analysis. Phase 4 blocked; user must review before proceeding.
+
 **Polling → Realtime migration Phase 2 — CLOSED (2026-06-03, commit 7566673).**
 
 Removed 2s setInterval poll from LobbyPhase.tsx; added reconnect-refresh (re-fetch players/spectators/game.phase on every 'SUBSCRIBED' transition). Scoped test run lobby+dev-mode: 11/12 pass (1 cold-start flake on fresh port, not a regression). Build clean. Awaiting manual lobby reconnect verification before Phase 3 approval.
