@@ -68,33 +68,6 @@ export function MisalignedPrivateChat({ gameId, currentPlayer, misalignedPlayers
     };
   }, [gameId]);
 
-  // Poll backup — 3s id-dedup
-  useEffect(() => {
-    const supabase = createClient();
-    const id = setInterval(async () => {
-      const { data } = await supabase
-        .from("chat_messages")
-        .select("*")
-        .eq("game_id", gameId)
-        .eq("channel", "misaligned_private")
-        .order("created_at", { ascending: false })
-        .limit(30);
-      if (data && data.length > 0) {
-        const existingIds = new Set(messagesRef.current.map((m) => m.id));
-        const newRows = data.filter((r) => !existingIds.has(r.id)).reverse();
-        const newCount = newRows.length;
-        if (newCount > 0) {
-          setMessages((prev) => {
-            const prevIds = new Set(prev.map((m) => m.id));
-            const toAdd = newRows.filter((r) => !prevIds.has(r.id));
-            return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
-          });
-          for (let i = 0; i < newCount; i++) onNewMsgRef.current?.();
-        }
-      }
-    }, 3000);
-    return () => clearInterval(id);
-  }, [gameId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
