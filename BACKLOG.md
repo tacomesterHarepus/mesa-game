@@ -124,4 +124,40 @@ Items to revisit after the final board-redesign phase task (game_over) ships.
 
 - **Captain role for humans** — Consider restricting human actions (resource adjustment, allocation, mission abort) to a single "captain" human rather than any human. Needs design decisions: captain selection (random/voted/rotating), mid-game reassignment, scope (which actions are captain-only vs. all-humans). Rationale: clearer decision-making, reduced coordination friction, more social-deduction-game feel. Defer until after first multi-human playtest confirms coordination is actually a problem. *(Reported: design review, not yet tested)*
 
+---
+
+## Online playtest #1 (02.06.26) findings
+
+### Architecture
+
+- **[Online playtest #1 02.06.26] Polling → WebSocket/Realtime migration** — Client polls constantly, sends unnecessary data, and keeps sending requests after the game is over. Game felt laggy at times (player-reported). Move from poll-based to push-based (Supabase Realtime/WebSocket) so the client is notified when something changes rather than asking. Already uses Realtime partially — this is "finish the transition," not build from zero. Likely resolves the double secret-chat messages and post-game-over requests below as a side effect. **Treat as diagnose-first:** inventory every poll site and existing subscription before implementing. Address this before tackling the items below that may be caused by it.
+
+### Bugs
+
+- **[Online playtest #1 02.06.26] Secret chat messages doubled** — All secret chats render twice. Probable cause: poll-backup + Realtime subscription both delivering without dedup. May be resolved by the WebSocket/Realtime migration — re-test after that lands; do not fix against the polling layer first.
+
+- **[Online playtest #1 02.06.26] Post-game-over requests** — Client keeps sending requests after the game ends. Likely resolved by the WebSocket/Realtime migration as a side effect.
+
+- **[Online playtest #1 02.06.26] Constraint warning hidden by "selected ×1" text** — When a card cannot be played, the constraint warning text is pushed out of view by the "selected ×1" label. Old bug, recurring instance; layout-only fix, architecture-independent.
+
+- **[Online playtest #1 02.06.26] Chat/Log tab scroll resets to top** — Switching between CHAT and LOG tabs scrolls the container to the very top. Annoying and frequent.
+
+### UX / Clarity
+
+- **[Online playtest #1 02.06.26] AI cannot see own hand off-turn** — AIs only see their cards on their own turn. Change so an AI sees its own hand at all times — eases in-game coordination without requiring card memorisation, and matches the physical prototype. Confirmed design intent (not a bug). RLS already permits own-hand reads; this is a UI gating change only.
+
+- **[Online playtest #1 02.06.26] Resource-adjustment: too easy to skip** — Players hit Continue without removing any AI resources; happened in the first two rounds of the playtest. Add a confirmation/nudge when no CPU/RAM change has been made in the resource_adjustment phase. Note: the allocation phase already has an unallocated-pool dialog (shipped 2026-05-06); this is the inverse case for the adjustment phase.
+
+- **[Online playtest #1 02.06.26] Humans can't see each other's resource selections live** — When one human removes or assigns CPU/RAM, the other human cannot see what is being selected; unintuitive. Should be a shared live view of pending changes before either human confirms. Same class as the live nomination sharing item under Misaligned coordination — requires live pending-state sharing, easier to build on the WebSocket model.
+
+- **[Online playtest #1 02.06.26] Discard cards stack invisibly** — Discarded cards stack directly on top of each other; only the count number changes. Players were confused. Make stacking visually clearer: offset each stacked card slightly further to one side per additional card so the pile visibly grows rather than appearing unchanged.
+
+### Virus Pool
+
+- **[Online playtest #1 02.06.26] Auto-pull wait feels dead** — The 5 s auto-pull on the virus pool left everyone waiting with no feedback. Add a countdown progress bar inside the Pull button so players can see time remaining; if the AI clicks early it resolves immediately. Consider building on the WebSocket/Realtime model rather than a polling timer.
+
+### Ideas / Nice-to-Have
+
+- **[Online playtest #1 02.06.26] JSON config file for UI sizing** — A JSON file that controls element sizes (and possibly other display settings). Fun IT-culture reference for players who get it. Low priority.
+
 
