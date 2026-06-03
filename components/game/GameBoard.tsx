@@ -94,39 +94,6 @@ export function GameBoard({
 
   const gameId = game.id;
 
-  // Hand-only polling fallback: game/players/mission/log are now gap-filled by the
-  // reconnect-refresh in the Realtime subscription. This setInterval stays until Phase 4.
-  useEffect(() => {
-    const supabase = createClient();
-    const handPlayerId = devMode ? activeDevPlayer?.id : currentPlayer?.id;
-    const handPlayerRole = devMode ? activeDevPlayer?.role : currentPlayer?.role;
-
-    const poll = async () => {
-      await supabase.auth.getSession();
-      // Hand poll backup: avoids invisible cards when Realtime INSERT/DELETE is dropped.
-      // game/players/mission/log are now covered by the reconnect-refresh on the Realtime
-      // subscription (fires on every 'SUBSCRIBED' transition — including reconnects).
-      // Sort by id ensures stable display order across polls (hands table has no position column).
-      if (handPlayerId && handPlayerRole !== "human") {
-        const { data: h } = await supabase
-          .from("hands").select("*")
-          .eq("player_id", handPlayerId).eq("game_id", gameId);
-        if (h) {
-          const sorted = [...h].sort((a, b) => a.id.localeCompare(b.id));
-          if (process.env.NODE_ENV !== "production") {
-            console.log(`[hand poll] ${new Date().toISOString()} player=${handPlayerId.slice(0, 8)} ids=${sorted.map((c) => c.id.slice(0, 8)).join(",")}`);
-          }
-          setHand(sorted);
-        }
-      }
-    };
-
-    const id = setInterval(poll, 3000);
-    return () => clearInterval(id);
-  // activeDevPlayer?.id in deps ensures the interval re-creates when switching players
-  // in dev mode so the hand poll targets the newly selected bot.
-  }, [gameId, activeDevPlayer?.id, currentPlayer?.id, devMode]);
-
   // Phase-keepalive: 2s poll for phase + current_turn_player_id.
   // Recovers phase-transition events dropped in Supabase's documented 1–3s
   // post-SUBSCRIBED replication-ready window (same gap that broke the lobby).
@@ -284,13 +251,18 @@ export function GameBoard({
           const { data: g } = await supabase.from("games").select("*").eq("id", gameId).single();
           if (cancelled) return;
           const missionId = (g as unknown as Partial<Game>)?.current_mission_id ?? null;
-          const [{ data: p }, { data: m }, { data: recentLog }] = await Promise.all([
+          const handPlayerId = devMode ? activeDevPlayer?.id : currentPlayer?.id;
+          const handPlayerRole = devMode ? activeDevPlayer?.role : currentPlayer?.role;
+          const [{ data: p }, { data: m }, { data: recentLog }, { data: h }] = await Promise.all([
             supabase.from("players").select("*").eq("game_id", gameId),
             missionId
               ? supabase.from("active_mission").select("*").eq("id", missionId).maybeSingle()
               : Promise.resolve({ data: null }),
             supabase.from("game_log").select("*").eq("game_id", gameId)
               .order("created_at", { ascending: false }).limit(50),
+            handPlayerId && handPlayerRole !== "human"
+              ? supabase.from("hands").select("*").eq("player_id", handPlayerId).eq("game_id", gameId)
+              : Promise.resolve({ data: null }),
           ]);
           if (cancelled) return;
           if (subEventGenRef.current === genAtStart) {
@@ -329,6 +301,9 @@ export function GameBoard({
               );
             }
             if (m !== undefined) setMission(m);
+            if (h) {
+              setHand([...h].sort((a, b) => a.id.localeCompare(b.id)));
+            }
           }
           // game_log applied unconditionally: append-only dedup makes stale entries safe.
           if (recentLog && recentLog.length > 0) {
