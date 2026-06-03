@@ -41,6 +41,14 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 
 ## Current Phase
 
+**Autonomous run triage — BLOCKED at Step 1 (2026-06-03).**
+
+Two Phase 2 regressions found in isolation: abort-mission.spec.ts:175 and mission-flow.spec.ts:122 both fail (waitForURL timeout after clicking Start Game). Root cause: Phase 2 removed LobbyPhase 2s poll; Supabase Realtime has 1-3s replication-ready window after SUBSCRIBED — start-game games UPDATE lands in this window and is dropped with no recovery. virus-system:404 passes in isolation (full-suite contention flake).
+
+Phase 3 card-reveal:201 race mechanism also confirmed in code (lines 141/242 no guard, lines 222/228/231 async window, line 242 stale phase write) — diagnosis in DIAGNOSIS_2026-06-03-reconnect-refresh-race.md. Fix not implemented — blocked by Phase 2 regression triage rule.
+
+Required before proceeding: fix LobbyPhase start-game navigation (restore minimal phase-check to cover the 1-3s Supabase window), re-approve.
+
 **Polling → Realtime migration Phase 3 — SHIPPED but Phase 4 BLOCKED (2026-06-03, commit 1fba3b0).**
 
 GameBoard 3s poll stripped of game/players/mission/log/poolCount fetches. Added reconnect-refresh on SUBSCRIBED to game-${gameId} channel. Added game-over teardown (removeChannel on winner≠null or phase=game_over). Hand fetch stays in poll for Phase 4. Full suite: 58 pass / 8 fail / 16 skip / 9 did not run (15.7m). Gate FAILED: 4 new failures. Most actionable: card-reveal.spec.ts:201 — heading not found in 15s (PASSING in Phase 1). Suspected cause: reconnect-refresh async fetch overwrites games UPDATE phase transition (race condition). See LATEST_TASK.md §Gate analysis. Phase 4 blocked; user must review before proceeding.
