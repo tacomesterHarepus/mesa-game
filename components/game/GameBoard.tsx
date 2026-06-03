@@ -179,7 +179,7 @@ export function GameBoard({
           (payload) => {
             subEventGenRef.current += 1;
             setMission((prev) =>
-              prev ? { ...prev, ...(payload.new as Partial<ActiveMission>) } : prev
+              prev ? { ...prev, ...(payload.new as Partial<ActiveMission>) } : (payload.new as ActiveMission)
             );
           }
         )
@@ -300,11 +300,13 @@ export function GameBoard({
                 })
               );
             }
-            if (m !== undefined) setMission(m);
             if (h) {
               setHand([...h].sort((a, b) => a.id.localeCompare(b.id)));
             }
           }
+          // active_mission applied unconditionally: not volatile; a fresh DB fetch is always
+          // safe to apply. The gen guard protects volatile game/player fields only.
+          if (m !== undefined) setMission(m);
           // game_log applied unconditionally: append-only dedup makes stale entries safe.
           if (recentLog && recentLog.length > 0) {
             setLog((prev) => {
