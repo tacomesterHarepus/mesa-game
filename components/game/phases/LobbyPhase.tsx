@@ -118,8 +118,19 @@ export function LobbyPhase({
               supabase.from("games").select("phase").eq("id", gameId).single(),
             ]);
             if (cancelled) return;
-            if (p) setPlayers(p);
-            if (s) setSpectators(s);
+            // Merge rather than replace: the subscription's INSERT handler and handleJoin's
+            // optimistic update may have added players that aren't yet on the read replica
+            // the reconnect-refresh query hits. Leaves are handled by the DELETE handler.
+            if (p) setPlayers((prev) => {
+              const existingIds = new Set(prev.map((pl) => pl.id));
+              const added = p.filter((r) => !existingIds.has(r.id));
+              return added.length > 0 ? [...prev, ...added] : prev;
+            });
+            if (s) setSpectators((prev) => {
+              const existingIds = new Set(prev.map((sp) => sp.id));
+              const added = s.filter((r) => !existingIds.has(r.id));
+              return added.length > 0 ? [...prev, ...added] : prev;
+            });
             if (g && g.phase !== "lobby") router.push(gameUrl);
           }
         });
@@ -131,6 +142,19 @@ export function LobbyPhase({
       cancelled = true;
       if (channel) supabase.removeChannel(channel);
     };
+  }, [gameId, router, gameUrl]);
+
+  // Phase-only poll: safety net for Supabase's 1-3s replication-ready window where a
+  // stable-connection games UPDATE can be silently dropped on initial connect. Fetches
+  // only games.phase — players/spectators are covered by the subscription. Navigates on
+  // transition. Low-traffic lobby — 2s interval is acceptable here.
+  useEffect(() => {
+    const supabase = createClient();
+    const id = setInterval(async () => {
+      const { data: g } = await supabase.from("games").select("phase").eq("id", gameId).single();
+      if (g && g.phase !== "lobby") router.push(gameUrl);
+    }, 2000);
+    return () => clearInterval(id);
   }, [gameId, router, gameUrl]);
 
   async function handleJoin(e: React.FormEvent) {
