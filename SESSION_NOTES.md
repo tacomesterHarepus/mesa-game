@@ -41,6 +41,14 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 
 ## Current Phase
 
+**Foreign-uid mission/log regression — SHIPPED (2026-06-04, commit 61d0dee).**
+
+Root cause: Phase 3 (1fba3b0) removed the 3s poll; the gen guard in 1b0a32d blocked `setMission(m)` in the reconnect-refresh for the foreign-uid browser's one-shot SUBSCRIBED callback. Two-line fix: Option C (setMission moved outside gen guard — unconditional, like game_log) + Option B (active_mission UPDATE null-branch now assigns full payload row instead of no-op). Build clean. Full root cause in DIAGNOSIS_2026-06-03-foreignuid-mission-log-missing.md.
+
+**Manual verification required:** Start a game, foreign-uid player hard-refreshes during resource_adjustment (between missions). Confirm mission panel populates on next mission selection. If game_log is also still frozen, it is a separate issue (tracked in the diagnosis doc).
+
+---
+
 **Dev-game hand access — SHIPPED (2026-06-03, commit 008dec6, start-game v13, migration 023).**
 
 Migration 023 adds `is_dev_game boolean NOT NULL DEFAULT false` to `games` and a new additive SELECT policy on `hands`: the game host can read all hands when `is_dev_game = true`. start-game v13 sets `is_dev_game = true` when origin is localhost/127.0.0.1. Prod games unaffected (Vercel origin leaves it false).

@@ -2,32 +2,18 @@
 
 ## Summary
 
-Fixed dev-mode hand display bug: the dev player-switcher showed empty hands for AI players who joined with their own `user_id` (different from the host's). Root cause: the `hands` RLS policy (`player_id IN (SELECT id FROM players WHERE user_id = auth.uid())`) blocked the host from reading hands of players with a different `user_id`. All hand queries returned `[]`, and `if ([])` is truthy in JS, so `setHand([])` fired, leaving the hand empty and never updated.
-
-Fix: migration 023 adds `is_dev_game boolean NOT NULL DEFAULT false` to `games` and a new additive `hands` SELECT policy (`dev host reads all hands`) that fires only when `is_dev_game = true`. start-game v13 sets `is_dev_game = true` when the request `Origin` is localhost/127.0.0.1 — the same gate used by `override_player_id` in all other functions. Prod games are unaffected (Vercel origin leaves `is_dev_game = false`).
+Fixed foreign-uid browser regression: after a hard refresh, a real independently-joined player saw the mission panel as NONE and game_log frozen at "Game started". Root cause traced to Phase 3 + stable/volatile split commits removing the 3s poll and adding a gen guard that blocked `setMission(m)` in the reconnect-refresh. Two targeted changes in GameBoard.tsx: (Option C) moved `setMission(m)` outside the gen guard so mission is always applied from the reconnect-refresh regardless of in-flight events; (Option B) changed the active_mission UPDATE handler null-branch from a no-op to assigning `payload.new` directly, so a missed INSERT can be recovered by the first contribution UPDATE.
 
 ## Files changed
 
-- `supabase/migrations/023_dev_game_hand_access.sql` — new migration: `is_dev_game` column + `"dev host reads all hands"` policy
-- `supabase/functions/start-game/index.ts` — origin check + `is_dev_game: isDevGame` in games.update
-
-## Deployed
-
-- Migration 023: applied to prod via MCP
-- start-game: v13, deployed via MCP
-- Verified live: origin gate present in function body, both hands policies exist, `is_dev_game` column confirmed `boolean NOT NULL DEFAULT false`
+- `components/game/GameBoard.tsx` — 2 lines changed: Option C (setMission moved out of gen guard) + Option B (UPDATE handler null-branch fix)
+- `DIAGNOSIS_2026-06-03-foreignuid-mission-log-missing.md` — new, full root-cause analysis
 
 ## Test status
 
-- `next build`: clean (pre-existing lint warnings only)
-- E2E suite: not run (env issue)
-
-## Known limitation
-
-Supabase Realtime re-evaluates RLS at `postgres_changes` event delivery. The new `"dev host reads all hands"` policy should also gate Realtime INSERT events — but this is unverified. If initial hand load is fixed but live card draws don't appear in the dev window, that is the known Realtime-RLS gap. Do not add polling without approval; report and stop.
+- `next build` clean
+- Playwright not run (non-mission-rules scope; user to run full suite from Windows terminal and compare against BASELINE_2026-04-28.md)
 
 ## Suggested next
 
-1. **Manual verification:** Start a new dev game via Fill Lobby (must be a fresh start so start-game v13 runs and sets `is_dev_game = true`). Switch the dev switcher to an AI player who also has a real separate browser open. Confirm the hand shows correctly and card draws update live.
-2. If Realtime INSERT events still don't reach dev window, report. Do not add polling without approval.
-3. Otherwise: this closes the dev-mode hand-display bug. Next from BACKLOG.
+Manual verification: start a new game, have the foreign-uid player hard-refresh mid-game during `resource_adjustment` (between missions) and confirm: (1) mission panel populates when the next mission is selected, (2) game_log updates live. The game_log freeze is a separate tracked diagnosis (DIAGNOSIS_2026-06-03-foreignuid-mission-log-missing.md §game_log) — if the log is still frozen after this fix, it is a distinct Realtime delivery issue requiring a targeted log poll or further investigation.
