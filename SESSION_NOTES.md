@@ -41,6 +41,18 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 
 ## Current Phase
 
+**Dev-game hand access — SHIPPED (2026-06-03, commit 008dec6, start-game v13, migration 023).**
+
+Migration 023 adds `is_dev_game boolean NOT NULL DEFAULT false` to `games` and a new additive SELECT policy on `hands`: the game host can read all hands when `is_dev_game = true`. start-game v13 sets `is_dev_game = true` when origin is localhost/127.0.0.1. Prod games unaffected (Vercel origin leaves it false).
+
+Root cause (DIAGNOSIS_2026-06-03-devmode-hand-display.md): hands RLS gates on `players.user_id = auth.uid()`; dev window is authenticated as host — any player with a different `user_id` (real player, different session) returned `[]` from all hand fetches, emptying the hand display.
+
+**Known limitation:** Supabase Realtime re-evaluates RLS at INSERT event delivery. If live INSERT events still don't reach the dev window (initial load fixed but cards don't update live after a draw), that's a known limitation — do not add polling without approval. User must verify manually.
+
+**Manual verification required:** Start a new dev game via Fill Lobby (origin localhost → `is_dev_game = true`). Switch dev switcher to an AI player with a real separate browser open. Confirm hand shows correctly and updates on draw.
+
+---
+
 **Polling → Realtime migration — COMPLETE (2026-06-03, commit ed3e387).**
 
 Phase 4 shipped: hand fetch moved from the 3s setInterval into the SUBSCRIBED reconnect-refresh on the game-${gameId} channel. Applied under the same generation-counter guard and stable/volatile discipline as other recovered state. The 3s hand-only poll useEffect is removed in full. Phase-keepalive (2s games.phase + current_turn_player_id) and dev-mode hand-switch effect are untouched.

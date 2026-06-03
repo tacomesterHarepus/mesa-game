@@ -2,21 +2,32 @@
 
 ## Summary
 
-Phase 4 of the polling → Realtime migration. Hand fetch moved from the 3s `setInterval` into the SUBSCRIBED reconnect-refresh on the `game-${gameId}` channel. The hand is fetched in the same `Promise.all` as game/players/mission/log, and applied under the same generation-counter guard (skipped if any subscription event fired during the async window). The 3s hand-only poll `useEffect` is removed in full. The phase-keepalive (2s `games.phase + current_turn_player_id` poll) and the dev-mode hand-switch effect are untouched.
+Fixed dev-mode hand display bug: the dev player-switcher showed empty hands for AI players who joined with their own `user_id` (different from the host's). Root cause: the `hands` RLS policy (`player_id IN (SELECT id FROM players WHERE user_id = auth.uid())`) blocked the host from reading hands of players with a different `user_id`. All hand queries returned `[]`, and `if ([])` is truthy in JS, so `setHand([])` fired, leaving the hand empty and never updated.
 
-This completes the polling → Realtime migration. No data polling remains in the GameBoard except the intentional phase-keepalive.
+Fix: migration 023 adds `is_dev_game boolean NOT NULL DEFAULT false` to `games` and a new additive `hands` SELECT policy (`dev host reads all hands`) that fires only when `is_dev_game = true`. start-game v13 sets `is_dev_game = true` when the request `Origin` is localhost/127.0.0.1 — the same gate used by `override_player_id` in all other functions. Prod games are unaffected (Vercel origin leaves `is_dev_game = false`).
 
 ## Files changed
 
-- `components/game/GameBoard.tsx` — Removed hand-only poll `useEffect` (33 lines); added `handPlayerId`/`handPlayerRole` + hand fetch to the reconnect-refresh `Promise.all`; added `setHand` apply under generation-counter guard
+- `supabase/migrations/023_dev_game_hand_access.sql` — new migration: `is_dev_game` column + `"dev host reads all hands"` policy
+- `supabase/functions/start-game/index.ts` — origin check + `is_dev_game: isDevGame` in games.update
+
+## Deployed
+
+- Migration 023: applied to prod via MCP
+- start-game: v13, deployed via MCP
+- Verified live: origin gate present in function body, both hands policies exist, `is_dev_game` column confirmed `boolean NOT NULL DEFAULT false`
 
 ## Test status
 
-- `next build`: clean (0 errors; pre-existing lint warnings unchanged)
-- E2E suite: not run — pre-existing environment issue blocks Playwright on this machine. User must run from Windows terminal.
+- `next build`: clean (pre-existing lint warnings only)
+- E2E suite: not run (env issue)
+
+## Known limitation
+
+Supabase Realtime re-evaluates RLS at `postgres_changes` event delivery. The new `"dev host reads all hands"` policy should also gate Realtime INSERT events — but this is unverified. If initial hand load is fixed but live card draws don't appear in the dev window, that is the known Realtime-RLS gap. Do not add polling without approval; report and stop.
 
 ## Suggested next
 
-1. **Manual hand-recovery reconnect test** (the real close-out for Phase 4): in two browser windows, mid-turn for an AI player, disable network on one window for ~5s, re-enable. Confirm hand reappears without page refresh.
-2. **Run full Playwright suite** from Windows terminal. Compare against BASELINE_2026-04-28.md. Phase 4 touches only the reconnect path — no subscription events or edge functions changed.
-3. If both pass: migration is fully closed. Next logical work is from BACKLOG (UI polish, chat system, or email invites).
+1. **Manual verification:** Start a new dev game via Fill Lobby (must be a fresh start so start-game v13 runs and sets `is_dev_game = true`). Switch the dev switcher to an AI player who also has a real separate browser open. Confirm the hand shows correctly and card draws update live.
+2. If Realtime INSERT events still don't reach dev window, report. Do not add polling without approval.
+3. Otherwise: this closes the dev-mode hand-display bug. Next from BACKLOG.
