@@ -2,27 +2,21 @@
 
 ## Summary
 
-Implemented card-reveal:201 fix: Option 2 (stable/volatile field split in GameBoard reconnect-refresh) plus a phase-keepalive poll. Also committed the generation counter (Fix 2, which was in the working tree from a prior session). Build clean.
+Phase 4 of the polling → Realtime migration. Hand fetch moved from the 3s `setInterval` into the SUBSCRIBED reconnect-refresh on the `game-${gameId}` channel. The hand is fetched in the same `Promise.all` as game/players/mission/log, and applied under the same generation-counter guard (skipped if any subscription event fired during the async window). The 3s hand-only poll `useEffect` is removed in full. The phase-keepalive (2s `games.phase + current_turn_player_id` poll) and the dev-mode hand-switch effect are untouched.
 
-**What shipped:**
-- **Stable/volatile split (Step 2):** The reconnect-refresh on SUBSCRIBED no longer overwrites volatile subscription-owned fields. Stable game fields applied: `host_user_id`, `created_at`, `turn_order_ids`, `core_progress`, `escape_timer`. Stable player fields applied: `display_name`, `role`, `cpu`, `ram`, `turn_order`. All other fields (phase, current_turn_player_id, role_revealed, has_revealed_card, has_discarded_this_turn, skip_next_turn, revealed_card_key, and all other volatile game fields) are now subscription-only.
-- **Phase-keepalive (Step 3):** 2s `setInterval` fetching only `games.phase + current_turn_player_id`. On each tick, applies if different from current state. Recovers phase-transition events dropped in Supabase's documented 1–3s post-SUBSCRIBED dead zone. Clears on unmount. This is the same safety net the lobby got in Fix 1.
-- **Generation counter (Fix 2, riding along):** `subEventGenRef` incremented by every subscription event; reconnect-refresh captures counter at SUBSCRIBED and skips the stable-field apply if any event fired during the async window. Defence-in-depth against the interleaved race.
-
-**Field audit:** Full volatile/stable classification documented in DIAGNOSIS_2026-06-03-reconnect-refresh-race.md §card-reveal:201.
+This completes the polling → Realtime migration. No data polling remains in the GameBoard except the intentional phase-keepalive.
 
 ## Files changed
 
-- `components/game/GameBoard.tsx` — Stable/volatile split in reconnect-refresh guard block (lines ~296–331); phase-keepalive useEffect added (lines ~130–169); `Phase` type imported; generation counter implementation (from prior session)
-- `DIAGNOSIS_2026-06-03-reconnect-refresh-race.md` — New section: card-reveal:201 at-mount stale-snapshot mechanism; architecture decision; Option 1/2 trade-offs
+- `components/game/GameBoard.tsx` — Removed hand-only poll `useEffect` (33 lines); added `handPlayerId`/`handPlayerRole` + hand fetch to the reconnect-refresh `Promise.all`; added `setHand` apply under generation-counter guard
 
 ## Test status
 
-- `next build`: clean
-- Isolated card-reveal:201: **could not verify** — pre-existing environment issue: `fillLobby` helper hangs at Supabase anonymous auth via Playwright on all Windows-side dev servers in this session (confirmed same failure with changes stashed, i.e. not caused by our code). User must run from Windows terminal.
-- card-reveal:132: same environment issue — could not verify whether pre-existing DevQueueInspector overlay failure persists or resolves.
+- `next build`: clean (0 errors; pre-existing lint warnings unchanged)
+- E2E suite: not run — pre-existing environment issue blocks Playwright on this machine. User must run from Windows terminal.
 
 ## Suggested next
 
-1. **User: run full suite from Windows terminal** (`npx playwright test` or `npm run test:e2e`). Compare against BASELINE_2026-04-28.md. card-reveal:201 should pass. card-reveal:132 is expected to still fail (pre-existing DevQueueInspector overlay issue, unrelated to this fix). If full suite passes gate (no new failures), proceed to Phase 4.
-2. **Phase 4 scope:** add hand to reconnect-refresh; remove hand from the remaining 3s poll; remove the entire poll setInterval useEffect.
+1. **Manual hand-recovery reconnect test** (the real close-out for Phase 4): in two browser windows, mid-turn for an AI player, disable network on one window for ~5s, re-enable. Confirm hand reappears without page refresh.
+2. **Run full Playwright suite** from Windows terminal. Compare against BASELINE_2026-04-28.md. Phase 4 touches only the reconnect path — no subscription events or edge functions changed.
+3. If both pass: migration is fully closed. Next logical work is from BACKLOG (UI polish, chat system, or email invites).

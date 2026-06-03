@@ -41,6 +41,16 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 
 ## Current Phase
 
+**Polling → Realtime migration — COMPLETE (2026-06-03, commit ed3e387).**
+
+Phase 4 shipped: hand fetch moved from the 3s setInterval into the SUBSCRIBED reconnect-refresh on the game-${gameId} channel. Applied under the same generation-counter guard and stable/volatile discipline as other recovered state. The 3s hand-only poll useEffect is removed in full. Phase-keepalive (2s games.phase + current_turn_player_id) and dev-mode hand-switch effect are untouched.
+
+**Manual verification required:** Hand displays correctly during play, and hand-state recovers after an offline-toggle mid-turn. User should do the two-window reconnect test — disable network mid-turn in one window, re-enable, confirm cards reappear without a full page refresh.
+
+Full Playwright suite gate: user should still run the full suite from Windows terminal (the environment issue preventing Playwright from running on this machine remains). Compare against BASELINE_2026-04-28.md.
+
+---
+
 **card-reveal:201 fix — SHIPPED (2026-06-03). Full suite pending user run.**
 
 Option 2 (stable/volatile field split) + phase-keepalive implemented in GameBoard.tsx. Generation counter (Fix 2) also committed. Build clean. Isolated test run attempted but failed at `fillLobby` (pre-existing environment issue: anonymous Supabase auth via Playwright hangs on these Windows-side dev servers regardless of code — confirmed same failure without our changes). User must run full suite from their terminal.
