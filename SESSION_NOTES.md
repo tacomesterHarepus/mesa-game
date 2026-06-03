@@ -41,6 +41,19 @@ The concurrent call (Call B) runs BEFORE CF's `applyVirusEffect` deletes the 2 p
 
 ## Current Phase
 
+**card-reveal:201 fix — SHIPPED (2026-06-03). Full suite pending user run.**
+
+Option 2 (stable/volatile field split) + phase-keepalive implemented in GameBoard.tsx. Generation counter (Fix 2) also committed. Build clean. Isolated test run attempted but failed at `fillLobby` (pre-existing environment issue: anonymous Supabase auth via Playwright hangs on these Windows-side dev servers regardless of code — confirmed same failure without our changes). User must run full suite from their terminal.
+
+Key changes (single commit, including generation counter from prior session):
+- Reconnect-refresh now applies ONLY stable game fields (host_user_id, created_at, turn_order_ids, core_progress, escape_timer) and stable player fields (display_name, role, cpu, ram, turn_order). Volatile fields (phase, current_turn_player_id, role_revealed, has_revealed_card, etc.) are subscription-only.
+- Phase-keepalive: 2s poll for games.phase + current_turn_player_id recovers events dropped in Supabase's 1-3s post-SUBSCRIBED dead zone. Runs for game lifetime, clears on unmount.
+- Generation counter (subEventGenRef): kept as defence-in-depth for the interleaved race.
+
+Field audit: DIAGNOSIS_2026-06-03-reconnect-refresh-race.md §card-reveal:201 (full volatile/stable table).
+
+**Next:** User should run full suite from Windows terminal to gate Phase 4.
+
 **Autonomous run triage — BLOCKED at Step 1 (2026-06-03).**
 
 Two Phase 2 regressions found in isolation: abort-mission.spec.ts:175 and mission-flow.spec.ts:122 both fail (waitForURL timeout after clicking Start Game). Root cause: Phase 2 removed LobbyPhase 2s poll; Supabase Realtime has 1-3s replication-ready window after SUBSCRIBED — start-game games UPDATE lands in this window and is dropped with no recovery. virus-system:404 passes in isolation (full-suite contention flake).

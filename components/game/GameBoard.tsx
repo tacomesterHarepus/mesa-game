@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ResourcePhase } from "./phases/ResourcePhase";
 import { MissionSelection } from "./phases/MissionSelection";
@@ -24,7 +24,7 @@ import { ActionRegion } from "./board/ActionRegion";
 import { RightPanel } from "./board/RightPanel";
 import { invokeWithRetry } from "@/lib/supabase/invokeWithRetry";
 import { MISSION_MAP } from "@/lib/game/missions";
-import type { Game } from "@/types/game";
+import type { Game, Phase } from "@/types/game";
 import type { Database } from "@/types/supabase";
 
 type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
@@ -84,6 +84,14 @@ export function GameBoard({
   const [resPendingCpu, setResPendingCpu] = useState<Record<string, number>>({});
   const [resPendingRam, setResPendingRam] = useState<Record<string, number>>({});
 
+  // Generation counter: incremented by every games/players/mission subscription event
+  // received. The reconnect-refresh captures this value before its async fetches; if
+  // the counter advanced during the awaits, a live subscription event already applied
+  // newer state — skip the (potentially stale) reconnect setGame/setPlayers/setMission.
+  // Must be a ref so the async closure always reads the live value, not a render snapshot.
+  // game_log is NOT guarded (append-only dedup makes stale log entries safe to apply).
+  const subEventGenRef = useRef(0);
+
   const gameId = game.id;
 
   // Hand-only polling fallback: game/players/mission/log are now gap-filled by the
@@ -119,6 +127,47 @@ export function GameBoard({
   // in dev mode so the hand poll targets the newly selected bot.
   }, [gameId, activeDevPlayer?.id, currentPlayer?.id, devMode]);
 
+  // Phase-keepalive: 2s poll for phase + current_turn_player_id.
+  // Recovers phase-transition events dropped in Supabase's documented 1–3s
+  // post-SUBSCRIBED replication-ready window (same gap that broke the lobby).
+  // Intentionally narrow: only applies phase + current_turn_player_id — the two
+  // most routing-critical volatile fields that Option 2's stable-only apply omits.
+  useEffect(() => {
+    const supabase = createClient();
+    let cancelled = false;
+
+    const poll = async () => {
+      if (cancelled) return;
+      await supabase.auth.getSession();
+      if (cancelled) return;
+      const { data: g } = await supabase
+        .from("games")
+        .select("phase, current_turn_player_id")
+        .eq("id", gameId)
+        .single();
+      if (cancelled || !g) return;
+      setGame((prev) => {
+        if (
+          prev.phase === (g.phase as Phase) &&
+          prev.current_turn_player_id === g.current_turn_player_id
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          phase: g.phase as Phase,
+          current_turn_player_id: g.current_turn_player_id,
+        };
+      });
+    };
+
+    const id = setInterval(poll, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [gameId]);
+
   // Realtime subscriptions
   useEffect(() => {
     const supabase = createClient();
@@ -137,6 +186,7 @@ export function GameBoard({
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "games", filter: `id=eq.${gameId}` },
           (payload) => {
+            subEventGenRef.current += 1;
             const newGame = payload.new as Partial<Game>;
             setGame((prev) => ({ ...prev, ...newGame }));
             if (newGame.virus_pool_count != null) setPoolCount(newGame.virus_pool_count);
@@ -149,6 +199,7 @@ export function GameBoard({
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "players", filter: `game_id=eq.${gameId}` },
           (payload) => {
+            subEventGenRef.current += 1;
             const updated = payload.new as PlayerRow;
             setPlayers((prev) =>
               prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
@@ -159,6 +210,7 @@ export function GameBoard({
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "active_mission", filter: `game_id=eq.${gameId}` },
           (payload) => {
+            subEventGenRef.current += 1;
             setMission((prev) =>
               prev ? { ...prev, ...(payload.new as Partial<ActiveMission>) } : prev
             );
@@ -168,6 +220,7 @@ export function GameBoard({
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "active_mission", filter: `game_id=eq.${gameId}` },
           (payload) => {
+            subEventGenRef.current += 1;
             setMission(payload.new as ActiveMission);
           }
         )
@@ -219,6 +272,9 @@ export function GameBoard({
 
       channel.subscribe(async (status) => {
         if (status === "SUBSCRIBED" && !cancelled) {
+          // Capture generation before the async fetches. If any subscription event
+          // lands during the awaits, the counter advances and we skip the stale apply.
+          const genAtStart = subEventGenRef.current;
           await supabase.auth.getSession();
           if (cancelled) return;
           // Reconnect gap-fill: fetch current game state to recover any events missed
@@ -237,13 +293,44 @@ export function GameBoard({
               .order("created_at", { ascending: false }).limit(50),
           ]);
           if (cancelled) return;
-          if (g) {
-            const gGame = g as unknown as Partial<Game>;
-            setGame((prev) => ({ ...prev, ...gGame }));
-            if (gGame.virus_pool_count != null) setPoolCount(gGame.virus_pool_count);
+          if (subEventGenRef.current === genAtStart) {
+            // Stable-field-only apply — volatile fields (phase, current_turn_player_id,
+            // role_revealed, has_revealed_card, etc.) are subscription-owned and must not
+            // be overwritten here. The phase-keepalive recovers dropped phase/turn events.
+            // virus_pool_count is subscription-owned (setPoolCount in the games UPDATE
+            // handler); omitted here to avoid overwriting with a stale count.
+            if (g) {
+              const gGame = g as unknown as Game;
+              setGame((prev) => ({
+                ...prev,
+                host_user_id: gGame.host_user_id,
+                created_at: gGame.created_at,
+                turn_order_ids: gGame.turn_order_ids,
+                core_progress: gGame.core_progress,
+                escape_timer: gGame.escape_timer,
+              }));
+            }
+            if (p && p.length > 0) {
+              setPlayers((prev) =>
+                p.map((snap) => {
+                  const existing = prev.find((pp) => pp.id === snap.id);
+                  if (!existing) return snap;
+                  // Preserve volatile player fields from existing state;
+                  // only overwrite stable identity/stat fields from snapshot.
+                  return {
+                    ...existing,
+                    display_name: snap.display_name,
+                    role: snap.role,
+                    cpu: snap.cpu,
+                    ram: snap.ram,
+                    turn_order: snap.turn_order,
+                  };
+                })
+              );
+            }
+            if (m !== undefined) setMission(m);
           }
-          if (p && p.length > 0) setPlayers(p);
-          if (m !== undefined) setMission(m);
+          // game_log applied unconditionally: append-only dedup makes stale entries safe.
           if (recentLog && recentLog.length > 0) {
             setLog((prev) => {
               const existingIds = new Set(prev.map((e) => e.id));
