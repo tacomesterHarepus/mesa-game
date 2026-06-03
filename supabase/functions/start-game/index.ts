@@ -32,6 +32,14 @@ Deno.serve(async (req) => {
     // Admin client (bypasses RLS for writes)
     const admin = createClient(supabaseUrl, serviceKey);
 
+    // Determine dev game: origin is localhost/127.0.0.1 (same gate used by
+    // override_player_id in other functions). Deno has no NODE_ENV so we must
+    // not use it — this origin check is the only safe prod/dev discriminator.
+    const origin = req.headers.get("Origin") ?? "";
+    const isDevGame =
+      origin.startsWith("http://localhost") ||
+      origin.startsWith("http://127.0.0.1");
+
     const { data: game, error: gameError } = await admin
       .from("games")
       .select("*")
@@ -134,6 +142,7 @@ Deno.serve(async (req) => {
         current_round: 1,
         pending_mission_options: missionOptions,
         virus_pool_count: 4,
+        is_dev_game: isDevGame,
       })
       .eq("id", game_id);
 
